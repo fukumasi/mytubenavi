@@ -1,0 +1,23 @@
+# 依存関係
+/node_modules
+
+# ビルド出力
+/public/bundle.js
+/public/bundle.js.map
+
+# 環境変数
+.env
+
+# ログ
+*.log
+
+# テストカバレッジ
+/coverage
+
+# エディタ固有のファイル
+.vscode/
+.idea/
+
+# OS生成ファイル
+.DS_Store
+Thumbs.db

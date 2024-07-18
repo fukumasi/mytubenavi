@@ -1,0 +1,178 @@
+/* 既存のスタイルに追加 */
+
+.container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.left-column, .right-column {
+  width: 20%;
+}
+
+.main-content {
+  width: 55%;
+}
+
+.genre-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.genre-item {
+  background-color: #f0f0f0;
+  padding: 20px;
+  text-align: center;
+  text-decoration: none;
+  color: #333;
+  border-radius: 5px;
+  transition: background-color 0.3s;
+}
+
+.genre-item:hover {
+  background-color: #e0e0e0;
+}
+
+.sub-genre-list ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.sub-genre-list li {
+  margin-bottom: 10px;
+}
+
+.video-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.video-table th, .video-table td {
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+.video-table th {
+  background-color: #f2f2f2;
+  cursor: pointer;
+}
+
+.thumbnail {
+  width: 120px;
+  height: 67px;
+  object-fit: cover;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.pagination button {
+  margin: 0 5px;
+  padding: 5px 10px;
+  background-color: #f0f0f0;
+  border: none;
+  cursor: pointer;
+}
+
+.pagination button.active {
+  background-color: #007bff;
+  color: white;
+}
+
+.ad-space {
+  background-color: #f9f9f9;
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: 5px;
+}
+
+.ad-space img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* レスポンシブデザイン */
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+  }
+
+  .left-column, .right-column, .main-content {
+    width: 100%;
+  }
+
+  .genre-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+/* 既存のスタイルに追加 */
+
+.search-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.search-form {
+  display: flex;
+  margin-bottom: 20px;
+}
+
+.search-form input {
+  flex-grow: 1;
+  padding: 10px;
+  font-size: 16px;
+}
+
+.search-form button {
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.error-message {
+  color: red;
+  margin-bottom: 20px;
+}
+
+.video-detail {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.video-container {
+  position: relative;
+  padding-bottom: 56.25%; /* 16:9 アスペクト比 */
+  height: 0;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.video-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.video-info {
+  margin-bottom: 20px;
+}
+
+.video-description {
+  background-color: #f9f9f9;
+  padding: 15px;
+  border-radius: 5px;
+}
