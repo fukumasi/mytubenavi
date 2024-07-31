@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-const useAsync = (asyncFunction) => {
+export const useAsync = (asyncFunction) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
@@ -23,4 +23,16 @@ const useAsync = (asyncFunction) => {
   return { execute, loading, error, data };
 };
 
-export default useAsync;
+export const useError = () => {
+  const [error, setError] = useState(null);
+
+  const showError = useCallback((message) => {
+    setError(message);
+    // 5秒後にエラーメッセージをクリア
+    setTimeout(() => setError(null), 5000);
+  }, []);
+
+  const clearError = useCallback(() => setError(null), []);
+
+  return { error, showError, clearError };
+};

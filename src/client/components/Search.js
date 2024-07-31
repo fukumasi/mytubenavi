@@ -1,5 +1,86 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import styled from 'styled-components';
+
+const SearchContainer = styled.div`
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+`;
+
+const SearchForm = styled.form`
+  display: flex;
+  margin-bottom: 20px;
+`;
+
+const SearchInput = styled.input`
+  flex-grow: 1;
+  padding: 10px;
+  font-size: 16px;
+  border: 1px solid #ddd;
+  border-radius: 4px 0 0 4px;
+`;
+
+const SearchButton = styled.button`
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #0066cc;
+  color: white;
+  border: none;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  &:disabled {
+    background-color: #cccccc;
+  }
+`;
+
+const ErrorMessage = styled.p`
+  color: red;
+  margin-bottom: 10px;
+`;
+
+const VideoGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+`;
+
+const VideoCard = styled.div`
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+`;
+
+const VideoThumbnail = styled.img`
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+`;
+
+const VideoTitle = styled.h3`
+  margin: 10px 0;
+  font-size: 16px;
+`;
+
+const Pagination = styled.div`
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+`;
+
+const PageButton = styled.button`
+  margin: 0 5px;
+  padding: 5px 10px;
+  background-color: ${props => props.active ? '#0066cc' : '#f0f0f0'};
+  color: ${props => props.active ? 'white' : 'black'};
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
 
 const Search = () => {
   const [query, setQuery] = useState('');
@@ -31,45 +112,45 @@ const Search = () => {
   };
 
   return (
-    <div>
+    <SearchContainer>
       <h2>Search Videos</h2>
-      <form onSubmit={(e) => { e.preventDefault(); handleSearch(); }}>
-      <input
-  type="text"
-  id="search-query"  // この行を追加
-  name="search-query"  // この行を追加
-  value={query}
-  onChange={(e) => setQuery(e.target.value)}
-  placeholder="Enter search query"
-/>
-        <button type="submit" disabled={loading}>
+      <SearchForm onSubmit={(e) => { e.preventDefault(); handleSearch(); }}>
+        <SearchInput
+          type="text"
+          id="search-query"
+          name="search-query"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Enter search query"
+        />
+        <SearchButton type="submit" disabled={loading}>
           {loading ? 'Searching...' : 'Search'}
-        </button>
-      </form>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      <div>
+        </SearchButton>
+      </SearchForm>
+      {error && <ErrorMessage>{error}</ErrorMessage>}
+      <VideoGrid>
         {results.map((video) => (
-          <div key={video._id}>
-            <h3>{video.title}</h3>
-            <img src={video.thumbnailUrl} alt={video.title} />
-            <p>{video.description}</p>
-          </div>
+          <VideoCard key={video._id}>
+            <VideoThumbnail src={video.thumbnailUrl} alt={video.title} />
+            <VideoTitle>{video.title}</VideoTitle>
+          </VideoCard>
         ))}
-      </div>
+      </VideoGrid>
       {totalPages > 1 && (
-        <div>
+        <Pagination>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <button
+            <PageButton
               key={page}
               onClick={() => handlePageChange(page)}
               disabled={page === currentPage}
+              active={page === currentPage}
             >
               {page}
-            </button>
+            </PageButton>
           ))}
-        </div>
+        </Pagination>
       )}
-    </div>
+    </SearchContainer>
   );
 };
 

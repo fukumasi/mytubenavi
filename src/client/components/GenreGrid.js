@@ -1,68 +1,64 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import styled from 'styled-components';
-import PropTypes from 'prop-types';
+import { Link } from 'react-router-dom';
 
-const GridContainer = styled.div`
+const Grid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 20px;
-  margin-top: 20px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
 `;
 
-const GenreCard = styled(Link)`
-  background-color: #f0f0f0;
-  border-radius: 8px;
-  padding: 20px;
+const GenreItem = styled(Link)`
+  background-color: #e0e0e0;
+  padding: 10px;
   text-align: center;
+  border-radius: 5px;
   text-decoration: none;
-  color: #333;
-  transition: all 0.3s ease;
+  color: inherit;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  min-height: 150px;
-
-  &:hover {
-    background-color: #e0e0e0;
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-  }
 `;
 
-const GenreName = styled.h3`
-  margin: 0;
-  font-size: 1.2rem;
+const GenreIcon = styled.span`
+  font-size: 24px;
+  margin-bottom: 5px;
 `;
 
-const GenreIcon = styled.i`
-  font-size: 2rem;
-  margin-bottom: 10px;
-`;
+const genres = [
+  { name: 'エンタメ', icon: '📺' },
+  { name: '音楽', icon: '🎵' },
+  { name: 'ゲーム', icon: '🎮' },
+  { name: 'スポーツ', icon: '⚽' },
+  { name: 'ニュース', icon: '📰' },
+  { name: '教育', icon: '🎓' },
+  { name: '科学技術', icon: '🔬' },
+  { name: '料理', icon: '🍳' },
+  { name: '旅行', icon: '✈️' },
+  { name: 'ファッション', icon: '👗' },
+  { name: 'ビューティー', icon: '💄' },
+  { name: 'ペット', icon: '🐾' },
+  { name: 'DIY', icon: '🔨' },
+  { name: 'アート', icon: '🎨' },
+  { name: 'ビジネス', icon: '💼' },
+  { name: 'テクノロジー', icon: '💻' },
+  { name: '自動車', icon: '🚗' },
+  { name: '健康', icon: '🏋️‍♀️' },
+  { name: '映画', icon: '🎬' },
+  { name: 'アニメ', icon: '🦸‍♂️' }
+];
 
-const GenreGrid = ({ genres }) => {
+const GenreGrid = () => {
   return (
-    <GridContainer>
-      {genres.map(genre => (
-        <GenreCard key={genre._id} to={`/genre/${genre.slug}`}>
-          {genre.icon && <GenreIcon className={`fas ${genre.icon}`} />}
-          <GenreName>{genre.name}</GenreName>
-        </GenreCard>
+    <Grid>
+      {genres.map((genre, index) => (
+        <GenreItem key={index} to={`/genre/${genre.name}`}>
+          <GenreIcon>{genre.icon}</GenreIcon>
+          {genre.name}
+        </GenreItem>
       ))}
-    </GridContainer>
+    </Grid>
   );
 };
 
-GenreGrid.propTypes = {
-  genres: PropTypes.arrayOf(
-    PropTypes.shape({
-      _id: PropTypes.string.isRequired,
-      name: PropTypes.string.isRequired,
-      slug: PropTypes.string.isRequired,
-      icon: PropTypes.string
-    })
-  ).isRequired
-};
-
-export default React.memo(GenreGrid);
+export default GenreGrid;

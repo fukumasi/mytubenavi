@@ -1,37 +1,33 @@
 const express = require('express');
 const path = require('path');
-const cors = require('cors');
 const mongoose = require('mongoose');
 require('dotenv').config();
 
 const app = express();
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-
-// API routes
-const authRoutes = require('./routes/auth');
-const videoRoutes = require('./routes/videos'); // 新しく追加
-
-app.use('/api', authRoutes);
-app.use('/api/videos', videoRoutes); // 新しく追加
-
-// Serve static files from the React app
-app.use(express.static(path.join(__dirname, 'public')));
-
-// The "catchall" handler: for any request that doesn't
-// match one above, send back React's index.html file.
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// Connect to MongoDB
+// MongoDB接続
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB connected successfully'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+// ミドルウェア
+app.use(express.json());
+
+// 静的ファイルの提供
+app.use(express.static(path.join(__dirname, 'build')));
+
+// API ルート
+const featuredVideoRoutes = require('./src/server/routes/featuredVideos');
+app.use('/api/featured-videos', (req, res, next) => {
+  console.log('Received request for featured videos');
+  next();
+}, featuredVideoRoutes);
+
+// すべてのリクエストをReactアプリにリダイレクト
+app.get('*', (req, res) => {
+  console.log('Serving React app');
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
