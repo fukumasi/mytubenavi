@@ -10,11 +10,11 @@ const PaginationContainer = styled.div`
 const PageButton = styled.button`
   margin: 0 5px;
   padding: 5px 10px;
-  background-color: ${props => props.active ? '#1a73e8' : '#f0f0f0'};
+  border: 1px solid #ddd;
+  background-color: ${props => props.active ? '#0066cc' : 'white'};
   color: ${props => props.active ? 'white' : 'black'};
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
+  cursor: ${props => props.active ? 'default' : 'pointer'};
+  
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
@@ -22,16 +22,21 @@ const PageButton = styled.button`
 `;
 
 const Pagination = ({ currentPage, totalPages, onPageChange }) => {
+  const pageNumbers = [];
+  for (let i = 1; i <= totalPages; i++) {
+    pageNumbers.push(i);
+  }
+
   return (
     <PaginationContainer>
-      {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+      {pageNumbers.map(number => (
         <PageButton
-          key={page}
-          onClick={() => onPageChange(page)}
-          disabled={page === currentPage}
-          active={page === currentPage}
+          key={number}
+          onClick={() => onPageChange(number)}
+          active={number === currentPage ? 'true' : undefined}
+          disabled={number === currentPage}
         >
-          {page}
+          {number}
         </PageButton>
       ))}
     </PaginationContainer>

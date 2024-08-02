@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import axios from 'axios';
 
 export const useAsync = (asyncFunction) => {
   const [loading, setLoading] = useState(false);
@@ -35,4 +36,32 @@ export const useError = () => {
   const clearError = useCallback(() => setError(null), []);
 
   return { error, showError, clearError };
+};
+
+export const useYouTubeSearch = () => {
+  const searchVideos = async (query) => {
+    if (!query) return [];
+    
+    try {
+      const response = await axios.get(`/api/search?q=${encodeURIComponent(query)}`);
+      console.log('API response:', response.data); // 追加
+      if (!response.data.items) {
+        throw new Error('Invalid API response');
+      }
+      return response.data.items.map(item => ({
+        id: item.id.videoId,
+        title: item.snippet.title,
+        channel: item.snippet.channelTitle,
+        thumbnail: item.snippet.thumbnails.medium.url,
+        views: 'N/A',
+        rating: 'N/A',
+        uploadDate: new Date(item.snippet.publishedAt).toLocaleDateString()
+      }));
+    } catch (error) {
+      console.error('Error in useYouTubeSearch:', error);
+      throw error;
+    }
+  };
+
+  return useAsync(searchVideos);
 };

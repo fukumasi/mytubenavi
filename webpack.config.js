@@ -40,7 +40,7 @@ module.exports = {
         { 
           from: 'public/favicon.ico', 
           to: 'favicon.ico',
-          noErrorOnMissing: true  // favicon.icoが見つからない場合にエラーを出さない
+          noErrorOnMissing: true
         },
       ],
     }),
@@ -52,5 +52,11 @@ module.exports = {
     compress: true,
     port: 3000,
     historyApiFallback: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+    },
   },
 };

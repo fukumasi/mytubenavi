@@ -29,5 +29,30 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
+const axios = require('axios');
+
+app.get('/api/search', async (req, res) => {
+  const query = req.query.q;
+  const apiKey = process.env.REACT_APP_YOUTUBE_API_KEY_1;
+
+  console.log('Received search request for:', query); // 追加
+
+  try {
+    const response = await axios.get(`https://www.googleapis.com/youtube/v3/search`, {
+      params: {
+        part: 'snippet',
+        q: query,
+        type: 'video',
+        maxResults: 50,
+        key: apiKey
+      }
+    });
+    console.log('YouTube API response:', response.data); // 追加
+    res.json(response.data);
+  } catch (error) {
+    console.error('YouTube API error:', error.response ? error.response.data : error.message);
+    res.status(500).json({ error: '動画の検索中にエラーが発生しました。' });
+  }
+});

@@ -23,7 +23,7 @@ const Spinner = styled.div`
 `;
 
 const LoadingSpinner = () => (
-  <SpinnerContainer>
+  <SpinnerContainer data-testid="loading-spinner">
     <Spinner />
   </SpinnerContainer>
 );

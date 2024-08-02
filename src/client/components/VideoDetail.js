@@ -1,46 +1,56 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from 'react-query';
-import axios from 'axios';
 import styled from 'styled-components';
-import RelatedVideos from './RelatedVideos';
+import axios from 'axios';
 import LoadingSpinner from './LoadingSpinner';
 import ErrorMessage from './ErrorMessage';
 
-// ... 既存の styled components ...
+const VideoContainer = styled.div`
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+`;
 
-const InteractionButtons = styled.div`
+const VideoPlayer = styled.div`
+  position: relative;
+  padding-bottom: 56.25%; /* 16:9 アスペクト比 */
+  height: 0;
+  overflow: hidden;
+  margin-bottom: 20px;
+`;
+
+const VideoIframe = styled.iframe`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+`;
+
+const VideoInfo = styled.div`
+  background-color: #f9f9f9;
+  padding: 20px;
+  border-radius: 8px;
+`;
+
+const VideoTitle = styled.h1`
+  font-size: 24px;
+  margin-bottom: 10px;
+`;
+
+const VideoMeta = styled.div`
   display: flex;
-  gap: 10px;
-  margin-top: 10px;
+  justify-content: space-between;
+  margin-bottom: 20px;
 `;
 
-const Button = styled.button`
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  
-  &:hover {
-    opacity: 0.8;
-  }
-`;
-
-const LikeButton = styled(Button)`
-  background-color: #4CAF50;
-  color: white;
-`;
-
-const ShareButton = styled(Button)`
-  background-color: #2196F3;
-  color: white;
+const VideoDescription = styled.p`
+  white-space: pre-wrap;
 `;
 
 const fetchVideo = async (id) => {
   const response = await axios.get(`/api/videos/${id}`);
-  if (response.status === 404) {
-    throw new Error('動画が見つかりません。');
-  }
   return response.data;
 };
 
@@ -48,50 +58,32 @@ const VideoDetail = () => {
   const { id } = useParams();
   const { data: video, isLoading, error } = useQuery(['video', id], () => fetchVideo(id), {
     retry: 1,
-    retryDelay: 1000,
+    refetchOnWindowFocus: false,
   });
 
-  const handleLike = () => {
-    // いいね機能の実装（APIコールなど）
-    console.log('Video liked');
-  };
-
-  const handleShare = () => {
-    // 共有機能の実装
-    console.log('Video shared');
-  };
-
   if (isLoading) return <LoadingSpinner />;
-  if (error) return <ErrorMessage message={error instanceof Error ? error.message : '動画の取得中にエラーが発生しました。'} />;
-  if (!video) return null;
+  if (error) return <ErrorMessage message="動画の読み込み中にエラーが発生しました。" />;
+  if (!video) return <ErrorMessage message="動画データが見つかりません。" />;
 
   return (
     <VideoContainer>
-      <MainContent>
-        <VideoPlayer>
-          <iframe
-            src={`https://www.youtube.com/embed/${video.videoId}`}
-            title={video.title}
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            aria-label={`${video.title} の動画プレイヤー`}
-          ></iframe>
-        </VideoPlayer>
-        <VideoInfo>
-          <h1>{video.title}</h1>
-          <p>{video.channelTitle}</p>
-          <p>{video.viewCount.toLocaleString()} views</p>
-          <InteractionButtons>
-            <LikeButton onClick={handleLike} aria-label="この動画にいいねする">いいね</LikeButton>
-            <ShareButton onClick={handleShare} aria-label="この動画を共有する">共有</ShareButton>
-          </InteractionButtons>
-          <p>{video.description}</p>
-        </VideoInfo>
-      </MainContent>
-      <Sidebar>
-        <RelatedVideos videoId={id} />
-      </Sidebar>
+      <VideoPlayer>
+        <VideoIframe
+          src={`https://www.youtube.com/embed/${video.videoId}`}
+          title={video.title}
+          frameBorder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      </VideoPlayer>
+      <VideoInfo>
+        <VideoTitle>{video.title}</VideoTitle>
+        <VideoMeta>
+          <span>{video.views ? video.views.toLocaleString() : 'N/A'} 回視聴</span>
+          <span>{video.uploadDate || 'N/A'}</span>
+        </VideoMeta>
+        <VideoDescription>{video.description || '説明がありません。'}</VideoDescription>
+      </VideoInfo>
     </VideoContainer>
   );
 };
