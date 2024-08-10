@@ -1,21 +1,10 @@
-import Home from './components/Home';
-import SearchResults from './components/SearchResults';
-import VideoDetail from './components/VideoDetail';
-import Profile from './components/Profile';
-import GenrePage from './components/GenrePage';
-import Login from './components/Login';
-import Register from './components/Register';
-import ForgotPassword from './components/ForgotPassword';
-import ResetPassword from './components/ResetPassword';
-
-export {
-  Home,
-  SearchResults,
-  VideoDetail,
-  Profile,
-  GenrePage,
-  Login,
-  Register,
-  ForgotPassword,
-  ResetPassword
-};
+export { default as Home } from './pages/Home';
+export { default as SearchResults } from './pages/SearchResults';
+export { default as VideoDetail } from './pages/VideoDetail';
+export { default as Profile } from './pages/Profile';
+export { default as GenrePage } from './pages/GenrePage';
+export { default as Login } from './pages/Login';
+export { default as Register } from './pages/Register';
+export { default as ForgotPassword } from './pages/ForgotPassword';
+export { default as ResetPassword } from './pages/ResetPassword';
+export { default as NotFound } from './pages/NotFound';

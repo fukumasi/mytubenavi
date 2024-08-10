@@ -1,6 +1,17 @@
 const path = require('path');
+const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+const dotenv = require('dotenv');
+
+// .env ファイルから環境変数を読み込む
+const env = dotenv.config().parsed || {};
+
+// 環境変数をオブジェクトに変換
+const envKeys = Object.keys(env).reduce((prev, next) => {
+  prev[`process.env.${next}`] = JSON.stringify(env[next]);
+  return prev;
+}, {});
 
 module.exports = {
   entry: './src/client/index.js',
@@ -31,6 +42,10 @@ module.exports = {
     extensions: ['.js', '.jsx'],
   },
   plugins: [
+    new webpack.DefinePlugin({
+      'process.env': JSON.stringify(process.env),
+      ...envKeys,
+    }),
     new HtmlWebpackPlugin({
       template: './public/index.html',
     }),

@@ -3,13 +3,13 @@ import { useParams } from 'react-router-dom';
 import { useQuery } from 'react-query';
 import styled from 'styled-components';
 import axios from 'axios';
-import LoadingSpinner from './LoadingSpinner';
-import ErrorMessage from './ErrorMessage';
+import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorMessage from '../components/ErrorMessage';
 
 const VideoContainer = styled.div`
-  max-width: 1200px;
+  max-width: ${({ theme }) => theme.maxWidth};
   margin: 0 auto;
-  padding: 20px;
+  padding: ${({ theme }) => theme.spacing.large};
 `;
 
 const VideoPlayer = styled.div`
@@ -17,7 +17,7 @@ const VideoPlayer = styled.div`
   padding-bottom: 56.25%; /* 16:9 アスペクト比 */
   height: 0;
   overflow: hidden;
-  margin-bottom: 20px;
+  margin-bottom: ${({ theme }) => theme.spacing.medium};
 `;
 
 const VideoIframe = styled.iframe`
@@ -26,27 +26,31 @@ const VideoIframe = styled.iframe`
   left: 0;
   width: 100%;
   height: 100%;
+  border: none;
 `;
 
 const VideoInfo = styled.div`
-  background-color: #f9f9f9;
-  padding: 20px;
-  border-radius: 8px;
+  background-color: ${({ theme }) => theme.colors.background};
+  padding: ${({ theme }) => theme.spacing.medium};
+  border-radius: ${({ theme }) => theme.borderRadius};
 `;
 
 const VideoTitle = styled.h1`
-  font-size: 24px;
-  margin-bottom: 10px;
+  font-size: ${({ theme }) => theme.fontSize.large};
+  margin-bottom: ${({ theme }) => theme.spacing.small};
 `;
 
 const VideoMeta = styled.div`
   display: flex;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: ${({ theme }) => theme.spacing.medium};
+  font-size: ${({ theme }) => theme.fontSize.small};
+  color: ${({ theme }) => theme.colors.textSecondary};
 `;
 
 const VideoDescription = styled.p`
   white-space: pre-wrap;
+  font-size: ${({ theme }) => theme.fontSize.medium};
 `;
 
 const fetchVideo = async (id) => {
@@ -63,15 +67,14 @@ const VideoDetail = () => {
 
   if (isLoading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message="動画の読み込み中にエラーが発生しました。" />;
-  if (!video) return <ErrorMessage message="動画データが見つかりません。" />;
+  if (!video) return <ErrorMessage message="動画が見つかりません。" />;
 
   return (
     <VideoContainer>
       <VideoPlayer>
         <VideoIframe
-          src={`https://www.youtube.com/embed/${video.videoId}`}
+          src={`https://www.youtube.com/embed/${id}`}
           title={video.title}
-          frameBorder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
         />
@@ -79,7 +82,7 @@ const VideoDetail = () => {
       <VideoInfo>
         <VideoTitle>{video.title}</VideoTitle>
         <VideoMeta>
-          <span>{video.views ? video.views.toLocaleString() : 'N/A'} 回視聴</span>
+          <span>{video.views ? `${video.views.toLocaleString()} 回視聴` : 'N/A 回視聴'}</span>
           <span>{video.uploadDate || 'N/A'}</span>
         </VideoMeta>
         <VideoDescription>{video.description || '説明がありません。'}</VideoDescription>
