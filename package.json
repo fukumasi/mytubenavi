@@ -34,6 +34,8 @@
     "react-helmet-async": "^2.0.5",
     "react-query": "^3.39.3",
     "react-router-dom": "^6.25.1",
+    "react-virtualized-auto-sizer": "^1.0.24",
+    "react-window": "^1.8.10",
     "styled-components": "^6.1.12"
   },
   "devDependencies": {
