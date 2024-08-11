@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import styled, { ThemeProvider } from 'styled-components';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import GlobalStyle from './styles/GlobalStyle';
@@ -7,6 +7,7 @@ import Header from './components/Header';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingSpinner from './components/LoadingSpinner';
 import theme from './styles/theme';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 const Home = React.lazy(() => import('./pages/Home'));
 const SearchResults = React.lazy(() => import('./pages/SearchResults'));
@@ -31,31 +32,43 @@ const AppContainer = styled.div`
   }
 `;
 
+const PrivateRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  return user ? children : <Navigate to="/login" />;
+};
+
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
-        <Router>
-          <ErrorBoundary>
-            <GlobalStyle />
-            <AppContainer>
-              <Header />
-              <Suspense fallback={<LoadingSpinner />}>
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/search" element={<SearchResults />} />
-                  <Route path="/video/:id" element={<VideoDetail />} />
-                  <Route path="/genre/:genreSlug" element={<GenrePage />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/register" element={<Register />} />
-                  <Route path="/forgot-password" element={<ForgotPassword />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
-                </Routes>
-              </Suspense>
-            </AppContainer>
-          </ErrorBoundary>
-        </Router>
+        <AuthProvider>
+          <Router>
+            <ErrorBoundary>
+              <GlobalStyle />
+              <AppContainer>
+                <Header />
+                <Suspense fallback={<LoadingSpinner />}>
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/search" element={<SearchResults />} />
+                    <Route path="/video/:id" element={<VideoDetail />} />
+                    <Route path="/genre/:genreSlug" element={<GenrePage />} />
+                    <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
+                  </Routes>
+                </Suspense>
+              </AppContainer>
+            </ErrorBoundary>
+          </Router>
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

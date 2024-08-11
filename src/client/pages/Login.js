@@ -1,18 +1,37 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import { useAuth } from '../contexts/AuthContext';
 
 const Form = styled.form`
-  // ... 既存のスタイル
+  max-width: 300px;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-radius: 5px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 `;
 
 const Input = styled.input`
-  // ... 既存のスタイル
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
 `;
 
 const Button = styled.button`
-  // ... 既存のスタイル
+  width: 100%;
+  padding: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #0056b3;
+  }
 `;
 
 const ErrorMessage = styled.p`
@@ -27,6 +46,7 @@ const Login = () => {
   });
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -34,16 +54,16 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     try {
-      const res = await axios.post('/api/auth/login', formData);
-      localStorage.setItem('token', res.data.token);
-      navigate('/'); // ログイン後はホームページにリダイレクト
-    } catch (error) {
-      if (error.response) {
-        setError(error.response.data.message);
+      const success = await login(formData.email, formData.password);
+      if (success) {
+        navigate('/');
       } else {
-        setError('ログインに失敗しました。後でもう一度お試しください。');
+        setError('ログインに失敗しました。メールアドレスとパスワードを確認してください。');
       }
+    } catch (error) {
+      setError('ログイン中にエラーが発生しました。後でもう一度お試しください。');
     }
   };
 

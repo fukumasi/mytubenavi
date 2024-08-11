@@ -1,7 +1,9 @@
 const express = require('express');
 const path = require('path');
 const mongoose = require('mongoose');
+const axios = require('axios');
 require('dotenv').config();
+const authRoutes = require('./src/server/routes/auth');
 
 const app = express();
 
@@ -23,21 +25,15 @@ app.use('/api/featured-videos', (req, res, next) => {
   next();
 }, featuredVideoRoutes);
 
-// すべてのリクエストをReactアプリにリダイレクト
-app.get('*', (req, res) => {
-  console.log('Serving React app');
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
-});
+// 認証ルートを追加
+app.use('/api/auth', authRoutes);
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
-const axios = require('axios');
-
+// YouTube検索API
 app.get('/api/search', async (req, res) => {
   const query = req.query.q;
   const apiKey = process.env.REACT_APP_YOUTUBE_API_KEY_1;
 
-  console.log('Received search request for:', query); // 追加
+  console.log('Received search request for:', query);
 
   try {
     const response = await axios.get(`https://www.googleapis.com/youtube/v3/search`, {
@@ -49,10 +45,19 @@ app.get('/api/search', async (req, res) => {
         key: apiKey
       }
     });
-    console.log('YouTube API response:', response.data); // 追加
+    console.log('YouTube API response:', response.data);
     res.json(response.data);
   } catch (error) {
     console.error('YouTube API error:', error.response ? error.response.data : error.message);
     res.status(500).json({ error: '動画の検索中にエラーが発生しました。' });
   }
 });
+
+// すべてのリクエストをReactアプリにリダイレクト
+app.get('*', (req, res) => {
+  console.log('Serving React app');
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
