@@ -9,6 +9,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import AdSpace from '../components/AdSpace';
 import FeaturedVideos from '../components/FeaturedVideos';
+import GenreList from '../components/GenreList';
 
 const SearchContainer = styled.div`
   display: grid;
@@ -25,6 +26,16 @@ const LeftColumn = styled.div`
 
 const MainContent = styled.div`
   grid-column: 2;
+  display: flex;
+  flex-direction: column;
+`;
+
+const VideoTableContainer = styled.div`
+  margin-bottom: 20px;
+`;
+
+const PaginationContainer = styled.div`
+  margin-top: 20px;
 `;
 
 const RightColumn = styled.div`
@@ -32,24 +43,13 @@ const RightColumn = styled.div`
   width: 200px;
 `;
 
-const GenreList = styled.ul`
-  list-style-type: none;
-  padding: 0;
-`;
-
-const GenreItem = styled.li`
-  margin-bottom: 10px;
-  cursor: pointer;
-  &:hover {
-    text-decoration: underline;
-  }
-`;
+const VIDEOS_PER_PAGE = 20;
 
 const SearchResults = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
   const [selectedGenre, setSelectedGenre] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page') || '1', 10));
   const [sortConfig, setSortConfig] = useState({ key: 'publishedAt', direction: 'descending' });
 
   const { data: searchData, isLoading: isSearchLoading, error: searchError } = useQuery(
@@ -80,9 +80,14 @@ const SearchResults = () => {
   const handleGenreChange = useCallback((genre) => {
     setSelectedGenre(genre);
     setCurrentPage(1);
-  }, []);
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      newParams.set('page', '1');
+      return newParams;
+    });
+  }, [setSearchParams]);
 
-  const handleSort = (key) => {
+  const handleSort = useCallback((key) => {
     setSortConfig((prevConfig) => ({
       key,
       direction:
@@ -90,7 +95,16 @@ const SearchResults = () => {
           ? 'descending'
           : 'ascending',
     }));
-  };
+  }, []);
+
+  const handlePageChange = useCallback((page) => {
+    setCurrentPage(page);
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      newParams.set('page', page.toString());
+      return newParams;
+    });
+  }, [setSearchParams]);
 
   useEffect(() => {
     console.log('Search Data:', searchData);
@@ -105,49 +119,36 @@ const SearchResults = () => {
   if (searchError || dummyError) return <ErrorMessage message={`データの取得中にエラーが発生しました: ${searchError?.message || dummyError?.message}`} />;
 
   const displayVideos = query && searchData?.items ? searchData.items : (dummyVideos || []);
-
-  console.log('Display Videos:', displayVideos);
-  console.log('Search Data PageInfo:', searchData?.pageInfo);
+  const totalVideos = searchData?.pageInfo?.totalResults || displayVideos.length;
+  const totalPages = Math.ceil(totalVideos / VIDEOS_PER_PAGE);
+  const paginatedVideos = displayVideos.slice((currentPage - 1) * VIDEOS_PER_PAGE, currentPage * VIDEOS_PER_PAGE);
 
   return (
     <SearchContainer>
       <LeftColumn>
         <h3>ジャンル</h3>
-        <GenreList>
-          <GenreItem onClick={() => handleGenreChange('all')}>すべて</GenreItem>
-          <GenreItem onClick={() => handleGenreChange('entertainment')}>エンターテイメント</GenreItem>
-          <GenreItem onClick={() => handleGenreChange('music')}>音楽</GenreItem>
-          <GenreItem onClick={() => handleGenreChange('sports')}>スポーツ</GenreItem>
-          <GenreItem onClick={() => handleGenreChange('gaming')}>ゲーム</GenreItem>
-          <GenreItem onClick={() => handleGenreChange('education')}>教育</GenreItem>
-          <GenreItem onClick={() => handleGenreChange('science')}>科学と技術</GenreItem>
-          <GenreItem onClick={() => handleGenreChange('travel')}>旅行</GenreItem>
-        </GenreList>
+        <GenreList onGenreChange={handleGenreChange} selectedGenre={selectedGenre} />
       </LeftColumn>
 
       <MainContent>
         <h2>{query ? `「${query}」の検索結果` : 'おすすめ動画'}</h2>
-        {displayVideos.length > 0 ? (
+        {paginatedVideos.length > 0 ? (
           <>
-            <VideoTable 
-              videos={displayVideos} 
-              onSort={handleSort}
-              sortConfig={sortConfig}
-            />
-            {console.log('Rendering VideoTable with:', displayVideos)}
-            {query && searchData && searchData.pageInfo && (
-              <Pagination
-                currentPage={currentPage}
-                totalPages={Math.min(Math.ceil(searchData.pageInfo.totalResults / searchData.pageInfo.resultsPerPage), 10)}
-                onPageChange={(page) => {
-                  setCurrentPage(page);
-                  setSearchParams(prev => {
-                    const newParams = new URLSearchParams(prev);
-                    newParams.set('page', page.toString());
-                    return newParams;
-                  });
-                }}
+            <VideoTableContainer>
+              <VideoTable 
+                videos={paginatedVideos} 
+                onSort={handleSort}
+                sortConfig={sortConfig}
               />
+            </VideoTableContainer>
+            {totalPages > 1 && (
+              <PaginationContainer>
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                />
+              </PaginationContainer>
             )}
           </>
         ) : (

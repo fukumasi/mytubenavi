@@ -2,25 +2,40 @@ import React from 'react';
 import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 
-const Table = styled.table`
+const TableContainer = styled.div`
   width: 100%;
-  border-collapse: collapse;
 `;
 
-const Th = styled.th`
-  cursor: pointer;
-  padding: 10px;
+const TableHeader = styled.div`
+  display: flex;
   background-color: #f0f0f0;
-  text-align: left;
+  font-weight: bold;
+  border-bottom: 1px solid #ddd;
+`;
+
+const HeaderCell = styled.div`
+  flex: ${props => props.$flex || 1};
+  padding: 10px;
+  cursor: pointer;
   
   &:hover {
     background-color: #e0e0e0;
   }
 `;
 
-const Td = styled.td`
-  padding: 10px;
+const Row = styled.div`
+  display: flex;
   border-bottom: 1px solid #ddd;
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
+const Cell = styled.div`
+  flex: ${props => props.$flex || 1};
+  padding: 10px;
+  display: flex;
+  align-items: center;
 `;
 
 const ThumbnailImage = styled.img`
@@ -52,62 +67,54 @@ const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
     return '';
   };
 
-  // デフォルトのサムネイル画像URL
   const defaultThumbnail = 'https://via.placeholder.com/120x67.png?text=No+Image';
 
   return (
-    <Table>
-      <thead>
-        <tr>
-          <Th>サムネイル</Th>
-          <Th onClick={() => onSort('title')}>
-            タイトル {getSortIndicator('title')}
-          </Th>
-          <Th onClick={() => onSort('channelTitle')}>
-            チャンネル {getSortIndicator('channelTitle')}
-          </Th>
-          <Th onClick={() => onSort('viewCount')}>
-            再生回数 {getSortIndicator('viewCount')}
-          </Th>
-          <Th onClick={() => onSort('publishedAt')}>
-            投稿日 {getSortIndicator('publishedAt')}
-          </Th>
-        </tr>
-      </thead>
-      <tbody>
-        {videos.map((video) => {
-          const thumbnailUrl = video.thumbnails?.medium?.url || 
-                               video.thumbnails?.default?.url || 
-                               video.snippet?.thumbnails?.medium?.url ||
-                               video.snippet?.thumbnails?.default?.url ||
-                               defaultThumbnail;
-          
-          const title = video.title || video.snippet?.title || 'タイトルなし';
-          const channelTitle = video.channelTitle || video.snippet?.channelTitle || '不明';
-          const viewCount = (video.statistics?.viewCount || video.viewCount || 0).toLocaleString();
-          const publishedAt = new Date(video.publishedAt || video.snippet?.publishedAt || Date.now()).toLocaleDateString();
+    <TableContainer>
+      <TableHeader>
+        <HeaderCell $flex={2}>サムネイル</HeaderCell>
+        <HeaderCell $flex={4} onClick={() => onSort('title')}>
+          タイトル {getSortIndicator('title')}
+        </HeaderCell>
+        <HeaderCell $flex={2} onClick={() => onSort('channelTitle')}>
+          チャンネル {getSortIndicator('channelTitle')}
+        </HeaderCell>
+        <HeaderCell $flex={1} onClick={() => onSort('viewCount')}>
+          再生回数 {getSortIndicator('viewCount')}
+        </HeaderCell>
+        <HeaderCell $flex={1} onClick={() => onSort('publishedAt')}>
+          投稿日 {getSortIndicator('publishedAt')}
+        </HeaderCell>
+      </TableHeader>
+      {videos.map((video, index) => {
+        const thumbnailUrl = video.thumbnails?.medium?.url || 
+                             video.thumbnails?.default?.url || 
+                             video.snippet?.thumbnails?.medium?.url ||
+                             video.snippet?.thumbnails?.default?.url ||
+                             defaultThumbnail;
+        
+        const title = video.title || video.snippet?.title || 'タイトルなし';
+        const channelTitle = video.channelTitle || video.snippet?.channelTitle || '不明';
+        const viewCount = (video.statistics?.viewCount || video.viewCount || 0).toLocaleString();
+        const publishedAt = new Date(video.publishedAt || video.snippet?.publishedAt || Date.now()).toLocaleDateString();
 
-          return (
-            <tr key={video.id || video.videoId || Math.random().toString()}>
-              <Td>
-                <Link to={`/video/${video.id || video.videoId}`}>
-                  <ThumbnailImage 
-                    src={thumbnailUrl} 
-                    alt={title} 
-                  />
-                </Link>
-              </Td>
-              <Td>
-                <Link to={`/video/${video.id || video.videoId}`}>{title}</Link>
-              </Td>
-              <Td>{channelTitle}</Td>
-              <Td>{viewCount}</Td>
-              <Td>{publishedAt}</Td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </Table>
+        return (
+          <Row key={video.id || video.videoId || index}>
+            <Cell $flex={2}>
+              <Link to={`/video/${video.id || video.videoId}`}>
+                <ThumbnailImage src={thumbnailUrl} alt={title} />
+              </Link>
+            </Cell>
+            <Cell $flex={4}>
+              <Link to={`/video/${video.id || video.videoId}`}>{title}</Link>
+            </Cell>
+            <Cell $flex={2}>{channelTitle}</Cell>
+            <Cell $flex={1}>{viewCount}</Cell>
+            <Cell $flex={1}>{publishedAt}</Cell>
+          </Row>
+        );
+      })}
+    </TableContainer>
   );
 });
 
