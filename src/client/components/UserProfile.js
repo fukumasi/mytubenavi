@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import axios from 'axios';
-import styled from 'styled-components';
-import LoadingSpinner from './LoadingSpinner';
-import ErrorMessage from './ErrorMessage';
+import React, { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
+import axios from "axios";
+import styled from "styled-components";
+import LoadingSpinner from "./LoadingSpinner";
+import ErrorMessage from "./ErrorMessage";
 
 const ProfileContainer = styled.div`
   max-width: 800px;
@@ -29,7 +29,7 @@ const UserProfile = () => {
         const response = await axios.get(`/api/users/${id}`);
         setUser(response.data);
       } catch (err) {
-        setError('ユーザープロフィールの取得中にエラーが発生しました。');
+        setError("ユーザープロフィールの取得中にエラーが発生しました。");
       } finally {
         setLoading(false);
       }
@@ -46,8 +46,11 @@ const UserProfile = () => {
     <ProfileContainer>
       <ProfileInfo>
         <h1>{user.username}</h1>
-        <p>ユーザータイプ: {user.userType === 'creator' ? 'クリエイター' : '一般ユーザー'}</p>
-        {user.userType === 'creator' && (
+        <p>
+          ユーザータイプ:{" "}
+          {user.userType === "creator" ? "クリエイター" : "一般ユーザー"}
+        </p>
+        {user.userType === "creator" && (
           <>
             <h2>チャンネル情報</h2>
             <p>チャンネル名: {user.channelName}</p>
@@ -56,7 +59,7 @@ const UserProfile = () => {
           </>
         )}
       </ProfileInfo>
-      {user.userType === 'creator' && (
+      {user.userType === "creator" && (
         <div>
           <h2>有料掲載動画</h2>
           {/* ここに有料掲載動画のリストを表示するコンポーネントを追加 */}

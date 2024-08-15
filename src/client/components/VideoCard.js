@@ -1,65 +1,67 @@
 import React from 'react';
-import styled from 'styled-components';
 import { Link } from 'react-router-dom';
+import styled from 'styled-components';
 
-const CardContainer = styled(Link)`
+const Card = styled(Link)`
   display: flex;
-  margin-bottom: 20px;
+  flex-direction: column;
   text-decoration: none;
-  color: inherit;
+  color: ${({ theme }) => theme.colors.text};
+  background-color: ${({ theme }) => theme.colors.backgroundLight};
+  border-radius: ${({ theme }) => theme.borderRadius};
+  overflow: hidden;
+  transition: transform 0.2s ease-in-out;
+
+  &:hover {
+    transform: translateY(-5px);
+  }
+`;
+
+const ThumbnailWrapper = styled.div`
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%; /* 16:9 アスペクト比 */
 `;
 
 const Thumbnail = styled.img`
-  width: 320px;
-  height: 180px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  margin-right: 10px;
 `;
 
-const InfoContainer = styled.div`
-  display: flex;
-  flex-direction: column;
+const Content = styled.div`
+  padding: ${({ theme }) => theme.spacing.small};
 `;
 
 const Title = styled.h3`
-  margin: 0 0 5px 0;
-  font-size: 16px;
+  margin: 0 0 ${({ theme }) => theme.spacing.small};
+  font-size: ${({ theme }) => theme.fontSizes.medium};
 `;
 
 const ChannelName = styled.p`
   margin: 0;
-  font-size: 14px;
-  color: #606060;
-`;
-
-const VideoStats = styled.p`
-  margin: 5px 0 0 0;
-  font-size: 12px;
-  color: #606060;
+  font-size: ${({ theme }) => theme.fontSizes.small};
+  color: ${({ theme }) => theme.colors.textSecondary};
 `;
 
 const VideoCard = ({ video }) => {
-  if (!video) {
-    return null;
-  }
-
-  const thumbnailUrl = video.thumbnails?.medium?.url || '/path/to/default/thumbnail.jpg';
-
   return (
-    <CardContainer to={`/video/${video.videoId}`}>
-      <Thumbnail 
-        src={thumbnailUrl} 
-        alt={video.title} 
-      />
-      <InfoContainer>
+    <Card to={`/video/${video.id}`}>
+      <ThumbnailWrapper>
+        <Thumbnail
+          src={video.thumbnail}
+          alt={`${video.title} のサムネイル`}
+          loading="lazy"
+        />
+      </ThumbnailWrapper>
+      <Content>
         <Title>{video.title}</Title>
-        <ChannelName>{video.user?.channelName || 'Unknown Channel'}</ChannelName>
-        <VideoStats>
-          {video.views?.toLocaleString()} 回視聴 • 評価: {video.rating} • 
-          アップロード日: {video.uploadDate}
-        </VideoStats>
-      </InfoContainer>
-    </CardContainer>
+        <ChannelName>{video.channel}</ChannelName>
+      </Content>
+    </Card>
   );
 };
 

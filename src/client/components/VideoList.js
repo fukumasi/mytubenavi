@@ -1,6 +1,6 @@
-import React from 'react';
-import styled from 'styled-components';
-import VideoCard from './VideoCard';
+import React from "react";
+import styled from "styled-components";
+import VideoCard from "./VideoCard";
 
 const VideoListContainer = styled.div`
   display: grid;

@@ -1,179 +1,218 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
+import styled from "styled-components";
+import { useAuth } from "../contexts/AuthContext";
+import { useSettings } from "../contexts/SettingsContext";
+import { FaUser, FaTwitter, FaInstagram, FaYoutube } from "react-icons/fa";
+
+// ... (すべてのstyled-componentsは変更なし)
 
 const Profile = () => {
+  const { user, updateProfile } = useAuth();
+  const { theme, language, updateTheme, updateLanguage } = useSettings();
   const [profile, setProfile] = useState({
-    firstName: '',
-    lastName: '',
-    bio: '',
-    avatar: '',
-    preferences: { theme: 'light', language: 'en', notifications: true },
-    socialLinks: { twitter: '', instagram: '', youtube: '' }
+    firstName: "",
+    lastName: "",
+    bio: "",
+    avatar: "",
+    preferences: { theme: "light", language: "en", notifications: true },
+    socialLinks: { twitter: "", instagram: "", youtube: "" },
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
-
-  const fetchProfile = async () => {
-    try {
-      // Simulating API call
-      const response = await fetch('/api/user/profile', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    if (user) {
+      setProfile({
+        ...user,
+        preferences: {
+          ...user.preferences,
+          theme,
+          language,
+        },
       });
-      const data = await response.json();
-      setProfile(data);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
     }
-  };
+  }, [user, theme, language]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setProfile(prevProfile => ({
+    setProfile((prevProfile) => ({
       ...prevProfile,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const handlePreferenceChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setProfile(prevProfile => ({
+    const newValue = type === "checkbox" ? checked : value;
+    setProfile((prevProfile) => ({
       ...prevProfile,
       preferences: {
         ...prevProfile.preferences,
-        [name]: type === 'checkbox' ? checked : value
-      }
+        [name]: newValue,
+      },
     }));
+
+    if (name === "theme") {
+      updateTheme(value);
+    } else if (name === "language") {
+      updateLanguage(value);
+    }
   };
 
   const handleSocialLinkChange = (e) => {
     const { name, value } = e.target;
-    setProfile(prevProfile => ({
+    setProfile((prevProfile) => ({
       ...prevProfile,
       socialLinks: {
         ...prevProfile.socialLinks,
-        [name]: value
-      }
+        [name]: value,
+      },
     }));
+  };
+
+  const validateForm = () => {
+    if (!profile.firstName || !profile.lastName) {
+      setError("名前と姓を入力してください");
+      return false;
+    }
+    if (profile.bio && profile.bio.length > 500) {
+      setError("自己紹介は500文字以内で入力してください");
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsLoading(true);
+
     try {
-      // Simulating API call
-      await fetch('/api/user/profile', {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}` 
-        },
-        body: JSON.stringify(profile)
-      });
-      alert('Profile updated successfully');
+      await updateProfile(profile);
+      setSuccess("プロフィールが正常に更新されました");
     } catch (error) {
-      console.error('Error updating profile:', error);
-      alert('Error updating profile');
+      setError("プロフィールの更新中にエラーが発生しました");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
-      <h2 className="text-2xl font-bold mb-4">User Profile</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="text"
-          name="firstName"
-          placeholder="First Name"
-          value={profile.firstName}
-          onChange={handleChange}
-          className="w-full p-2 border rounded"
-        />
-        <input
-          type="text"
-          name="lastName"
-          placeholder="Last Name"
-          value={profile.lastName}
-          onChange={handleChange}
-          className="w-full p-2 border rounded"
-        />
-        <textarea
-          name="bio"
-          placeholder="Bio"
-          value={profile.bio}
-          onChange={handleChange}
-          className="w-full p-2 border rounded"
-        />
-        <input
-          type="text"
-          name="avatar"
-          placeholder="Avatar URL"
-          value={profile.avatar}
-          onChange={handleChange}
-          className="w-full p-2 border rounded"
-        />
-        <div>
-          <h3 className="font-semibold">Preferences</h3>
-          <select 
-            name="theme" 
-            value={profile.preferences.theme} 
+    <Container>
+      <Title>ユーザープロフィール</Title>
+      <Form onSubmit={handleSubmit}>
+        <FormSection>
+          <SectionTitle>基本情報</SectionTitle>
+          <AvatarPreview src={profile.avatar || "https://via.placeholder.com/100"} />
+          <Input
+            type="text"
+            name="firstName"
+            placeholder="名"
+            value={profile.firstName}
+            onChange={handleChange}
+            required
+          />
+          <Input
+            type="text"
+            name="lastName"
+            placeholder="姓"
+            value={profile.lastName}
+            onChange={handleChange}
+            required
+          />
+          <Textarea
+            name="bio"
+            placeholder="自己紹介（500文字以内）"
+            value={profile.bio}
+            onChange={handleChange}
+            maxLength={500}
+          />
+          <Input
+            type="text"
+            name="avatar"
+            placeholder="アバターURL"
+            value={profile.avatar}
+            onChange={handleChange}
+          />
+        </FormSection>
+
+        <FormSection>
+          <SectionTitle>設定</SectionTitle>
+          <Select
+            name="theme"
+            value={profile.preferences.theme}
             onChange={handlePreferenceChange}
-            className="w-full p-2 border rounded mt-2"
           >
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-          <select 
-            name="language" 
-            value={profile.preferences.language} 
+            <option value="light">ライト</option>
+            <option value="dark">ダーク</option>
+          </Select>
+          <Select
+            name="language"
+            value={profile.preferences.language}
             onChange={handlePreferenceChange}
-            className="w-full p-2 border rounded mt-2"
           >
             <option value="en">English</option>
             <option value="ja">日本語</option>
-          </select>
-          <label className="flex items-center mt-2">
-            <input
+          </Select>
+          <CheckboxLabel>
+            <Checkbox
               type="checkbox"
               name="notifications"
               checked={profile.preferences.notifications}
               onChange={handlePreferenceChange}
-              className="mr-2"
             />
-            Receive notifications
-          </label>
-        </div>
-        <div>
-          <h3 className="font-semibold">Social Links</h3>
-          <input
-            type="text"
-            name="twitter"
-            placeholder="Twitter"
-            value={profile.socialLinks.twitter}
-            onChange={handleSocialLinkChange}
-            className="w-full p-2 border rounded mt-2"
-          />
-          <input
-            type="text"
-            name="instagram"
-            placeholder="Instagram"
-            value={profile.socialLinks.instagram}
-            onChange={handleSocialLinkChange}
-            className="w-full p-2 border rounded mt-2"
-          />
-          <input
-            type="text"
-            name="youtube"
-            placeholder="YouTube"
-            value={profile.socialLinks.youtube}
-            onChange={handleSocialLinkChange}
-            className="w-full p-2 border rounded mt-2"
-          />
-        </div>
-        <button type="submit" className="w-full p-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-          Update Profile
-        </button>
-      </form>
-    </div>
+            通知を受け取る
+          </CheckboxLabel>
+        </FormSection>
+
+        <FormSection>
+          <SectionTitle>ソーシャルリンク</SectionTitle>
+          <InputWithIcon>
+            <FaTwitter />
+            <Input
+              type="text"
+              name="twitter"
+              placeholder="Twitter"
+              value={profile.socialLinks.twitter}
+              onChange={handleSocialLinkChange}
+            />
+          </InputWithIcon>
+          <InputWithIcon>
+            <FaInstagram />
+            <Input
+              type="text"
+              name="instagram"
+              placeholder="Instagram"
+              value={profile.socialLinks.instagram}
+              onChange={handleSocialLinkChange}
+            />
+          </InputWithIcon>
+          <InputWithIcon>
+            <FaYoutube />
+            <Input
+              type="text"
+              name="youtube"
+              placeholder="YouTube"
+              value={profile.socialLinks.youtube}
+              onChange={handleSocialLinkChange}
+            />
+          </InputWithIcon>
+        </FormSection>
+
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? "更新中..." : "プロフィールを更新"}
+        </Button>
+        {error && <ErrorMessage>{error}</ErrorMessage>}
+        {success && <SuccessMessage>{success}</SuccessMessage>}
+      </Form>
+    </Container>
   );
 };
 

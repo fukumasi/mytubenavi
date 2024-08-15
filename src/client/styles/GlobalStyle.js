@@ -5,16 +5,26 @@ const GlobalStyle = createGlobalStyle`
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
-    background-color: #f0f2f5;
+    background-color: ${({ theme }) => theme.colors.background};
+    color: ${({ theme }) => theme.colors.text};
+    transition: all 0.3s ease-in-out;
   }
 
   a {
-    color: #1a73e8;
+    color: ${({ theme }) => theme.colors.primary};
     text-decoration: none;
+    
+    &:hover {
+      text-decoration: underline;
+    }
   }
 
-  a:hover {
-    text-decoration: underline;
+  button {
+    cursor: pointer;
+  }
+
+  * {
+    box-sizing: border-box;
   }
 `;
 

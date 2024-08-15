@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import React, { useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
 
 const RegisterForm = () => {
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const { register } = useAuth();
 
   const handleSubmit = async (e) => {
@@ -12,7 +12,7 @@ const RegisterForm = () => {
     try {
       await register(username, email, password);
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error("Registration error:", error);
     }
   };
 

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import styled from "styled-components";
 
 const SearchForm = styled.form`
   display: flex;
@@ -42,20 +42,22 @@ const SearchButton = styled.button`
 `;
 
 const SearchBar = () => {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (searchTerm.trim()) {
       navigate(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
-      setSearchTerm('');  // 検索後に検索バーをクリア
+      setSearchTerm(""); // 検索後に検索バーをクリア
     }
   };
 
   return (
     <SearchForm onSubmit={handleSubmit} role="search">
-      <label htmlFor="search-input" className="sr-only">動画を検索</label>
+      <label htmlFor="search-input" className="sr-only">
+        動画を検索
+      </label>
       <SearchInput
         id="search-input"
         type="search"

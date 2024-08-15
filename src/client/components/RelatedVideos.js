@@ -1,27 +1,43 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import axios from 'axios';
+import React, { useCallback, useMemo } from 'react';
 import styled from 'styled-components';
-import LoadingSpinner from './LoadingSpinner';
-import ErrorMessage from './ErrorMessage';
+import { Link } from 'react-router-dom';
+import { useTheme } from '../hooks';
 
-const RelatedVideosList = styled.div`
+const RelatedVideosList = styled.ul`
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: ${({ theme }) => theme.spacing?.small || '10px'};
+  list-style-type: none;
+  padding: 0;
 `;
 
-const RelatedVideoItem = styled(Link)`
+const VideoItemWrapper = styled.li`
+  &:focus-within {
+    outline: 2px solid ${({ theme }) => theme.colors?.primary || '#1a73e8'};
+  }
+`;
+
+const VideoLink = styled(Link)`
   display: flex;
-  gap: 10px;
   text-decoration: none;
   color: inherit;
+  padding: ${({ theme }) => theme.spacing?.xsmall || '5px'};
+  border-radius: ${({ theme }) => theme.borderRadius || '4px'};
+
+  &:focus {
+    outline: none;
+  }
+
+  &:hover {
+    background-color: ${({ theme }) => theme.colors?.backgroundHover || '#f0f0f0'};
+  }
 `;
 
 const Thumbnail = styled.img`
   width: 120px;
   height: 67px;
   object-fit: cover;
+  margin-right: ${({ theme }) => theme.spacing?.small || '10px'};
 `;
 
 const VideoInfo = styled.div`
@@ -29,45 +45,64 @@ const VideoInfo = styled.div`
   flex-direction: column;
 `;
 
-const RelatedVideos = ({ videoId }) => {
-  const [relatedVideos, setRelatedVideos] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const Title = styled.h3`
+  font-size: ${({ theme }) => theme.fontSize?.small || '14px'};
+  margin: 0 0 5px 0;
+`;
 
-  useEffect(() => {
-    const fetchRelatedVideos = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await axios.get(`/api/videos/${videoId}/related`);
-        setRelatedVideos(response.data);
-      } catch (err) {
-        setError('関連動画の取得中にエラーが発生しました。');
-      } finally {
-        setLoading(false);
-      }
-    };
+const ChannelName = styled.span`
+  font-size: ${({ theme }) => theme.fontSize?.xsmall || '12px'};
+  color: ${({ theme }) => theme.colors?.textSecondary || '#666'};
+`;
 
-    fetchRelatedVideos();
-  }, [videoId]);
+const RelatedVideoItem = React.memo(({ video, theme, handleKeyDown }) => (
+  <VideoItemWrapper theme={theme}>
+    <VideoLink
+      to={`/video/${video.id.videoId || video.id}`}
+      onKeyDown={(e) => handleKeyDown(e, video.id.videoId || video.id)}
+      theme={theme}
+    >
+      <Thumbnail
+        src={video.snippet.thumbnails.medium.url}
+        alt={`${video.snippet.title} のサムネイル`}
+        loading="lazy"
+        theme={theme}
+      />
+      <VideoInfo>
+        <Title theme={theme}>{video.snippet.title}</Title>
+        <ChannelName theme={theme}>{video.snippet.channelTitle}</ChannelName>
+      </VideoInfo>
+    </VideoLink>
+  </VideoItemWrapper>
+));
 
-  if (loading) return <LoadingSpinner />;
-  if (error) return <ErrorMessage message={error} />;
+const RelatedVideos = ({ videos }) => {
+  const theme = useTheme();
+
+  const handleKeyDown = useCallback((event, videoId) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      window.location.href = `/video/${videoId}`;
+    }
+  }, []);
+
+  const memoizedVideos = useMemo(() => 
+    videos.map((video) => (
+      <RelatedVideoItem 
+        key={video.id.videoId || video.id}
+        video={video}
+        theme={theme}
+        handleKeyDown={handleKeyDown}
+      />
+    )),
+    [videos, theme, handleKeyDown]
+  );
 
   return (
-    <RelatedVideosList>
-      {relatedVideos.map(video => (
-        <RelatedVideoItem key={video._id} to={`/video/${video._id}`}>
-          <Thumbnail src={video.thumbnail} alt={video.title} />
-          <VideoInfo>
-            <h3>{video.title}</h3>
-            <p>{video.channelName}</p>
-            <p>{video.viewCount.toLocaleString()} views</p>
-          </VideoInfo>
-        </RelatedVideoItem>
-      ))}
+    <RelatedVideosList theme={theme}>
+      {memoizedVideos}
     </RelatedVideosList>
   );
 };
 
-export default RelatedVideos;
+export default React.memo(RelatedVideos);

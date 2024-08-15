@@ -8,26 +8,30 @@ const TableContainer = styled.div`
 
 const TableHeader = styled.div`
   display: flex;
-  background-color: #f0f0f0;
+  background-color: ${({ theme }) => theme.colors.backgroundLight};
   font-weight: bold;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
 `;
 
 const HeaderCell = styled.div`
   flex: ${props => props.$flex || 1};
   padding: 10px;
   cursor: pointer;
+  transition: background-color 0.3s ease;
   
   &:hover {
-    background-color: #e0e0e0;
+    background-color: ${({ theme }) => theme.colors.backgroundHover};
   }
 `;
 
 const Row = styled.div`
   display: flex;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
   &:last-child {
     border-bottom: none;
+  }
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.backgroundHover};
   }
 `;
 
@@ -42,17 +46,26 @@ const ThumbnailImage = styled.img`
   width: 120px;
   height: 67px;
   object-fit: cover;
+  border-radius: 4px;
 `;
 
 const NoVideosMessage = styled.p`
   text-align: center;
   padding: 20px;
   font-style: italic;
-  color: #666;
+  color: ${({ theme }) => theme.colors.textLight};
 `;
 
 const SortIndicator = styled.span`
   margin-left: 5px;
+`;
+
+const StyledLink = styled(Link)`
+  color: ${({ theme }) => theme.colors.primary};
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
 `;
 
 const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
@@ -68,6 +81,23 @@ const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
   };
 
   const defaultThumbnail = 'https://via.placeholder.com/120x67.png?text=No+Image';
+
+  const formatDuration = (duration) => {
+    if (!duration) return '不明';
+    const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+    if (!match) return '不明';
+    const hours = parseInt(match[1] || '0', 10);
+    const minutes = parseInt(match[2] || '0', 10);
+    const seconds = parseInt(match[3] || '0', 10);
+    
+    if (hours > 0) {
+      return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    } else {
+      return `${minutes}:${String(seconds).padStart(2, '0')}`;
+    }
+  };
+
+  console.log('Videos prop:', videos); // デバッグ用
 
   return (
     <TableContainer>
@@ -85,8 +115,11 @@ const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
         <HeaderCell $flex={1} onClick={() => onSort('publishedAt')}>
           投稿日 {getSortIndicator('publishedAt')}
         </HeaderCell>
+        <HeaderCell $flex={1} onClick={() => onSort('duration')}>
+          長さ {getSortIndicator('duration')}
+        </HeaderCell>
       </TableHeader>
-      {videos.map((video, index) => {
+      {videos.map((video) => {
         const thumbnailUrl = video.thumbnails?.medium?.url || 
                              video.thumbnails?.default?.url || 
                              video.snippet?.thumbnails?.medium?.url ||
@@ -97,20 +130,24 @@ const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
         const channelTitle = video.channelTitle || video.snippet?.channelTitle || '不明';
         const viewCount = (video.statistics?.viewCount || video.viewCount || 0).toLocaleString();
         const publishedAt = new Date(video.publishedAt || video.snippet?.publishedAt || Date.now()).toLocaleDateString();
+        const duration = formatDuration(video.contentDetails?.duration);
+
+        const uniqueKey = video.id || video.videoId || `video-${video.etag}`;
 
         return (
-          <Row key={video.id || video.videoId || index}>
+          <Row key={uniqueKey}>
             <Cell $flex={2}>
-              <Link to={`/video/${video.id || video.videoId}`}>
+              <StyledLink to={`/video/${video.id || video.videoId}`}>
                 <ThumbnailImage src={thumbnailUrl} alt={title} />
-              </Link>
+              </StyledLink>
             </Cell>
             <Cell $flex={4}>
-              <Link to={`/video/${video.id || video.videoId}`}>{title}</Link>
+              <StyledLink to={`/video/${video.id || video.videoId}`}>{title}</StyledLink>
             </Cell>
             <Cell $flex={2}>{channelTitle}</Cell>
             <Cell $flex={1}>{viewCount}</Cell>
             <Cell $flex={1}>{publishedAt}</Cell>
+            <Cell $flex={1}>{duration}</Cell>
           </Row>
         );
       })}

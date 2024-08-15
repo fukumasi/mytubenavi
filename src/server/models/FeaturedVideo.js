@@ -1,7 +1,7 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const featuredVideoSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   videoId: { type: String, required: true },
   title: { type: String, required: true },
   description: { type: String },
@@ -10,4 +10,4 @@ const featuredVideoSchema = new mongoose.Schema({
   endDate: { type: Date, required: true },
 });
 
-module.exports = mongoose.model('FeaturedVideo', featuredVideoSchema);
+module.exports = mongoose.model("FeaturedVideo", featuredVideoSchema);

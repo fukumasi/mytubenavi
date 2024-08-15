@@ -1,6 +1,6 @@
-import React from 'react';
-import styled from 'styled-components';
-import { X } from 'lucide-react';
+import React from "react";
+import styled from "styled-components";
+import { X } from "lucide-react";
 
 const ActiveFiltersContainer = styled.div`
   display: flex;
@@ -14,7 +14,8 @@ const ActiveFilter = styled.div`
   display: flex;
   align-items: center;
   margin: ${({ theme }) => theme.spacing.xsmall};
-  padding: ${({ theme }) => theme.spacing.xsmall} ${({ theme }) => theme.spacing.small};
+  padding: ${({ theme }) => theme.spacing.xsmall}
+    ${({ theme }) => theme.spacing.small};
 `;
 
 const RemoveFilterButton = styled.button`

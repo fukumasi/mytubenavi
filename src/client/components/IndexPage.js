@@ -1,16 +1,16 @@
-console.log('IndexPage.js is being imported');
-console.log('IndexPage rendering');
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import { Link } from 'react-router-dom';
-import styled from 'styled-components';
-import AdSpace from './AdSpace';
+console.log("IndexPage.js is being imported");
+console.log("IndexPage rendering");
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import { Link } from "react-router-dom";
+import styled from "styled-components";
+import AdSpace from "./AdSpace";
 
 const PageContainer = styled.div`
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
-  background-color: #e0e0e0; 
+  background-color: #e0e0e0;
 `;
 
 const MainContent = styled.div`
@@ -53,17 +53,17 @@ const IndexPage = () => {
   useEffect(() => {
     const fetchLargeGenres = async () => {
       try {
-        const response = await axios.get('/api/genres/large');
+        const response = await axios.get("/api/genres/large");
         setLargeGenres(response.data);
       } catch (error) {
-        console.error('Error fetching large genres:', error);
+        console.error("Error fetching large genres:", error);
       }
     };
 
     fetchLargeGenres();
   }, []);
 
-  console.log('IndexPage component is rendering');
+  console.log("IndexPage component is rendering");
 
   return (
     <PageContainer>
@@ -77,7 +77,7 @@ const IndexPage = () => {
           <p>Search and discover the best YouTube videos!</p>
           <h3>ジャンル一覧</h3>
           <GenreGrid>
-            {largeGenres.map(genre => (
+            {largeGenres.map((genre) => (
               <GenreItem key={genre._id} to={`/genre/${genre.slug}`}>
                 {genre.name}
               </GenreItem>

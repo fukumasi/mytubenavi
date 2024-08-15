@@ -1,6 +1,6 @@
-import React from 'react';
-import styled from 'styled-components';
-import { Link } from 'react-router-dom';
+import React from "react";
+import styled from "styled-components";
+import { Link } from "react-router-dom";
 
 const HighlightsContainer = styled.div`
   margin-top: ${({ theme }) => theme.spacing.large};
@@ -18,7 +18,9 @@ const VideoCard = styled(Link)`
   overflow: hidden;
   text-decoration: none;
   color: inherit;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
   &:hover {
     transform: translateY(-5px);
     box-shadow: 0 5px 15px ${({ theme }) => theme.colors.shadow};

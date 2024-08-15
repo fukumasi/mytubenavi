@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import styled from 'styled-components';
+import React, { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import axios from "axios";
+import styled from "styled-components";
 
 const Form = styled.form`
   display: flex;
@@ -24,21 +24,23 @@ const Button = styled.button`
 `;
 
 const ResetPassword = () => {
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [message, setMessage] = useState('');
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [message, setMessage] = useState("");
   const { resetToken } = useParams();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      return setMessage('パスワードが一致しません');
+      return setMessage("パスワードが一致しません");
     }
     try {
-      const res = await axios.put(`/api/auth/reset-password/${resetToken}`, { password });
+      const res = await axios.put(`/api/auth/reset-password/${resetToken}`, {
+        password,
+      });
       setMessage(res.data.message);
-      setTimeout(() => navigate('/login'), 3000);
+      setTimeout(() => navigate("/login"), 3000);
     } catch (error) {
       setMessage(error.response.data.message);
     }
