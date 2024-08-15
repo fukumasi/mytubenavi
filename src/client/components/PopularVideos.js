@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import styled from 'styled-components';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import styled from "styled-components";
 
 const VideoGrid = styled.div`
   display: grid;
@@ -13,7 +13,7 @@ const VideoCard = styled.div`
   border: 1px solid #ddd;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 `;
 
 const VideoThumbnail = styled.img`
@@ -46,11 +46,11 @@ const PopularVideos = () => {
   useEffect(() => {
     const fetchPopularVideos = async () => {
       try {
-        const response = await axios.get('/api/videos/popular');
+        const response = await axios.get("/api/videos/popular");
         setVideos(response.data);
         setLoading(false);
       } catch (err) {
-        setError('人気動画の取得に失敗しました。');
+        setError("人気動画の取得に失敗しました。");
         setLoading(false);
       }
     };
@@ -63,9 +63,12 @@ const PopularVideos = () => {
 
   return (
     <VideoGrid>
-      {videos.map(video => (
+      {videos.map((video) => (
         <VideoCard key={video._id}>
-          <VideoThumbnail src={video.thumbnail || 'placeholder.jpg'} alt={video.title} />
+          <VideoThumbnail
+            src={video.thumbnail || "placeholder.jpg"}
+            alt={video.title}
+          />
           <VideoInfo>
             <VideoTitle>{video.title}</VideoTitle>
             <ViewCount>{video.viewCount.toLocaleString()} views</ViewCount>

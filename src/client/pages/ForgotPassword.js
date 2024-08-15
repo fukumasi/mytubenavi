@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import styled from 'styled-components';
+import React, { useState } from "react";
+import axios from "axios";
+import styled from "styled-components";
 
 const Form = styled.form`
   display: flex;
@@ -23,13 +23,13 @@ const Button = styled.button`
 `;
 
 const ForgotPassword = () => {
-  const [email, setEmail] = useState('');
-  const [message, setMessage] = useState('');
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post('/api/auth/forgot-password', { email });
+      const res = await axios.post("/api/auth/forgot-password", { email });
       setMessage(res.data.message);
     } catch (error) {
       setMessage(error.response.data.message);

@@ -1,7 +1,7 @@
-import styled from 'styled-components';
+import styled from "styled-components";
 
 const FilterContainerResponsive = styled.div`
-  display: ${({ isVisible }) => (isVisible ? 'block' : 'none')};
+  display: ${({ isVisible }) => (isVisible ? "block" : "none")};
   @media (min-width: 768px) {
     display: block;
   }
@@ -12,4 +12,3 @@ const FilterContainerResponsive = styled.div`
 `;
 
 export default FilterContainerResponsive;
-

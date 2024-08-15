@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import styled from 'styled-components';
+import React, { useState } from "react";
+import axios from "axios";
+import styled from "styled-components";
 
 const SearchContainer = styled.div`
   max-width: 800px;
@@ -71,8 +71,8 @@ const Pagination = styled.div`
 const PageButton = styled.button`
   margin: 0 5px;
   padding: 5px 10px;
-  background-color: ${props => props.active ? '#0066cc' : '#f0f0f0'};
-  color: ${props => props.active ? 'white' : 'black'};
+  background-color: ${(props) => (props.active ? "#0066cc" : "#f0f0f0")};
+  color: ${(props) => (props.active ? "white" : "black")};
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -83,7 +83,7 @@ const PageButton = styled.button`
 `;
 
 const Search = () => {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -95,13 +95,15 @@ const Search = () => {
     setError(null);
 
     try {
-      const response = await axios.get(`/api/videos/search?query=${query}&page=${page}&limit=10`);
+      const response = await axios.get(
+        `/api/videos/search?query=${query}&page=${page}&limit=10`,
+      );
       setResults(response.data.videos);
       setCurrentPage(response.data.currentPage);
       setTotalPages(response.data.totalPages);
     } catch (err) {
-      setError('An error occurred while searching. Please try again.');
-      console.error('Error searching videos:', err);
+      setError("An error occurred while searching. Please try again.");
+      console.error("Error searching videos:", err);
     } finally {
       setLoading(false);
     }
@@ -114,7 +116,12 @@ const Search = () => {
   return (
     <SearchContainer>
       <h2>Search Videos</h2>
-      <SearchForm onSubmit={(e) => { e.preventDefault(); handleSearch(); }}>
+      <SearchForm
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSearch();
+        }}
+      >
         <SearchInput
           type="text"
           id="search-query"
@@ -124,7 +131,7 @@ const Search = () => {
           placeholder="Enter search query"
         />
         <SearchButton type="submit" disabled={loading}>
-          {loading ? 'Searching...' : 'Search'}
+          {loading ? "Searching..." : "Search"}
         </SearchButton>
       </SearchForm>
       {error && <ErrorMessage>{error}</ErrorMessage>}

@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+import styled from "styled-components";
 
 const FilterToggle = styled.button`
   background-color: ${({ theme }) => theme.colors.primary};
@@ -14,4 +14,3 @@ const FilterToggle = styled.button`
 `;
 
 export default FilterToggle;
-

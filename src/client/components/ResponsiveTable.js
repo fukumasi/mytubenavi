@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+import styled from "styled-components";
 
 const ResponsiveTable = styled.div`
   overflow-x: auto;
@@ -49,4 +49,13 @@ const VideoTitle = styled.a`
   }
 `;
 
-export { ResponsiveTable, Table, TableRow, TableCell, SortableTableHeader, SortIcon, ThumbnailImage, VideoTitle };
+export {
+  ResponsiveTable,
+  Table,
+  TableRow,
+  TableCell,
+  SortableTableHeader,
+  SortIcon,
+  ThumbnailImage,
+  VideoTitle,
+};

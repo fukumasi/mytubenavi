@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import LargeGenreList from './LargeGenreList';
-import MediumGenreList from './MediumGenreList';
-import SmallGenreList from './SmallGenreList';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import LargeGenreList from "./LargeGenreList";
+import MediumGenreList from "./MediumGenreList";
+import SmallGenreList from "./SmallGenreList";
 
 const GenreSelector = () => {
   const [largeGenres, setLargeGenres] = useState([]);
@@ -15,10 +15,10 @@ const GenreSelector = () => {
   useEffect(() => {
     const fetchLargeGenres = async () => {
       try {
-        const response = await axios.get('/api/genres/large');
+        const response = await axios.get("/api/genres/large");
         setLargeGenres(response.data);
       } catch (error) {
-        console.error('Error fetching large genres:', error);
+        console.error("Error fetching large genres:", error);
       }
     };
     fetchLargeGenres();
@@ -32,7 +32,7 @@ const GenreSelector = () => {
       const response = await axios.get(`/api/genres/${genre.slug}/medium`);
       setMediumGenres(response.data);
     } catch (error) {
-      console.error('Error fetching medium genres:', error);
+      console.error("Error fetching medium genres:", error);
     }
   };
 
@@ -43,7 +43,7 @@ const GenreSelector = () => {
       const response = await axios.get(`/api/genres/${genre.slug}/small`);
       setSmallGenres(response.data);
     } catch (error) {
-      console.error('Error fetching small genres:', error);
+      console.error("Error fetching small genres:", error);
     }
   };
 
@@ -55,21 +55,21 @@ const GenreSelector = () => {
 
   return (
     <div>
-      <LargeGenreList 
-        genres={largeGenres} 
+      <LargeGenreList
+        genres={largeGenres}
         onSelect={handleLargeGenreSelect}
         selectedGenre={selectedLargeGenre}
       />
       {selectedLargeGenre && (
-        <MediumGenreList 
-          genres={mediumGenres} 
+        <MediumGenreList
+          genres={mediumGenres}
           onSelect={handleMediumGenreSelect}
           selectedGenre={selectedMediumGenre}
         />
       )}
       {selectedMediumGenre && (
-        <SmallGenreList 
-          genres={smallGenres} 
+        <SmallGenreList
+          genres={smallGenres}
           onSelect={handleSmallGenreSelect}
           selectedGenre={selectedSmallGenre}
         />

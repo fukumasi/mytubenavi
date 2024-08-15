@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import styled from 'styled-components';
+import React, { useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import styled from "styled-components";
 
 const Form = styled.form`
   // ... styles ...
@@ -20,25 +20,27 @@ const ErrorMessage = styled.div`
 `;
 
 const LoginForm = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     if (!email || !password) {
-      setError('メールアドレスとパスワードを入力してください。');
+      setError("メールアドレスとパスワードを入力してください。");
       return;
     }
 
     try {
       await login(email, password);
     } catch (error) {
-      console.error('Login error:', error);
-      setError('ログインに失敗しました。メールアドレスとパスワードを確認してください。');
+      console.error("Login error:", error);
+      setError(
+        "ログインに失敗しました。メールアドレスとパスワードを確認してください。",
+      );
     }
   };
 

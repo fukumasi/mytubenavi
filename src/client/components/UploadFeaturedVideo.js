@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import styled from 'styled-components';
+import React, { useState } from "react";
+import axios from "axios";
+import styled from "styled-components";
 
 const UploadForm = styled.form`
   display: flex;
@@ -28,12 +28,12 @@ const Button = styled.button`
 
 const UploadFeaturedVideo = () => {
   const [videoData, setVideoData] = useState({
-    videoId: '',
-    title: '',
-    description: '',
-    thumbnailUrl: '',
-    startDate: '',
-    endDate: ''
+    videoId: "",
+    title: "",
+    description: "",
+    thumbnailUrl: "",
+    startDate: "",
+    endDate: "",
   });
 
   const handleChange = (e) => {
@@ -43,18 +43,18 @@ const UploadFeaturedVideo = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('/api/featured-videos', videoData);
-      alert('動画が正常にアップロードされました。');
+      await axios.post("/api/featured-videos", videoData);
+      alert("動画が正常にアップロードされました。");
       setVideoData({
-        videoId: '',
-        title: '',
-        description: '',
-        thumbnailUrl: '',
-        startDate: '',
-        endDate: ''
+        videoId: "",
+        title: "",
+        description: "",
+        thumbnailUrl: "",
+        startDate: "",
+        endDate: "",
       });
     } catch (error) {
-      alert('動画のアップロード中にエラーが発生しました。');
+      alert("動画のアップロード中にエラーが発生しました。");
     }
   };
 

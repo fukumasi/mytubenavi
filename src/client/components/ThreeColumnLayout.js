@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+import styled from "styled-components";
 
 const ThreeColumnLayout = styled.div`
   display: flex;

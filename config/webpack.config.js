@@ -1,11 +1,11 @@
-const path = require('path');
+const path = require("path");
 
 module.exports = {
-  entry: './src/client/index.js',
+  entry: "./src/client/index.js",
   output: {
-    path: path.resolve(__dirname, 'public'),
-    filename: 'bundle.js',
-    publicPath: '/'
+    path: path.resolve(__dirname, "public"),
+    filename: "bundle.js",
+    publicPath: "/",
   },
   module: {
     rules: [
@@ -13,21 +13,21 @@ module.exports = {
         test: /\.(js|jsx)$/,
         exclude: /node_modules/,
         use: {
-          loader: 'babel-loader',
+          loader: "babel-loader",
         },
       },
       {
         test: /\.css$/,
-        use: ['style-loader', 'css-loader'],
+        use: ["style-loader", "css-loader"],
       },
     ],
   },
   resolve: {
-    extensions: ['.js', '.jsx'],
+    extensions: [".js", ".jsx"],
   },
   devServer: {
     static: {
-      directory: path.join(__dirname, 'public'),
+      directory: path.join(__dirname, "public"),
     },
     compress: true,
     port: 3000,

@@ -1,6 +1,6 @@
-import React from 'react';
-import { useParams } from 'react-router-dom';
-import styled from 'styled-components';
+import React from "react";
+import { useParams } from "react-router-dom";
+import styled from "styled-components";
 
 const GenreContainer = styled.div`
   padding: 20px;
