@@ -94,26 +94,32 @@ const SearchResults = () => {
   const [dateFilter, setDateFilter] = useState(searchParams.get("date") || "any");
   const [durationFilter, setDurationFilter] = useState(searchParams.get("duration") || "any");
 
+  const searchQueryConfig = useMemo(() => ({
+    q: query,
+    genre: selectedGenre,
+    page: currentPage,
+    sort: `${sortConfig.key},${sortConfig.direction}`,
+    date: dateFilter,
+    duration: durationFilter,
+  }), [query, selectedGenre, currentPage, sortConfig, dateFilter, durationFilter]);
+
   const {
     data: searchData,
     isLoading: isSearchLoading,
     error: searchError,
   } = useQuery(
-    ["searchVideos", query, selectedGenre, currentPage, sortConfig, dateFilter, durationFilter],
-    () =>
-      searchVideos({
-        q: query,
-        genre: selectedGenre,
-        page: currentPage,
-        sort: `${sortConfig.key},${sortConfig.direction}`,
-        date: dateFilter,
-        duration: durationFilter,
-      }),
+    ["searchVideos", searchQueryConfig],
+    () => searchVideos(searchQueryConfig),
     {
       enabled: !!query,
       retry: 3,
       onError: (error) => console.error("Search error:", error),
-      select: (data) => data || [],
+      select: (data) => {
+        if (!Array.isArray(data)) {
+          throw new Error("Invalid data format: expected an array");
+        }
+        return data;
+      },
     }
   );
 
@@ -125,7 +131,27 @@ const SearchResults = () => {
     staleTime: Infinity,
     retry: 3,
     onError: (error) => console.error("Dummy videos error:", error),
+    select: (data) => {
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid dummy data format: expected an array");
+      }
+      return data;
+    },
   });
+
+  const updateSearchParams = useCallback((params) => {
+    setSearchParams((prev) => {
+      const newParams = new URLSearchParams(prev);
+      Object.entries(params).forEach(([key, value]) => {
+        if (value) {
+          newParams.set(key, value);
+        } else {
+          newParams.delete(key);
+        }
+      });
+      return newParams;
+    });
+  }, [setSearchParams]);
 
   const handleGenreChange = useCallback(
     (genre) => {
@@ -133,7 +159,7 @@ const SearchResults = () => {
       setCurrentPage(1);
       updateSearchParams({ page: "1", genre });
     },
-    [setSearchParams]
+    [updateSearchParams]
   );
 
   const handleSort = useCallback((key) => {
@@ -148,14 +174,14 @@ const SearchResults = () => {
       updateSearchParams({ sort: newConfig.key, order: newConfig.direction });
       return newConfig;
     });
-  }, []);
+  }, [updateSearchParams]);
 
   const handlePageChange = useCallback(
     (page) => {
       setCurrentPage(page);
       updateSearchParams({ page: page.toString() });
     },
-    [setSearchParams]
+    [updateSearchParams]
   );
 
   const handleFilterChange = useCallback((filterType, value) => {
@@ -166,17 +192,7 @@ const SearchResults = () => {
     }
     setCurrentPage(1);
     updateSearchParams({ [filterType]: value, page: "1" });
-  }, [setSearchParams]);
-
-  const updateSearchParams = useCallback((params) => {
-    setSearchParams((prev) => {
-      const newParams = new URLSearchParams(prev);
-      Object.entries(params).forEach(([key, value]) => {
-        newParams.set(key, value);
-      });
-      return newParams;
-    });
-  }, [setSearchParams]);
+  }, [updateSearchParams]);
 
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
@@ -214,13 +230,22 @@ const SearchResults = () => {
     return { totalVideos: total, totalPages: pages, paginatedVideos: paginated };
   }, [displayVideos, currentPage]);
 
-  if (isSearchLoading || isDummyLoading) return <LoadingSpinner />;
-  if (searchError || dummyError)
-    return (
-      <ErrorMessage
-        message={`データの取得中にエラーが発生しました: ${searchError?.message || dummyError?.message}`}
-      />
-    );
+  if (isSearchLoading || isDummyLoading) return <LoadingSpinner data-testid="loading-spinner" />;
+
+  if (searchError || dummyError) {
+    let errorMessage = "データの取得中にエラーが発生しました。";
+    if (searchError instanceof Error) {
+      errorMessage += ` 検索エラー: ${searchError.message}`;
+    }
+    if (dummyError instanceof Error) {
+      errorMessage += ` ダミーデータエラー: ${dummyError.message}`;
+    }
+    return <ErrorMessage message={errorMessage} />;
+  }
+
+  if (!displayVideos || displayVideos.length === 0) {
+    return <ErrorMessage message="動画が見つかりませんでした。検索条件を変更してお試しください。" />;
+  }
 
   return (
     <SearchContainer>
@@ -245,27 +270,21 @@ const SearchResults = () => {
             onSort={handleSort}
           />
         </FilterSortContainer>
-        {paginatedVideos.length > 0 ? (
-          <>
-            <VideoTableContainer>
-              <VideoTable
-                videos={paginatedVideos}
-                onSort={handleSort}
-                sortConfig={sortConfig}
-              />
-            </VideoTableContainer>
-            {totalPages > 1 && (
-              <PaginationContainer>
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={handlePageChange}
-                />
-              </PaginationContainer>
-            )}
-          </>
-        ) : (
-          <p>表示する動画がありません。</p>
+        <VideoTableContainer>
+          <VideoTable
+            videos={paginatedVideos}
+            onSort={handleSort}
+            sortConfig={sortConfig}
+          />
+        </VideoTableContainer>
+        {totalPages > 1 && (
+          <PaginationContainer>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
+          </PaginationContainer>
         )}
       </MainContent>
 
@@ -280,4 +299,4 @@ const SearchResults = () => {
   );
 };
 
-export default SearchResults;
+export default React.memo(SearchResults);

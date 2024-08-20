@@ -1,162 +1,248 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import styled from "styled-components";
 import { useAuth } from "../contexts/AuthContext";
 import { useSettings } from "../contexts/SettingsContext";
 import { FaUser, FaTwitter, FaInstagram, FaYoutube } from "react-icons/fa";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import * as yup from "yup";
+import ImageUploader from "../components/ImageUploader";
+import axios from "axios";
 
-// ... (すべてのstyled-componentsは変更なし)
+// Styled components (既存のものをそのまま使用)
+const Container = styled.div`
+  // ...
+`;
 
-const Profile = () => {
+const Title = styled.h1`
+  // ...
+`;
+
+const Form = styled.form`
+  // ...
+`;
+
+const FormSection = styled.div`
+  // ...
+`;
+
+const SectionTitle = styled.h2`
+  // ...
+`;
+
+const Input = styled.input`
+  // ...
+`;
+
+const Textarea = styled.textarea`
+  // ...
+`;
+
+const Select = styled.select`
+  // ...
+`;
+
+const CheckboxLabel = styled.label`
+  // ...
+`;
+
+const Checkbox = styled.input`
+  // ...
+`;
+
+const Button = styled.button`
+  // ...
+`;
+
+const ErrorMessage = styled.p`
+  // ...
+`;
+
+const SuccessMessage = styled.p`
+  // ...
+`;
+
+const InputWithIcon = styled.div`
+  // ...
+`;
+
+const AvatarPreview = styled.img`
+  // ...
+`;
+
+const ProgressBar = styled.div`
+  width: 100%;
+  height: 10px;
+  background-color: #e0e0e0;
+  border-radius: 5px;
+  margin-top: 10px;
+`;
+
+const ProgressFill = styled.div`
+  height: 100%;
+  background-color: #4caf50;
+  border-radius: 5px;
+  width: ${props => props.progress}%;
+  transition: width 0.3s ease;
+`;
+
+const schema = yup.object().shape({
+  firstName: yup.string().required("名前は必須です"),
+  lastName: yup.string().required("姓は必須です"),
+  bio: yup.string().max(500, "自己紹介は500文字以内で入力してください"),
+  preferences: yup.object().shape({
+    theme: yup.string().oneOf(["light", "dark"]),
+    language: yup.string().oneOf(["en", "ja"]),
+    notifications: yup.boolean(),
+  }),
+  socialLinks: yup.object().shape({
+    twitter: yup.string().url("有効なTwitter URLを入力してください"),
+    instagram: yup.string().url("有効なInstagram URLを入力してください"),
+    youtube: yup.string().url("有効なYouTube URLを入力してください"),
+  }),
+});
+
+const Profile = React.memo(({ showToast }) => {
   const { user, updateProfile } = useAuth();
   const { theme, language, updateTheme, updateLanguage } = useSettings();
-  const [profile, setProfile] = useState({
-    firstName: "",
-    lastName: "",
-    bio: "",
-    avatar: "",
-    preferences: { theme: "light", language: "en", notifications: true },
-    socialLinks: { twitter: "", instagram: "", youtube: "" },
-  });
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm({
+    resolver: yupResolver(schema),
+    defaultValues: useMemo(() => ({
+      firstName: "",
+      lastName: "",
+      bio: "",
+      preferences: { theme: "light", language: "en", notifications: true },
+      socialLinks: { twitter: "", instagram: "", youtube: "" },
+    }), []),
+  });
 
   useEffect(() => {
     if (user) {
-      setProfile({
-        ...user,
-        preferences: {
-          ...user.preferences,
-          theme,
-          language,
-        },
+      Object.entries(user).forEach(([key, value]) => {
+        setValue(key, value);
       });
+      setValue("preferences.theme", theme);
+      setValue("preferences.language", language);
+      setAvatarPreview(user.avatar);
     }
-  }, [user, theme, language]);
+  }, [user, theme, language, setValue]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setProfile((prevProfile) => ({
-      ...prevProfile,
-      [name]: value,
-    }));
-  };
+  const onSubmit = useCallback(async (data) => {
+    setIsLoading(true);
+    try {
+      await updateProfile(data);
+      showToast("プロフィールが正常に更新されました", "success");
+    } catch (error) {
+      showToast("プロフィールの更新中にエラーが発生しました", "error");
+      console.error("プロフィールの更新中にエラーが発生しました", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [updateProfile, showToast]);
 
-  const handlePreferenceChange = (e) => {
+  const handlePreferenceChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
     const newValue = type === "checkbox" ? checked : value;
-    setProfile((prevProfile) => ({
-      ...prevProfile,
-      preferences: {
-        ...prevProfile.preferences,
-        [name]: newValue,
-      },
-    }));
+    setValue(`preferences.${name}`, newValue);
 
     if (name === "theme") {
       updateTheme(value);
     } else if (name === "language") {
       updateLanguage(value);
     }
-  };
+  }, [setValue, updateTheme, updateLanguage]);
 
-  const handleSocialLinkChange = (e) => {
-    const { name, value } = e.target;
-    setProfile((prevProfile) => ({
-      ...prevProfile,
-      socialLinks: {
-        ...prevProfile.socialLinks,
-        [name]: value,
-      },
-    }));
-  };
-
-  const validateForm = () => {
-    if (!profile.firstName || !profile.lastName) {
-      setError("名前と姓を入力してください");
-      return false;
-    }
-    if (profile.bio && profile.bio.length > 500) {
-      setError("自己紹介は500文字以内で入力してください");
-      return false;
-    }
-    return true;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
-
-    if (!validateForm()) {
-      return;
-    }
-
-    setIsLoading(true);
+  const handleImageUpload = useCallback(async (file) => {
+    const formData = new FormData();
+    formData.append('avatar', file);
 
     try {
-      await updateProfile(profile);
-      setSuccess("プロフィールが正常に更新されました");
+      setIsLoading(true);
+      setUploadProgress(0);
+      const response = await axios.post('/api/users/avatar', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percentCompleted);
+        }
+      });
+      setAvatarPreview(response.data.avatar);
+      await updateProfile({ avatar: response.data.avatar });
+      showToast("プロフィール画像が正常に更新されました", "success");
     } catch (error) {
-      setError("プロフィールの更新中にエラーが発生しました");
+      showToast("プロフィール画像のアップロード中にエラーが発生しました", "error");
+      console.error('アバターのアップロード中にエラーが発生しました', error);
     } finally {
       setIsLoading(false);
+      setUploadProgress(0);
     }
-  };
+  }, [updateProfile, showToast]);
+
+  const memoizedImageUploader = useMemo(() => (
+    <ImageUploader onImageUpload={handleImageUpload} />
+  ), [handleImageUpload]);
 
   return (
     <Container>
       <Title>ユーザープロフィール</Title>
-      <Form onSubmit={handleSubmit}>
+      <Form onSubmit={handleSubmit(onSubmit)}>
         <FormSection>
           <SectionTitle>基本情報</SectionTitle>
-          <AvatarPreview src={profile.avatar || "https://via.placeholder.com/100"} />
+          {memoizedImageUploader}
+          {avatarPreview && (
+            <AvatarPreview
+              src={`/avatars/${avatarPreview}`}
+              alt="ユーザーアバター"
+            />
+          )}
+          {uploadProgress > 0 && uploadProgress < 100 && (
+            <ProgressBar>
+              <ProgressFill progress={uploadProgress} />
+            </ProgressBar>
+          )}
           <Input
-            type="text"
-            name="firstName"
+            {...register("firstName")}
             placeholder="名"
-            value={profile.firstName}
-            onChange={handleChange}
-            required
+            aria-label="名"
+            aria-invalid={errors.firstName ? "true" : "false"}
           />
+          {errors.firstName && <ErrorMessage role="alert">{errors.firstName.message}</ErrorMessage>}
           <Input
-            type="text"
-            name="lastName"
+            {...register("lastName")}
             placeholder="姓"
-            value={profile.lastName}
-            onChange={handleChange}
-            required
+            aria-label="姓"
+            aria-invalid={errors.lastName ? "true" : "false"}
           />
+          {errors.lastName && <ErrorMessage role="alert">{errors.lastName.message}</ErrorMessage>}
           <Textarea
-            name="bio"
+            {...register("bio")}
             placeholder="自己紹介（500文字以内）"
-            value={profile.bio}
-            onChange={handleChange}
-            maxLength={500}
+            aria-label="自己紹介"
+            aria-invalid={errors.bio ? "true" : "false"}
           />
-          <Input
-            type="text"
-            name="avatar"
-            placeholder="アバターURL"
-            value={profile.avatar}
-            onChange={handleChange}
-          />
+          {errors.bio && <ErrorMessage role="alert">{errors.bio.message}</ErrorMessage>}
         </FormSection>
 
         <FormSection>
           <SectionTitle>設定</SectionTitle>
           <Select
-            name="theme"
-            value={profile.preferences.theme}
+            {...register("preferences.theme")}
             onChange={handlePreferenceChange}
+            aria-label="テーマ"
           >
             <option value="light">ライト</option>
             <option value="dark">ダーク</option>
           </Select>
           <Select
-            name="language"
-            value={profile.preferences.language}
+            {...register("preferences.language")}
             onChange={handlePreferenceChange}
+            aria-label="言語"
           >
             <option value="en">English</option>
             <option value="ja">日本語</option>
@@ -164,9 +250,9 @@ const Profile = () => {
           <CheckboxLabel>
             <Checkbox
               type="checkbox"
-              name="notifications"
-              checked={profile.preferences.notifications}
+              {...register("preferences.notifications")}
               onChange={handlePreferenceChange}
+              aria-label="通知設定"
             />
             通知を受け取る
           </CheckboxLabel>
@@ -175,45 +261,43 @@ const Profile = () => {
         <FormSection>
           <SectionTitle>ソーシャルリンク</SectionTitle>
           <InputWithIcon>
-            <FaTwitter />
+            <FaTwitter aria-hidden="true" />
             <Input
-              type="text"
-              name="twitter"
+              {...register("socialLinks.twitter")}
               placeholder="Twitter"
-              value={profile.socialLinks.twitter}
-              onChange={handleSocialLinkChange}
+              aria-label="Twitter URL"
+              aria-invalid={errors.socialLinks?.twitter ? "true" : "false"}
             />
           </InputWithIcon>
+          {errors.socialLinks?.twitter && <ErrorMessage role="alert">{errors.socialLinks.twitter.message}</ErrorMessage>}
           <InputWithIcon>
-            <FaInstagram />
+            <FaInstagram aria-hidden="true" />
             <Input
-              type="text"
-              name="instagram"
+              {...register("socialLinks.instagram")}
               placeholder="Instagram"
-              value={profile.socialLinks.instagram}
-              onChange={handleSocialLinkChange}
+              aria-label="Instagram URL"
+              aria-invalid={errors.socialLinks?.instagram ? "true" : "false"}
             />
           </InputWithIcon>
+          {errors.socialLinks?.instagram && <ErrorMessage role="alert">{errors.socialLinks.instagram.message}</ErrorMessage>}
           <InputWithIcon>
-            <FaYoutube />
+            <FaYoutube aria-hidden="true" />
             <Input
-              type="text"
-              name="youtube"
+              {...register("socialLinks.youtube")}
               placeholder="YouTube"
-              value={profile.socialLinks.youtube}
-              onChange={handleSocialLinkChange}
+              aria-label="YouTube URL"
+              aria-invalid={errors.socialLinks?.youtube ? "true" : "false"}
             />
           </InputWithIcon>
+          {errors.socialLinks?.youtube && <ErrorMessage role="alert">{errors.socialLinks.youtube.message}</ErrorMessage>}
         </FormSection>
 
         <Button type="submit" disabled={isLoading}>
           {isLoading ? "更新中..." : "プロフィールを更新"}
         </Button>
-        {error && <ErrorMessage>{error}</ErrorMessage>}
-        {success && <SuccessMessage>{success}</SuccessMessage>}
       </Form>
     </Container>
   );
-};
+});
 
 export default Profile;

@@ -33,7 +33,6 @@ export const useError = () => {
 
   const showError = useCallback((message) => {
     setError(message);
-    // 5秒後にエラーメッセージをクリア
     setTimeout(() => setError(null), 5000);
   }, []);
 
@@ -43,17 +42,18 @@ export const useError = () => {
 };
 
 export const useYouTubeSearch = () => {
-  const searchVideos = async (query) => {
+  const searchVideos = useCallback(async (query) => {
     if (!query) return [];
 
     try {
-      const response = await axios.get(
-        `/api/search?q=${encodeURIComponent(query)}`,
-      );
-      console.log("API response:", response.data); // 追加
-      if (!response.data.items) {
+      const response = await axios.get(`/api/search`, {
+        params: { q: query }
+      });
+      
+      if (!response.data.items || !Array.isArray(response.data.items)) {
         throw new Error("Invalid API response");
       }
+      
       return response.data.items.map((item) => ({
         id: item.id.videoId,
         title: item.snippet.title,
@@ -67,7 +67,7 @@ export const useYouTubeSearch = () => {
       console.error("Error in useYouTubeSearch:", error);
       throw error;
     }
-  };
+  }, []);
 
   return useAsync(searchVideos);
 };

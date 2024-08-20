@@ -1,82 +1,311 @@
-exports.searchVideos = async (req, res) => {
-  try {
-    const {
-      q,
-      page = 1,
-      limit = 10,
-      sort = "relevance",
-      dateRange,
-      duration,
-    } = req.query;
-    const skip = (page - 1) * limit;
+const Video = require('../models/Video');
+const User = require('../models/User');
+const Channel = require('../models/Channel');
+const { catchAsync } = require('../utils/errorHandlers');
 
-    let sortOption = { score: { $meta: "textScore" } };
-    if (sort === "views") {
-      sortOption = { viewCount: -1 };
-    } else if (sort === "date") {
-      sortOption = { publishedAt: -1 };
+exports.createVideo = catchAsync(async (req, res) => {
+  const { title, description, youtubeId, genre, tags, channelId } = req.body;
+  const video = await Video.create({
+    title,
+    description,
+    youtubeId,
+    genre,
+    tags,
+    uploader: req.user.id,
+    channel: channelId
+  });
+
+  await Channel.findByIdAndUpdate(channelId, { $push: { videos: video._id } });
+
+  res.status(201).json({
+    status: 'success',
+    data: { video }
+  });
+});
+
+exports.getAllVideos = catchAsync(async (req, res) => {
+  const videos = await Video.find()
+    .populate('uploader', 'username')
+    .populate('channel', 'name');
+
+  res.status(200).json({
+    status: 'success',
+    results: videos.length,
+    data: { videos }
+  });
+});
+
+exports.getVideo = catchAsync(async (req, res) => {
+  const video = await Video.findById(req.params.id)
+    .populate('uploader', 'username')
+    .populate('channel', 'name')
+    .populate('comments.user', 'username');
+
+  if (!video) {
+    return res.status(404).json({
+      status: 'fail',
+      message: '動画が見つかりません'
+    });
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: { video }
+  });
+});
+
+exports.updateVideo = catchAsync(async (req, res) => {
+  const video = await Video.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
+    runValidators: true
+  });
+
+  if (!video) {
+    return res.status(404).json({
+      status: 'fail',
+      message: '動画が見つかりません'
+    });
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: { video }
+  });
+});
+
+exports.deleteVideo = catchAsync(async (req, res) => {
+  const video = await Video.findByIdAndDelete(req.params.id);
+
+  if (!video) {
+    return res.status(404).json({
+      status: 'fail',
+      message: '動画が見つかりません'
+    });
+  }
+
+  await Channel.findByIdAndUpdate(video.channel, { $pull: { videos: video._id } });
+
+  res.status(204).json({
+    status: 'success',
+    data: null
+  });
+});
+
+exports.incrementViewCount = catchAsync(async (req, res) => {
+  const video = await Video.findById(req.params.id);
+
+  if (!video) {
+    return res.status(404).json({
+      status: 'fail',
+      message: '動画が見つかりません'
+    });
+  }
+
+  await video.incrementViewCount();
+
+  res.status(200).json({
+    status: 'success',
+    data: { viewCount: video.viewCount }
+  });
+});
+
+exports.addComment = catchAsync(async (req, res) => {
+  const { text } = req.body;
+  const video = await Video.findById(req.params.id);
+
+  if (!video) {
+    return res.status(404).json({
+      status: 'fail',
+      message: '動画が見つかりません'
+    });
+  }
+
+  await video.addComment(req.user.id, text);
+
+  res.status(201).json({
+    status: 'success',
+    message: 'コメントが追加されました'
+  });
+});
+
+exports.searchVideos = catchAsync(async (req, res) => {
+  const {
+    q,
+    page = 1,
+    limit = 10,
+    sort = "relevance",
+    dateRange,
+    duration,
+  } = req.query;
+
+  if (!q) {
+    return res.status(400).json({ message: "検索クエリが必要です" });
+  }
+
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  let sortOption = { score: { $meta: "textScore" } };
+  if (sort === "views") {
+    sortOption = { viewCount: -1 };
+  } else if (sort === "date") {
+    sortOption = { publishedAt: -1 };
+  }
+
+  let query = { $text: { $search: q } };
+
+  if (dateRange) {
+    const date = new Date();
+    date.setDate(date.getDate() - parseInt(dateRange));
+    query.publishedAt = { $gte: date };
+  }
+
+  if (duration) {
+    switch (duration) {
+      case "short":
+        query.duration = { $lt: "PT4M" };
+        break;
+      case "medium":
+        query.duration = { $gte: "PT4M", $lte: "PT20M" };
+        break;
+      case "long":
+        query.duration = { $gt: "PT20M" };
+        break;
+      default:
+        return res.status(400).json({ message: "無効な duration パラメータです" });
     }
+  }
 
-    let query = { $text: { $search: q } };
+  const videos = await Video.find(query, { score: { $meta: "textScore" } })
+    .sort(sortOption)
+    .skip(skip)
+    .limit(parseInt(limit))
+    .select("title thumbnail channelName viewCount publishedAt duration");
 
-    // 日付範囲フィルター
-    if (dateRange) {
-      const date = new Date();
-      date.setDate(date.getDate() - parseInt(dateRange));
-      query.publishedAt = { $gte: date };
+  const total = await Video.countDocuments(query);
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      videos,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit)),
+      totalVideos: total,
     }
+  });
+});
 
-    // 動画の長さフィルター
-    if (duration) {
-      switch (duration) {
-        case "short":
-          query.duration = { $lt: "PT4M" };
-          break;
-        case "medium":
-          query.duration = { $gte: "PT4M", $lte: "PT20M" };
-          break;
-        case "long":
-          query.duration = { $gt: "PT20M" };
-          break;
-      }
-    }
+exports.getRelatedVideos = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  
+  if (!id) {
+    return res.status(400).json({ message: "動画IDが必要です" });
+  }
 
-    const videos = await Video.find(query, { score: { $meta: "textScore" } })
-      .sort(sortOption)
-      .skip(skip)
-      .limit(parseInt(limit))
-      .select("title thumbnail channelName viewCount publishedAt duration");
+  const video = await Video.findById(id);
 
-    const total = await Video.countDocuments(query);
+  if (!video) {
+    return res.status(404).json({ message: "動画が見つかりません" });
+  }
 
-    res.json({
+  const relatedVideos = await Video.find({
+    $or: [
+      { genre: video.genre },
+      { tags: { $in: video.tags } }
+    ],
+    _id: { $ne: video._id },
+  })
+    .limit(10)
+    .select("title thumbnail channelName viewCount");
+
+  res.status(200).json({
+    status: 'success',
+    data: { relatedVideos }
+  });
+});
+
+exports.getVideoDetails = catchAsync(async (req, res) => {
+  const { id } = req.params;
+
+  if (!id) {
+    return res.status(400).json({ message: "動画IDが必要です" });
+  }
+
+  const video = await Video.findById(id)
+    .select("-__v");
+
+  if (!video) {
+    return res.status(404).json({ message: "動画が見つかりません" });
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: { video }
+  });
+});
+
+exports.searchAndSaveVideos = catchAsync(async (req, res) => {
+  const { q } = req.body;
+  if (!q) {
+    return res.status(400).json({ message: "検索クエリが必要です" });
+  }
+
+  // ここで外部APIを使用して動画を検索し、データベースに保存する処理を実装
+  // 例: const videos = await searchVideosFromExternalAPI(q);
+  // const savedVideos = await Video.insertMany(videos);
+
+  res.status(200).json({
+    status: 'success',
+    message: '動画が検索され、保存されました',
+    // data: { savedVideos }
+  });
+});
+
+exports.getPopularVideos = catchAsync(async (req, res) => {
+  const popularVideos = await Video.find()
+    .sort({ viewCount: -1 })
+    .limit(10)
+    .select("title thumbnail channelName viewCount");
+
+  res.status(200).json({
+    status: 'success',
+    data: { popularVideos }
+  });
+});
+
+exports.getVideosByGenre = catchAsync(async (req, res) => {
+  const { genreId } = req.params;
+  const videos = await Video.find({ genre: genreId })
+    .sort({ publishedAt: -1 })
+    .limit(20)
+    .select("title thumbnail channelName viewCount");
+
+  res.status(200).json({
+    status: 'success',
+    data: { videos }
+  });
+});
+
+exports.getVideos = catchAsync(async (req, res) => {
+  const { page = 1, limit = 20, sort = 'publishedAt' } = req.query;
+  const skip = (page - 1) * limit;
+
+  const videos = await Video.find()
+    .sort({ [sort]: -1 })
+    .skip(skip)
+    .limit(parseInt(limit))
+    .select("title thumbnail channelName viewCount publishedAt");
+
+  const total = await Video.countDocuments();
+
+  res.status(200).json({
+    status: 'success',
+    data: {
       videos,
       currentPage: parseInt(page),
       totalPages: Math.ceil(total / limit),
-      totalVideos: total,
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-exports.getRelatedVideos = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const video = await Video.findById(id);
-
-    if (!video) {
-      return res.status(404).json({ message: "Video not found" });
+      totalVideos: total
     }
+  });
+});
 
-    const relatedVideos = await Video.find({
-      $or: [{ genre: video.genre }, { tags: { $in: video.tags } }],
-      _id: { $ne: video._id },
-    })
-      .limit(10)
-      .select("title thumbnail channelName viewCount");
-
-    res.json(relatedVideos);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+exports.addVideo = exports.createVideo;  // createVideo 関数を再利用

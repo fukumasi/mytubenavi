@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { useQuery } from "react-query";
+import { useQuery, useMutation } from "react-query";
 import styled from "styled-components";
-import { getVideoDetails, getRelatedVideos } from "../api/youtube";
+import { getVideoDetails, getRelatedVideos, incrementViewCount, addComment, getComments } from "../api/youtube";
 import ErrorMessage from "../components/ErrorMessage";
 import RelatedVideos from "../components/RelatedVideos";
 import { useTheme } from "../hooks";
@@ -90,9 +90,49 @@ const ChannelName = styled.span`
 
 const Sidebar = styled.aside``;
 
+const CommentSection = styled.section`
+  margin-top: ${({ theme }) => theme.spacing.large};
+`;
+
+const CommentForm = styled.form`
+  display: flex;
+  margin-bottom: ${({ theme }) => theme.spacing.medium};
+`;
+
+const CommentInput = styled.input`
+  flex-grow: 1;
+  padding: ${({ theme }) => theme.spacing.small};
+  font-size: ${({ theme }) => theme.fontSizes.medium};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius};
+`;
+
+const CommentButton = styled.button`
+  padding: ${({ theme }) => theme.spacing.small} ${({ theme }) => theme.spacing.medium};
+  background-color: ${({ theme }) => theme.colors.primary};
+  color: ${({ theme }) => theme.colors.white};
+  border: none;
+  border-radius: ${({ theme }) => theme.borderRadius};
+  cursor: pointer;
+  margin-left: ${({ theme }) => theme.spacing.small};
+`;
+
+const CommentList = styled.ul`
+  list-style-type: none;
+  padding: 0;
+`;
+
+const CommentItem = styled.li`
+  margin-bottom: ${({ theme }) => theme.spacing.medium};
+  padding: ${({ theme }) => theme.spacing.small};
+  background-color: ${({ theme }) => theme.colors.backgroundLight};
+  border-radius: ${({ theme }) => theme.borderRadius};
+`;
+
 const VideoDetail = () => {
   const { id } = useParams();
   const [playerReady, setPlayerReady] = useState(false);
+  const [newComment, setNewComment] = useState("");
   const theme = useTheme();
 
   const {
@@ -114,10 +154,34 @@ const VideoDetail = () => {
     onError: (error) => console.error("Related videos fetching error:", error)
   });
 
+  const {
+    data: comments,
+    isLoading: isLoadingComments,
+    error: commentsError,
+    refetch: refetchComments
+  } = useQuery(["comments", id], () => getComments(id), {
+    enabled: !!id,
+    retry: 3,
+    onError: (error) => console.error("Comments fetching error:", error)
+  });
+
+  const incrementViewCountMutation = useMutation(incrementViewCount, {
+    onError: (error) => console.error("Error incrementing view count:", error)
+  });
+
+  const addCommentMutation = useMutation(addComment, {
+    onSuccess: () => {
+      refetchComments();
+      setNewComment("");
+    },
+    onError: (error) => console.error("Error adding comment:", error)
+  });
+
   const onPlayerReady = useCallback(() => {
     console.log("Player is ready");
     setPlayerReady(true);
-  }, []);
+    incrementViewCountMutation.mutate(id);
+  }, [id, incrementViewCountMutation]);
 
   useEffect(() => {
     if (!window.YT) {
@@ -150,7 +214,14 @@ const VideoDetail = () => {
     return "N/A";
   }, [video?.snippet?.publishedAt]);
 
-  if (isLoadingVideo || isLoadingRelated) return <SkeletonLoader />;
+  const handleCommentSubmit = (e) => {
+    e.preventDefault();
+    if (newComment.trim()) {
+      addCommentMutation.mutate({ videoId: id, text: newComment });
+    }
+  };
+
+  if (isLoadingVideo || isLoadingRelated || isLoadingComments) return <SkeletonLoader />;
   if (videoError) return <ErrorMessage message={`動画の読み込み中にエラーが発生しました: ${videoError.message || '不明なエラー'}`} />;
   if (!video) return <ErrorMessage message="動画が見つかりません。" />;
 
@@ -191,6 +262,31 @@ const VideoDetail = () => {
             {video.snippet?.description || "説明がありません。"}
           </VideoDescription>
         </VideoInfo>
+        <CommentSection theme={theme}>
+          <h2>コメント</h2>
+          <CommentForm onSubmit={handleCommentSubmit}>
+            <CommentInput
+              type="text"
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="コメントを追加..."
+              theme={theme}
+            />
+            <CommentButton type="submit" theme={theme}>投稿</CommentButton>
+          </CommentForm>
+          {commentsError ? (
+            <ErrorMessage message={`コメントの読み込み中にエラーが発生しました: ${commentsError.message || '不明なエラー'}`} />
+          ) : (
+            <CommentList theme={theme}>
+              {comments?.map((comment, index) => (
+                <CommentItem key={index} theme={theme}>
+                  <strong>{comment.user.username}: </strong>
+                  {comment.text}
+                </CommentItem>
+              ))}
+            </CommentList>
+          )}
+        </CommentSection>
       </MainContent>
       <Sidebar theme={theme}>
         <h2 id="related-videos-heading" className="sr-only">関連動画</h2>

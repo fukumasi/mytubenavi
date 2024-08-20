@@ -14,16 +14,35 @@ exports.protect = async (req, res, next) => {
   if (!token) {
     return res
       .status(401)
-      .json({ message: "Not authorized to access this route" });
+      .json({ message: "アクセスするには認証が必要です" });
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(decoded.userId).select("-password");
+
+    const user = await User.findById(decoded.userId).select("-password");
+
+    if (!user) {
+      return res.status(401).json({ message: "ユーザーが見つかりません" });
+    }
+
+    req.user = user;
     next();
   } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ message: "トークンの有効期限が切れています" });
+    }
     return res
       .status(401)
-      .json({ message: "Not authorized to access this route" });
+      .json({ message: "無効なトークンです" });
   }
+};
+
+exports.authorize = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.userType)) {
+      return res.status(403).json({ message: "このアクションを実行する権限がありません" });
+    }
+    next();
+  };
 };

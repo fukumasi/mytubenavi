@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>メールアドレスの確認 - MyTubeNavi</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #2ecc71;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>メールアドレスの確認</h1>
+        <p>こんにちは、{{name}}さん</p>
+        <p>MyTubeNaviへのご登録ありがとうございます。以下のボタンをクリックして、メールアドレスを確認してください。</p>
+        <a href="{{confirmLink}}" class="button">メールアドレスを確認</a>
+        <p>このリンクは24時間有効です。期限が切れた場合は、再度登録をお願いいたします。</p>
+        <p>もしMyTubeNaviに登録した覚えがない場合は、このメールを無視してください。</p>
+        <div class="footer">
+            <p>このメールは自動送信されています。返信はできませんのでご了承ください。</p>
+            <p>&copy; 2023 MyTubeNavi. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
