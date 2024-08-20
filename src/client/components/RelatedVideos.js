@@ -2,6 +2,7 @@ import React, { useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../hooks';
+import { useInView } from 'react-intersection-observer';
 
 const RelatedVideosList = styled.ul`
   display: flex;
@@ -55,26 +56,35 @@ const ChannelName = styled.span`
   color: ${({ theme }) => theme.colors?.textSecondary || '#666'};
 `;
 
-const RelatedVideoItem = React.memo(({ video, theme, handleKeyDown }) => (
-  <VideoItemWrapper theme={theme}>
-    <VideoLink
-      to={`/video/${video.id.videoId || video.id}`}
-      onKeyDown={(e) => handleKeyDown(e, video.id.videoId || video.id)}
-      theme={theme}
-    >
-      <Thumbnail
-        src={video.snippet.thumbnails.medium.url}
-        alt={`${video.snippet.title} のサムネイル`}
-        loading="lazy"
+const RelatedVideoItem = React.memo(({ video, theme, handleKeyDown }) => {
+  const [ref, inView] = useInView({
+    triggerOnce: true,
+    rootMargin: '200px 0px',
+  });
+
+  return (
+    <VideoItemWrapper ref={ref} theme={theme}>
+      <VideoLink
+        to={`/video/${video.id.videoId || video.id}`}
+        onKeyDown={(e) => handleKeyDown(e, video.id.videoId || video.id)}
         theme={theme}
-      />
-      <VideoInfo>
-        <Title theme={theme}>{video.snippet.title}</Title>
-        <ChannelName theme={theme}>{video.snippet.channelTitle}</ChannelName>
-      </VideoInfo>
-    </VideoLink>
-  </VideoItemWrapper>
-));
+      >
+        {inView && (
+          <Thumbnail
+            src={video.snippet.thumbnails.medium.url}
+            alt={`${video.snippet.title} のサムネイル`}
+            loading="lazy"
+            theme={theme}
+          />
+        )}
+        <VideoInfo>
+          <Title theme={theme}>{video.snippet.title}</Title>
+          <ChannelName theme={theme}>{video.snippet.channelTitle}</ChannelName>
+        </VideoInfo>
+      </VideoLink>
+    </VideoItemWrapper>
+  );
+});
 
 const RelatedVideos = ({ videos }) => {
   const theme = useTheme();
@@ -99,7 +109,7 @@ const RelatedVideos = ({ videos }) => {
   );
 
   return (
-    <RelatedVideosList theme={theme}>
+    <RelatedVideosList theme={theme} aria-label="関連動画">
       {memoizedVideos}
     </RelatedVideosList>
   );

@@ -18,6 +18,7 @@ yarn-error.log
 
 # ログ
 *.log
+/logs
 
 # テストカバレッジ
 /coverage

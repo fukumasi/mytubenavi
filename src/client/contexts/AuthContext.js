@@ -76,7 +76,7 @@ export const AuthProvider = ({ children }) => {
     setError(null);
   }, []);
 
-  const updateProfile = async (profileData) => {
+  const updateUser = async (profileData) => {
     try {
       const res = await axios.put("/api/auth/profile", profileData);
       setUser(res.data);
@@ -101,6 +101,33 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // 新しく追加した関数：メールアドレス変更
+  const changeEmail = async (newEmail) => {
+    try {
+      const res = await axios.put("/api/auth/change-email", { newEmail });
+      setUser(res.data);
+      setError(null);
+      return true;
+    } catch (error) {
+      console.error("Email change error:", error);
+      setError(error.response?.data?.message || "Email change failed");
+      return false;
+    }
+  };
+
+  // 新しく追加した関数：パスワード変更
+  const changePassword = async (currentPassword, newPassword) => {
+    try {
+      await axios.put("/api/auth/change-password", { currentPassword, newPassword });
+      setError(null);
+      return true;
+    } catch (error) {
+      console.error("Password change error:", error);
+      setError(error.response?.data?.message || "Password change failed");
+      return false;
+    }
+  };
+
   return (
     <AuthContext.Provider 
       value={{ 
@@ -110,9 +137,11 @@ export const AuthProvider = ({ children }) => {
         logout, 
         loading, 
         error, 
-        updateProfile, 
+        updateUser, 
         resetPassword,
-        fetchUser 
+        fetchUser,
+        changeEmail,
+        changePassword
       }}
     >
       {children}

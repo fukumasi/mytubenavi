@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import styled from "styled-components";
 import { useAuth } from "../contexts/AuthContext";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 
 const Container = styled.div`
   display: flex;
@@ -27,10 +29,14 @@ const Title = styled.h2`
   text-align: center;
 `;
 
+const InputGroup = styled.div`
+  position: relative;
+  margin-bottom: 16px;
+`;
+
 const Input = styled.input`
   width: 100%;
   padding: 12px;
-  margin-bottom: 16px;
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: 4px;
   font-size: 16px;
@@ -80,7 +86,7 @@ const Button = styled.button`
 const Message = styled.p`
   margin-top: 16px;
   text-align: center;
-  color: ${({ isError, theme }) => isError ? theme.colors.error : theme.colors.success};
+  color: ${({ isError, theme }) => (isError ? theme.colors.error : theme.colors.success)};
 `;
 
 const LinkContainer = styled.div`
@@ -97,34 +103,62 @@ const StyledLink = styled(Link)`
   }
 `;
 
+const PasswordToggle = styled.button`
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+`;
+
 const Register = () => {
   const [formData, setFormData] = useState({
     username: "",
     email: "",
     password: "",
+    confirmPassword: "",
     userType: "general",
   });
   const [message, setMessage] = useState({ text: "", isError: false });
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register } = useAuth() || {}; // useAuthがundefinedの場合でもエラーを防ぐ
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const validateForm = () => {
+    if (formData.password !== formData.confirmPassword) {
+      setMessage({ text: "パスワードが一致しません", isError: true });
+      return false;
+    }
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(formData.password)) {
+      setMessage({ text: "パスワードは8文字以上で、大文字、小文字、数字、特殊文字を含む必要があります", isError: true });
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage({ text: "", isError: false });
+
+    if (!validateForm()) return;
+
     setIsLoading(true);
 
     try {
-      const success = await register(formData.username, formData.email, formData.password, formData.userType);
-      if (success) {
-        setMessage({ text: "登録が完了しました。ログインページに移動します...", isError: false });
-        setTimeout(() => navigate("/login"), 3000);
+      const result = await register(formData.username, formData.email, formData.password, formData.userType);
+      if (result?.success) {
+        setMessage({ text: "登録が完了しました。確認メールを送信しました。ログインページに移動します...", isError: false });
+        setTimeout(() => navigate("/login"), 5000);
       } else {
-        setMessage({ text: "登録に失敗しました。もう一度お試しください。", isError: true });
+        setMessage({ text: result?.message || "登録に失敗しました。もう一度お試しください。", isError: true });
       }
     } catch (error) {
       setMessage({ text: error.response?.data?.message || "登録中にエラーが発生しました。", isError: true });
@@ -137,38 +171,65 @@ const Register = () => {
     <Container>
       <Form onSubmit={handleSubmit}>
         <Title>新規登録</Title>
-        <Input
-          type="text"
-          name="username"
-          placeholder="ユーザー名"
-          value={formData.username}
-          onChange={handleChange}
-          required
-        />
-        <Input
-          type="email"
-          name="email"
-          placeholder="メールアドレス"
-          value={formData.email}
-          onChange={handleChange}
-          required
-        />
-        <Input
-          type="password"
-          name="password"
-          placeholder="パスワード"
-          value={formData.password}
-          onChange={handleChange}
-          required
-        />
-        <Select name="userType" value={formData.userType} onChange={handleChange}>
+        <InputGroup>
+          <Input
+            type="text"
+            name="username"
+            placeholder="ユーザー名"
+            value={formData.username}
+            onChange={handleChange}
+            required
+            aria-label="ユーザー名"
+          />
+        </InputGroup>
+        <InputGroup>
+          <Input
+            type="email"
+            name="email"
+            placeholder="メールアドレス"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            aria-label="メールアドレス"
+          />
+        </InputGroup>
+        <InputGroup>
+          <Input
+            type={showPassword ? "text" : "password"}
+            name="password"
+            placeholder="パスワード"
+            value={formData.password}
+            onChange={handleChange}
+            required
+            aria-label="パスワード"
+          />
+          <PasswordToggle
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            aria-label={showPassword ? "パスワードを隠す" : "パスワードを表示"}
+          >
+            <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
+          </PasswordToggle>
+        </InputGroup>
+        <InputGroup>
+          <Input
+            type={showPassword ? "text" : "password"}
+            name="confirmPassword"
+            placeholder="パスワード（確認）"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            required
+            aria-label="パスワード（確認）"
+          />
+        </InputGroup>
+        <Select name="userType" value={formData.userType} onChange={handleChange} aria-label="ユーザータイプ">
           <option value="general">一般ユーザー</option>
           <option value="creator">クリエイター</option>
         </Select>
         <Button type="submit" disabled={isLoading}>
           {isLoading ? "登録中..." : "登録"}
         </Button>
-        {message.text && <Message isError={message.isError}>{message.text}</Message>}
+        {message.text && <Message isError={message.isError} role={message.isError ? "alert" : "status"}>{message.text}</Message>}
         <LinkContainer>
           すでにアカウントをお持ちの方は <StyledLink to="/login">こちら</StyledLink>
         </LinkContainer>

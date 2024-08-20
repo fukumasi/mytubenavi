@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 require("dotenv").config();
 const authRoutes = require("./src/server/routes/auth");
 const youtubeService = require("./src/server/services/youtubeService");
+const commentRoutes = require("./src/server/routes/comment");
 
 const app = express();
 const cors = require('cors');
@@ -34,8 +35,11 @@ app.use(express.static(path.join(__dirname, "build")));
 const featuredVideoRoutes = require("./src/server/routes/featuredVideos");
 app.use("/api/featured-videos", featuredVideoRoutes);
 
-// 認証ルートを追加
+// 認証ルートを追加（この行を修正）
 app.use("/api/auth", authRoutes);
+
+// コメントルートを追加
+app.use("/api/comments", commentRoutes);
 
 // 動画詳細を取得するエンドポイント
 app.get("/api/videos/:id", async (req, res) => {
@@ -82,7 +86,7 @@ app.get("/api/search", async (req, res) => {
   }
 });
 
-// すべてのリクエストをReactアプリにリダイレクト
+// すべてのリクエストをReactアプリにリダイレクト（この行を修正）
 app.get("*", (req, res) => {
   console.log("Serving React app");
   res.sendFile(path.join(__dirname, "build", "index.html"));
