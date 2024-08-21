@@ -83,4 +83,17 @@ describe('VideoTable Component', () => {
     expect(thumbnails).toHaveLength(mockVideos.length);
     expect(thumbnails[0]).toHaveAttribute('src', 'http://example.com/thumbnail1.jpg');
   });
+
+  test('calls onSort when header is clicked', () => {
+    renderVideoTable();
+    const titleHeader = screen.getByText(/タイトル/);
+    titleHeader.click();
+    expect(mockOnSort).toHaveBeenCalledWith('title');
+  });
+
+  test('displays correct sort indicator', () => {
+    renderVideoTable({ sortConfig: { key: 'viewCount', direction: 'descending' } });
+    const viewCountHeader = screen.getByText(/再生回数 ▼/);
+    expect(viewCountHeader).toBeInTheDocument();
+  });
 });
