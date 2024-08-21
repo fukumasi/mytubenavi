@@ -2,40 +2,40 @@ import React from 'react';
 import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 
-const TableContainer = styled.div`
+const TableContainer = styled.div.attrs({ role: 'table' })`
   width: 100%;
 `;
 
-const TableHeader = styled.div`
+const TableHeader = styled.div.attrs({ role: 'row' })`
   display: flex;
-  background-color: ${({ theme }) => theme.colors.backgroundLight};
+  background-color: ${({ theme }) => theme.colors?.backgroundLight || '#f8f9fa'};
   font-weight: bold;
-  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+  border-bottom: 1px solid ${({ theme }) => theme.colors?.border || '#dee2e6'};
 `;
 
-const HeaderCell = styled.div`
+const HeaderCell = styled.div.attrs({ role: 'columnheader' })`
   flex: ${props => props.$flex || 1};
   padding: 10px;
   cursor: pointer;
   transition: background-color 0.3s ease;
   
   &:hover {
-    background-color: ${({ theme }) => theme.colors.backgroundHover};
+    background-color: ${({ theme }) => theme.colors?.backgroundHover || '#e9ecef'};
   }
 `;
 
-const Row = styled.div`
+const Row = styled.div.attrs({ role: 'row' })`
   display: flex;
-  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+  border-bottom: 1px solid ${({ theme }) => theme.colors?.border || '#dee2e6'};
   &:last-child {
     border-bottom: none;
   }
   &:hover {
-    background-color: ${({ theme }) => theme.colors.backgroundHover};
+    background-color: ${({ theme }) => theme.colors?.backgroundHover || '#e9ecef'};
   }
 `;
 
-const Cell = styled.div`
+const Cell = styled.div.attrs({ role: 'cell' })`
   flex: ${props => props.$flex || 1};
   padding: 10px;
   display: flex;
@@ -53,7 +53,7 @@ const NoVideosMessage = styled.p`
   text-align: center;
   padding: 20px;
   font-style: italic;
-  color: ${({ theme }) => theme.colors.textLight};
+  color: ${({ theme }) => theme.colors?.textLight || '#6c757d'};
 `;
 
 const SortIndicator = styled.span`
@@ -61,24 +61,24 @@ const SortIndicator = styled.span`
 `;
 
 const StyledLink = styled(Link)`
-  color: ${({ theme }) => theme.colors.primary};
+  color: ${({ theme }) => theme.colors?.primary || '#007bff'};
   text-decoration: none;
   &:hover {
     text-decoration: underline;
   }
 `;
 
+const getSortIndicator = (columnName, sortConfig) => {
+  if (sortConfig.key === columnName) {
+    return sortConfig.direction === 'ascending' ? '▲' : '▼';
+  }
+  return '';
+};
+
 const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
   if (!videos || videos.length === 0) {
     return <NoVideosMessage>動画が見つかりません</NoVideosMessage>;
   }
-
-  const getSortIndicator = (columnName) => {
-    if (sortConfig.key === columnName) {
-      return sortConfig.direction === 'ascending' ? '▲' : '▼';
-    }
-    return '';
-  };
 
   const defaultThumbnail = 'https://via.placeholder.com/120x67.png?text=No+Image';
 
@@ -104,19 +104,19 @@ const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
       <TableHeader>
         <HeaderCell $flex={2}>サムネイル</HeaderCell>
         <HeaderCell $flex={4} onClick={() => onSort('title')}>
-          タイトル {getSortIndicator('title')}
+          タイトル {getSortIndicator('title', sortConfig)}
         </HeaderCell>
         <HeaderCell $flex={2} onClick={() => onSort('channelTitle')}>
-          チャンネル {getSortIndicator('channelTitle')}
+          チャンネル {getSortIndicator('channelTitle', sortConfig)}
         </HeaderCell>
         <HeaderCell $flex={1} onClick={() => onSort('viewCount')}>
-          再生回数 {getSortIndicator('viewCount')}
+          再生回数 {getSortIndicator('viewCount', sortConfig)}
         </HeaderCell>
         <HeaderCell $flex={1} onClick={() => onSort('publishedAt')}>
-          投稿日 {getSortIndicator('publishedAt')}
+          投稿日 {getSortIndicator('publishedAt', sortConfig)}
         </HeaderCell>
         <HeaderCell $flex={1} onClick={() => onSort('duration')}>
-          長さ {getSortIndicator('duration')}
+          長さ {getSortIndicator('duration', sortConfig)}
         </HeaderCell>
       </TableHeader>
       {videos.map((video) => {

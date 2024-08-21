@@ -59,6 +59,10 @@ const darkTheme = {
   },
 };
 
+const defaultTheme = lightTheme; // デフォルトテーマとしてlightThemeを使用
+
+export { lightTheme, darkTheme, defaultTheme };
+
 export default {
   light: lightTheme,
   dark: darkTheme,
