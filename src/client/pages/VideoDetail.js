@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { useQuery, useMutation } from "react-query";
+import { useQuery } from "react-query";
 import styled from "styled-components";
-import { getVideoDetails, getRelatedVideos, incrementViewCount, addComment, getComments } from "../api/youtube";
+import { getVideoDetails, getRelatedVideos, getVideoComments } from "../api/youtube";
 import ErrorMessage from "../components/ErrorMessage";
 import RelatedVideos from "../components/RelatedVideos";
 import { useTheme } from "../hooks";
@@ -159,29 +159,16 @@ const VideoDetail = () => {
     isLoading: isLoadingComments,
     error: commentsError,
     refetch: refetchComments
-  } = useQuery(["comments", id], () => getComments(id), {
+  } = useQuery(["comments", id], () => getVideoComments(id), {
     enabled: !!id,
     retry: 3,
     onError: (error) => console.error("Comments fetching error:", error)
   });
 
-  const incrementViewCountMutation = useMutation(incrementViewCount, {
-    onError: (error) => console.error("Error incrementing view count:", error)
-  });
-
-  const addCommentMutation = useMutation(addComment, {
-    onSuccess: () => {
-      refetchComments();
-      setNewComment("");
-    },
-    onError: (error) => console.error("Error adding comment:", error)
-  });
-
   const onPlayerReady = useCallback(() => {
     console.log("Player is ready");
     setPlayerReady(true);
-    incrementViewCountMutation.mutate(id);
-  }, [id, incrementViewCountMutation]);
+  }, []);
 
   useEffect(() => {
     if (!window.YT) {
@@ -217,7 +204,8 @@ const VideoDetail = () => {
   const handleCommentSubmit = (e) => {
     e.preventDefault();
     if (newComment.trim()) {
-      addCommentMutation.mutate({ videoId: id, text: newComment });
+      console.log("Adding comment:", newComment);
+      setNewComment("");
     }
   };
 
@@ -280,7 +268,7 @@ const VideoDetail = () => {
             <CommentList theme={theme}>
               {comments?.map((comment, index) => (
                 <CommentItem key={index} theme={theme}>
-                  <strong>{comment.user.username}: </strong>
+                  <strong>{comment.author}: </strong>
                   {comment.text}
                 </CommentItem>
               ))}
