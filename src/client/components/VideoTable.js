@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import ErrorBoundary from './ErrorBoundary';
+import { FixedSizeList as List } from 'react-window';
 
 const MESSAGES = {
   NO_VIDEOS: '動画が見つかりません',
@@ -91,7 +92,29 @@ const getSortIndicator = (columnName, sortConfig) => {
   return '';
 };
 
+const performanceTest = (videoCount) => {
+  console.time('Generate Test Data');
+  const testVideos = Array(videoCount).fill().map((_, index) => ({
+    id: `test-${index}`,
+    title: `Test Video ${index}`,
+    channelTitle: `Test Channel ${index}`,
+    thumbnails: { medium: { url: 'https://via.placeholder.com/120x67' } },
+    statistics: { viewCount: Math.floor(Math.random() * 1000000).toString() },
+    publishedAt: new Date(Date.now() - Math.random() * 10000000000).toISOString(),
+    contentDetails: { duration: `PT${Math.floor(Math.random() * 120)}M${Math.floor(Math.random() * 60)}S` }
+  }));
+  console.timeEnd('Generate Test Data');
+  return testVideos;
+};
+
 const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      const testVideos = performanceTest(1000); // 1000個のテストデータを生成
+      console.log('Test videos generated:', testVideos.length);
+    }
+  }, []);
+
   if (!videos || videos.length === 0) {
     return <NoVideosMessage>{MESSAGES.NO_VIDEOS}</NoVideosMessage>;
   }
@@ -112,6 +135,40 @@ const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
       return `${minutes}:${String(seconds).padStart(2, '0')}`;
     }
   };
+
+  const RowRenderer = React.useCallback(({ index, style }) => {
+    const video = videos[index];
+    const thumbnailUrl = video.thumbnails?.medium?.url || 
+                         video.thumbnails?.default?.url || 
+                         video.snippet?.thumbnails?.medium?.url ||
+                         video.snippet?.thumbnails?.default?.url ||
+                         defaultThumbnail;
+    
+    const title = video.title || video.snippet?.title || MESSAGES.NO_TITLE;
+    const channelTitle = video.channelTitle || video.snippet?.channelTitle || MESSAGES.UNKNOWN;
+    const viewCount = (video.statistics?.viewCount || video.viewCount || 0).toLocaleString();
+    const publishedAt = new Date(video.publishedAt || video.snippet?.publishedAt || Date.now()).toLocaleDateString();
+    const duration = formatDuration(video.contentDetails?.duration);
+
+    const uniqueKey = video.id || video.videoId || `video-${video.etag}`;
+
+    return (
+      <Row key={uniqueKey} style={style}>
+        <Cell $flex={2}>
+          <StyledLink to={`/video/${video.id || video.videoId}`}>
+            <ThumbnailImage src={thumbnailUrl} alt={title} />
+          </StyledLink>
+        </Cell>
+        <Cell $flex={4}>
+          <StyledLink to={`/video/${video.id || video.videoId}`}>{title}</StyledLink>
+        </Cell>
+        <Cell $flex={2}>{channelTitle}</Cell>
+        <Cell $flex={1}>{viewCount}</Cell>
+        <Cell $flex={1}>{publishedAt}</Cell>
+        <Cell $flex={1}>{duration}</Cell>
+      </Row>
+    );
+  }, [videos]);
 
   console.log('Videos prop:', videos); // デバッグ用
 
@@ -136,38 +193,14 @@ const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
             {MESSAGES.DURATION} {getSortIndicator('duration', sortConfig)}
           </HeaderCell>
         </TableHeader>
-        {videos.map((video) => {
-          const thumbnailUrl = video.thumbnails?.medium?.url || 
-                               video.thumbnails?.default?.url || 
-                               video.snippet?.thumbnails?.medium?.url ||
-                               video.snippet?.thumbnails?.default?.url ||
-                               defaultThumbnail;
-          
-          const title = video.title || video.snippet?.title || MESSAGES.NO_TITLE;
-          const channelTitle = video.channelTitle || video.snippet?.channelTitle || MESSAGES.UNKNOWN;
-          const viewCount = (video.statistics?.viewCount || video.viewCount || 0).toLocaleString();
-          const publishedAt = new Date(video.publishedAt || video.snippet?.publishedAt || Date.now()).toLocaleDateString();
-          const duration = formatDuration(video.contentDetails?.duration);
-
-          const uniqueKey = video.id || video.videoId || `video-${video.etag}`;
-
-          return (
-            <Row key={uniqueKey}>
-              <Cell $flex={2}>
-                <StyledLink to={`/video/${video.id || video.videoId}`}>
-                  <ThumbnailImage src={thumbnailUrl} alt={title} />
-                </StyledLink>
-              </Cell>
-              <Cell $flex={4}>
-                <StyledLink to={`/video/${video.id || video.videoId}`}>{title}</StyledLink>
-              </Cell>
-              <Cell $flex={2}>{channelTitle}</Cell>
-              <Cell $flex={1}>{viewCount}</Cell>
-              <Cell $flex={1}>{publishedAt}</Cell>
-              <Cell $flex={1}>{duration}</Cell>
-            </Row>
-          );
-        })}
+        <List
+          height={600}
+          itemCount={videos.length}
+          itemSize={100}
+          width="100%"
+        >
+          {RowRenderer}
+        </List>
       </TableContainer>
     </ErrorBoundary>
   );

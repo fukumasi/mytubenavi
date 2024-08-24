@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import styled, { ThemeProvider, css } from "styled-components";
+import styled, { ThemeProvider } from "styled-components";
 import SearchBar from "./SearchBar";
 import { useAuth } from "../contexts/AuthContext";
 import { FaUser, FaSignOutAlt, FaSignInAlt, FaUserPlus, FaMoon, FaSun } from 'react-icons/fa';
-import theme from "../styles/theme"; // テーマのインポート
+import theme from "../styles/theme";
 
 const HeaderContainer = styled.header`
   background-color: ${({ theme }) => theme.colors.backgroundLight};
