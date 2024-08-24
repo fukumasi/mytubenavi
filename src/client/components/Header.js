@@ -1,10 +1,9 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import styled, { ThemeProvider } from "styled-components";
+import styled from "styled-components";
 import SearchBar from "./SearchBar";
 import { useAuth } from "../contexts/AuthContext";
 import { FaUser, FaSignOutAlt, FaSignInAlt, FaUserPlus, FaMoon, FaSun } from 'react-icons/fa';
-import theme from "../styles/theme";
 
 const HeaderContainer = styled.header`
   background-color: ${({ theme }) => theme.colors.backgroundLight};
@@ -60,23 +59,6 @@ const NavLink = styled(Link)`
   }
 `;
 
-const Button = styled.button`
-  background-color: ${({ theme }) => theme.colors.primary};
-  color: ${({ theme }) => theme.colors.background};
-  border: none;
-  padding: ${({ theme }) => theme.spacing.small} ${({ theme }) => theme.spacing.medium};
-  border-radius: ${({ theme }) => theme.borderRadius};
-  cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.3s ease;
-  display: flex;
-  align-items: center;
-  gap: ${({ theme }) => theme.spacing.small};
-  &:hover {
-    background-color: ${({ theme }) => theme.colors.primaryDark};
-  }
-`;
-
 const UserMenu = styled.div`
   position: relative;
 `;
@@ -123,12 +105,11 @@ const ThemeToggle = styled.button`
   padding: ${({ theme }) => theme.spacing.small};
 `;
 
-const Header = () => {
+const Header = ({ toggleTheme, isDarkMode }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const [currentTheme, setCurrentTheme] = useState(theme.light);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -147,50 +128,42 @@ const Header = () => {
     }
   };
 
-  const toggleTheme = () => {
-    setCurrentTheme((prevTheme) =>
-      prevTheme === theme.light ? theme.dark : theme.light
-    );
-  };
-
   return (
-    <ThemeProvider theme={currentTheme}>
-      <HeaderContainer>
-        <HeaderContent>
-          <Logo to="/">MyTubeNavi</Logo>
-          <SearchBar
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onSubmit={handleSearch}
-          />
-          <Nav>
-            <ThemeToggle onClick={toggleTheme}>
-              {currentTheme === theme.light ? <FaMoon /> : <FaSun />}
-            </ThemeToggle>
-            {user ? (
-              <UserMenu>
-                <UserMenuButton onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}>
-                  <FaUser /> {user.username}
-                </UserMenuButton>
-                <UserMenuDropdown $isOpen={isUserMenuOpen}>
-                  <UserMenuLink to="/profile" onClick={() => setIsUserMenuOpen(false)}>
-                    <FaUser /> プロフィール
-                  </UserMenuLink>
-                  <UserMenuLink as="button" onClick={handleLogout}>
-                    <FaSignOutAlt /> ログアウト
-                  </UserMenuLink>
-                </UserMenuDropdown>
-              </UserMenu>
-            ) : (
-              <>
-                <NavLink to="/login"><FaSignInAlt /> ログイン</NavLink>
-                <NavLink to="/register"><FaUserPlus /> 登録</NavLink>
-              </>
-            )}
-          </Nav>
-        </HeaderContent>
-      </HeaderContainer>
-    </ThemeProvider>
+    <HeaderContainer>
+      <HeaderContent>
+        <Logo to="/">MyTubeNavi</Logo>
+        <SearchBar
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onSubmit={handleSearch}
+        />
+        <Nav>
+          <ThemeToggle onClick={toggleTheme}>
+            {isDarkMode ? <FaSun /> : <FaMoon />}
+          </ThemeToggle>
+          {user ? (
+            <UserMenu>
+              <UserMenuButton onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}>
+                <FaUser /> {user.username}
+              </UserMenuButton>
+              <UserMenuDropdown $isOpen={isUserMenuOpen}>
+                <UserMenuLink to="/profile" onClick={() => setIsUserMenuOpen(false)}>
+                  <FaUser /> プロフィール
+                </UserMenuLink>
+                <UserMenuLink as="button" onClick={handleLogout}>
+                  <FaSignOutAlt /> ログアウト
+                </UserMenuLink>
+              </UserMenuDropdown>
+            </UserMenu>
+          ) : (
+            <>
+              <NavLink to="/login"><FaSignInAlt /> ログイン</NavLink>
+              <NavLink to="/register"><FaUserPlus /> 登録</NavLink>
+            </>
+          )}
+        </Nav>
+      </HeaderContent>
+    </HeaderContainer>
   );
 };
 
