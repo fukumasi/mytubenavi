@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
+=======
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+>>>>>>> 075d44ea1ec84ab720070539729f61c535d4b034
 import { ThemeProvider } from 'styled-components';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -14,6 +19,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import VideoDetail from './pages/VideoDetail';
 import SearchResults from './pages/SearchResults';
+<<<<<<< HEAD
 import About from './pages/About';
 import theme from './styles/theme';
 import GlobalStyle from './styles/GlobalStyle';
@@ -31,6 +37,10 @@ import AdEdit from './pages/AdEdit';
 import TwoFactorAuthSettings from './pages/TwoFactorAuthSettings';
 import NotFound from './components/NotFound';
 import UserDashboard from './pages/UserDashboard'; // 新しく作成したUserDashboardをインポート
+=======
+import { lightTheme, darkTheme } from './styles/theme';
+import GlobalStyle from './styles/GlobalStyle';
+>>>>>>> 075d44ea1ec84ab720070539729f61c535d4b034
 
 const queryClient = new QueryClient();
 
@@ -96,10 +106,17 @@ const AppContent = () => {
 };
 
 const App = () => {
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  const toggleTheme = () => {
+    setIsDarkMode(!isDarkMode);
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <SettingsProvider>
+<<<<<<< HEAD
           <ThemeProvider theme={theme.light}>
             <GlobalStyle />
             <ErrorBoundary>
@@ -107,6 +124,22 @@ const App = () => {
                 <AppContent />
               </Router>
             </ErrorBoundary>
+=======
+          <ThemeProvider theme={isDarkMode ? darkTheme : lightTheme}>
+            <GlobalStyle />
+            <Router>
+              <Header toggleTheme={toggleTheme} isDarkMode={isDarkMode} />
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/edit-profile" element={<EditProfile />} />
+                <Route path="/video/:id" element={<VideoDetail />} />
+                <Route path="/search" element={<SearchResults />} />
+              </Routes>
+            </Router>
+>>>>>>> 075d44ea1ec84ab720070539729f61c535d4b034
           </ThemeProvider>
         </SettingsProvider>
       </AuthProvider>
