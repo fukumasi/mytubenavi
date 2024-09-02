@@ -3,6 +3,8 @@ const { validateEmail } = require('../utils/validation');
 const fs = require('fs').promises;
 const path = require('path');
 const sharp = require('sharp');
+const { sanitizeUser } = require('../utils/sanitizer');
+const Video = require("../models/Video"); // 動画モデルをインポート
 
 exports.getProfile = async (req, res) => {
   try {
@@ -10,7 +12,7 @@ exports.getProfile = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "ユーザーが見つかりません" });
     }
-    res.json(user);
+    res.json(sanitizeUser(user));
   } catch (error) {
     console.error('Get profile error:', error);
     res.status(500).json({ message: "プロフィールの取得中にエラーが発生しました" });
@@ -43,6 +45,9 @@ exports.updateProfile = async (req, res) => {
       if (notifications !== undefined && typeof notifications !== 'boolean') {
         return res.status(400).json({ message: "無効な通知設定です" });
       }
+      if (language && typeof language !== 'string') {
+        return res.status(400).json({ message: "無効な言語設定です" });
+      }
     }
 
     if (actualUpdates.socialLinks) {
@@ -67,7 +72,7 @@ exports.updateProfile = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "ユーザーが見つかりません" });
     }
-    res.json(user);
+    res.json(sanitizeUser(user));
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(400).json({ message: "ユーザープロフィールの更新中にエラーが発生しました", error: error.message });
@@ -115,6 +120,11 @@ exports.changeEmail = async (req, res) => {
       return res.status(400).json({ message: "無効なメールアドレス形式です" });
     }
 
+    const existingUser = await User.findOne({ email: newEmail });
+    if (existingUser) {
+      return res.status(400).json({ message: "このメールアドレスは既に使用されています" });
+    }
+
     const user = await User.findById(req.user.userId);
     if (!user) {
       return res.status(404).json({ message: "ユーザーが見つかりません" });
@@ -137,7 +147,7 @@ exports.changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
-    const user = await User.findById(req.user.userId);
+    const user = await User.findById(req.user.userId).select('+password');
     if (!user) {
       return res.status(404).json({ message: "ユーザーが見つかりません" });
     }
@@ -147,6 +157,10 @@ exports.changePassword = async (req, res) => {
       return res.status(401).json({ message: "現在のパスワードが正しくありません" });
     }
 
+    if (await user.isPasswordUsedBefore(newPassword)) {
+      return res.status(400).json({ message: "このパスワードは以前に使用されています。新しいパスワードを選択してください" });
+    }
+
     user.password = newPassword;
     await user.save();
 
@@ -154,6 +168,101 @@ exports.changePassword = async (req, res) => {
   } catch (error) {
     console.error('Change password error:', error);
     res.status(400).json({ message: "パスワードの変更中にエラーが発生しました" });
+  }
+};
+
+exports.getWatchHistory = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).populate('watchHistory.video');
+    if (!user) {
+      return res.status(404).json({ message: "ユーザーが見つかりません" });
+    }
+    res.json(user.watchHistory);
+  } catch (error) {
+    console.error('Get watch history error:', error);
+    res.status(500).json({ message: "視聴履歴の取得中にエラーが発生しました" });
+  }
+};
+
+exports.getFavorites = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).populate('favorites');
+    if (!user) {
+      return res.status(404).json({ message: "ユーザーが見つかりません" });
+    }
+    res.json(user.favorites);
+  } catch (error) {
+    console.error('Get favorites error:', error);
+    res.status(500).json({ message: "お気に入りの取得中にエラーが発生しました" });
+  }
+};
+
+exports.getSubscriptions = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).populate('subscribedChannels');
+    if (!user) {
+      return res.status(404).json({ message: "ユーザーが見つかりません" });
+    }
+    res.json(user.subscribedChannels);
+  } catch (error) {
+    console.error('Get subscriptions error:', error);
+    res.status(500).json({ message: "購読チャンネルの取得中にエラーが発生しました" });
+  }
+};
+
+exports.getSearchHistory = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select('searchHistory');
+    if (!user) {
+      return res.status(404).json({ message: "ユーザーが見つかりません" });
+    }
+    res.json(user.searchHistory);
+  } catch (error) {
+    console.error('Get search history error:', error);
+    res.status(500).json({ message: "検索履歴の取得中にエラーが発生しました" });
+  }
+};
+
+exports.addSearchHistory = async (req, res) => {
+  try {
+    const { query } = req.body;
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: "ユーザーが見つかりません" });
+    }
+    user.searchHistory.unshift({ query, timestamp: new Date() });
+    user.searchHistory = user.searchHistory.slice(0, 20); // 最新の20件のみを保持
+    await user.save();
+    res.json({ message: "検索履歴が追加されました" });
+  } catch (error) {
+    console.error('Add search history error:', error);
+    res.status(500).json({ message: "検索履歴の追加中にエラーが発生しました" });
+  }
+};
+
+exports.getRecommendedVideos = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: "ユーザーが見つかりません" });
+    }
+    
+    // ユーザーの視聴履歴やお気に入りに基づいて動画を推奨
+    const recentWatchedVideos = user.watchHistory.slice(0, 5).map(h => h.video);
+    const favoriteVideos = user.favorites.slice(0, 5);
+    
+    const recommendedVideos = await Video.find({
+      $or: [
+        { category: { $in: recentWatchedVideos.map(v => v.category) } },
+        { tags: { $in: [...recentWatchedVideos, ...favoriteVideos].flatMap(v => v.tags) } }
+      ],
+      _id: { $nin: [...recentWatchedVideos, ...favoriteVideos].map(v => v._id) }
+    }).limit(10);
+    
+    res.json(recommendedVideos);
+  } catch (error) {
+    console.error('Get recommended videos error:', error);
+    res.status(500).json({ message: "おすすめ動画の取得中にエラーが発生しました" });
   }
 };
 

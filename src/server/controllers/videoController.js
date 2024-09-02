@@ -2,9 +2,26 @@ const Video = require('../models/Video');
 const User = require('../models/User');
 const Channel = require('../models/Channel');
 const { catchAsync } = require('../utils/errorHandlers');
+const { sanitizeVideo } = require('../utils/sanitizer');
 
 exports.createVideo = catchAsync(async (req, res) => {
   const { title, description, youtubeId, genre, tags, channelId } = req.body;
+
+  const channel = await Channel.findById(channelId);
+  if (!channel) {
+    return res.status(404).json({
+      status: 'fail',
+      message: 'チャンネルが見つかりません'
+    });
+  }
+
+  if (channel.owner.toString() !== req.user.id) {
+    return res.status(403).json({
+      status: 'fail',
+      message: 'このチャンネルに動画をアップロードする権限がありません'
+    });
+  }
+
   const video = await Video.create({
     title,
     description,
@@ -19,19 +36,33 @@ exports.createVideo = catchAsync(async (req, res) => {
 
   res.status(201).json({
     status: 'success',
-    data: { video }
+    data: { video: sanitizeVideo(video) }
   });
 });
 
 exports.getAllVideos = catchAsync(async (req, res) => {
+  const { page = 1, limit = 20, sort = '-publishedAt' } = req.query;
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
   const videos = await Video.find()
     .populate('uploader', 'username')
-    .populate('channel', 'name');
+    .populate('channel', 'name')
+    .sort(sort)
+    .skip(skip)
+    .limit(parseInt(limit))
+    .select('-__v');
+
+  const total = await Video.countDocuments();
 
   res.status(200).json({
     status: 'success',
     results: videos.length,
-    data: { videos }
+    data: { 
+      videos: videos.map(sanitizeVideo),
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit)),
+      totalVideos: total
+    }
   });
 });
 
@@ -50,31 +81,40 @@ exports.getVideo = catchAsync(async (req, res) => {
 
   res.status(200).json({
     status: 'success',
-    data: { video }
+    data: { video: sanitizeVideo(video) }
   });
 });
 
 exports.updateVideo = catchAsync(async (req, res) => {
-  const video = await Video.findByIdAndUpdate(req.params.id, req.body, {
+  const video = await Video.findById(req.params.id);
+
+  if (!video) {
+    return res.status(404).json({
+      status: 'fail',
+      message: '動画が見つかりません'
+    });
+  }
+
+  if (video.uploader.toString() !== req.user.id) {
+    return res.status(403).json({
+      status: 'fail',
+      message: 'この動画を更新する権限がありません'
+    });
+  }
+
+  const updatedVideo = await Video.findByIdAndUpdate(req.params.id, req.body, {
     new: true,
     runValidators: true
   });
 
-  if (!video) {
-    return res.status(404).json({
-      status: 'fail',
-      message: '動画が見つかりません'
-    });
-  }
-
   res.status(200).json({
     status: 'success',
-    data: { video }
+    data: { video: sanitizeVideo(updatedVideo) }
   });
 });
 
 exports.deleteVideo = catchAsync(async (req, res) => {
-  const video = await Video.findByIdAndDelete(req.params.id);
+  const video = await Video.findById(req.params.id);
 
   if (!video) {
     return res.status(404).json({
@@ -83,6 +123,14 @@ exports.deleteVideo = catchAsync(async (req, res) => {
     });
   }
 
+  if (video.uploader.toString() !== req.user.id) {
+    return res.status(403).json({
+      status: 'fail',
+      message: 'この動画を削除する権限がありません'
+    });
+  }
+
+  await Video.findByIdAndDelete(req.params.id);
   await Channel.findByIdAndUpdate(video.channel, { $pull: { videos: video._id } });
 
   res.status(204).json({
@@ -186,7 +234,7 @@ exports.searchVideos = catchAsync(async (req, res) => {
   res.status(200).json({
     status: 'success',
     data: {
-      videos,
+      videos: videos.map(sanitizeVideo),
       currentPage: parseInt(page),
       totalPages: Math.ceil(total / parseInt(limit)),
       totalVideos: total,
@@ -219,7 +267,7 @@ exports.getRelatedVideos = catchAsync(async (req, res) => {
 
   res.status(200).json({
     status: 'success',
-    data: { relatedVideos }
+    data: { relatedVideos: relatedVideos.map(sanitizeVideo) }
   });
 });
 
@@ -239,7 +287,7 @@ exports.getVideoDetails = catchAsync(async (req, res) => {
 
   res.status(200).json({
     status: 'success',
-    data: { video }
+    data: { video: sanitizeVideo(video) }
   });
 });
 
@@ -256,7 +304,7 @@ exports.searchAndSaveVideos = catchAsync(async (req, res) => {
   res.status(200).json({
     status: 'success',
     message: '動画が検索され、保存されました',
-    // data: { savedVideos }
+    // data: { savedVideos: savedVideos.map(sanitizeVideo) }
   });
 });
 
@@ -268,7 +316,7 @@ exports.getPopularVideos = catchAsync(async (req, res) => {
 
   res.status(200).json({
     status: 'success',
-    data: { popularVideos }
+    data: { popularVideos: popularVideos.map(sanitizeVideo) }
   });
 });
 
@@ -281,7 +329,7 @@ exports.getVideosByGenre = catchAsync(async (req, res) => {
 
   res.status(200).json({
     status: 'success',
-    data: { videos }
+    data: { videos: videos.map(sanitizeVideo) }
   });
 });
 
@@ -300,7 +348,7 @@ exports.getVideos = catchAsync(async (req, res) => {
   res.status(200).json({
     status: 'success',
     data: {
-      videos,
+      videos: videos.map(sanitizeVideo),
       currentPage: parseInt(page),
       totalPages: Math.ceil(total / limit),
       totalVideos: total

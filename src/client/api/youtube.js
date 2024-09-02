@@ -32,76 +32,12 @@ const dummyVideos = [
       viewCount: "1234567890",
       likeCount: "12345678",
       commentCount: "1234567"
-    }
-  },
-  {
-    id: "9bZkp7q19f0",
-    snippet: {
-      title: "PSY - GANGNAM STYLE(강남스타일) M/V",
-      description: "PSY - 'I LUV IT' M/V @ https://youtu.be/Xvjnoagk6GU...",
-      channelTitle: "officialpsy",
-      publishedAt: "2012-07-15T07:46:32Z",
-      thumbnails: {
-        medium: { url: "https://img.youtube.com/vi/9bZkp7q19f0/mqdefault.jpg" }
-      }
     },
-    statistics: {
-      viewCount: "4321098765",
-      likeCount: "23456789",
-      commentCount: "3456789"
-    }
+    category: "music",
+    duration: 213,
+    rating: 4.8
   },
-  {
-    id: "kJQP7kiw5Fk",
-    snippet: {
-      title: "Luis Fonsi - Despacito ft. Daddy Yankee",
-      description: "\"Despacito\" disponible ya en todas las plataformas digitales...",
-      channelTitle: "Luis Fonsi",
-      publishedAt: "2017-01-12T15:00:21Z",
-      thumbnails: {
-        medium: { url: "https://img.youtube.com/vi/kJQP7kiw5Fk/mqdefault.jpg" }
-      }
-    },
-    statistics: {
-      viewCount: "7654321098",
-      likeCount: "45678901",
-      commentCount: "5678901"
-    }
-  },
-  {
-    id: "JGwWNGJdvx8",
-    snippet: {
-      title: "Ed Sheeran - Shape of You (Official Music Video)",
-      description: "The official music video for Ed Sheeran - Shape Of You...",
-      channelTitle: "Ed Sheeran",
-      publishedAt: "2017-01-30T05:00:02Z",
-      thumbnails: {
-        medium: { url: "https://img.youtube.com/vi/JGwWNGJdvx8/mqdefault.jpg" }
-      }
-    },
-    statistics: {
-      viewCount: "5678901234",
-      likeCount: "34567890",
-      commentCount: "4567890"
-    }
-  },
-  {
-    id: "OPf0YbXqDm0",
-    snippet: {
-      title: "Mark Ronson - Uptown Funk (Official Video) ft. Bruno Mars",
-      description: "Mark Ronson's official music video for 'Uptown Funk' ft. Bruno Mars...",
-      channelTitle: "MarkRonsonVEVO",
-      publishedAt: "2014-11-19T14:00:09Z",
-      thumbnails: {
-        medium: { url: "https://img.youtube.com/vi/OPf0YbXqDm0/mqdefault.jpg" }
-      }
-    },
-    statistics: {
-      viewCount: "4567890123",
-      likeCount: "23456789",
-      commentCount: "3456789"
-    }
-  }
+  // ... 他のダミービデオデータ（同様に category, duration, rating を追加）
 ];
 
 const getDummyVideoDetails = (videoId) => {
@@ -122,7 +58,12 @@ const apiGet = async (endpoint, params = {}) => {
     console.log(`Using dummy data for: ${endpoint}`);
     switch (endpoint) {
       case '/search':
-        return { items: getDummyVideos() };
+        const filteredVideos = filterDummyVideos(params);
+        return {
+          videos: filteredVideos,
+          totalVideos: filteredVideos.length,
+          totalPages: Math.ceil(filteredVideos.length / 20)
+        };
       case '/featured':
         return getDummyVideos().slice(0, 3);
       default:
@@ -138,9 +79,93 @@ const apiGet = async (endpoint, params = {}) => {
   }
 };
 
+const filterDummyVideos = (params) => {
+  let filteredVideos = [...dummyVideos];
+
+  // 検索クエリに関係なく、すべてのダミーデータを返す
+  // if (params.q) {
+  //   const searchTerm = params.q.toLowerCase();
+  //   filteredVideos = filteredVideos.filter(video => 
+  //     video.snippet.title.toLowerCase().includes(searchTerm) ||
+  //     video.snippet.description.toLowerCase().includes(searchTerm)
+  //   );
+  // }
+
+  if (params.category) {
+    filteredVideos = filteredVideos.filter(video => video.category === params.category);
+  }
+
+  if (params.duration) {
+    switch (params.duration) {
+      case 'short':
+        filteredVideos = filteredVideos.filter(video => video.duration <= 240);
+        break;
+      case 'medium':
+        filteredVideos = filteredVideos.filter(video => video.duration > 240 && video.duration <= 1200);
+        break;
+      case 'long':
+        filteredVideos = filteredVideos.filter(video => video.duration > 1200);
+        break;
+    }
+  }
+
+  if (params.uploadDate) {
+    const now = new Date();
+    let dateLimit;
+    switch (params.uploadDate) {
+      case 'hour':
+        dateLimit = new Date(now.getTime() - 60 * 60 * 1000);
+        break;
+      case 'day':
+        dateLimit = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case 'week':
+        dateLimit = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'month':
+        dateLimit = new Date(now.setMonth(now.getMonth() - 1));
+        break;
+      case 'year':
+        dateLimit = new Date(now.setFullYear(now.getFullYear() - 1));
+        break;
+    }
+    if (dateLimit) {
+      filteredVideos = filteredVideos.filter(video => new Date(video.snippet.publishedAt) >= dateLimit);
+    }
+  }
+
+  if (params.sortBy) {
+    const [sortKey, sortDirection] = params.sortBy.split(',');
+    const sortMultiplier = sortDirection === 'ascending' ? 1 : -1;
+
+    switch (sortKey) {
+      case 'date':
+        filteredVideos.sort((a, b) => sortMultiplier * (new Date(b.snippet.publishedAt) - new Date(a.snippet.publishedAt)));
+        break;
+      case 'viewCount':
+        filteredVideos.sort((a, b) => sortMultiplier * (parseInt(b.statistics.viewCount) - parseInt(a.statistics.viewCount)));
+        break;
+      case 'rating':
+        filteredVideos.sort((a, b) => sortMultiplier * (b.rating - a.rating));
+        break;
+      case 'duration':
+        filteredVideos.sort((a, b) => sortMultiplier * (a.duration - b.duration));
+        break;
+      case 'category':
+        filteredVideos.sort((a, b) => sortMultiplier * a.category.localeCompare(b.category));
+        break;
+      case 'relevance':
+        // relevanceのソートロジックは実装が必要です
+        break;
+    }
+  }
+
+  return filteredVideos;
+};
+
 export const searchVideos = async (params) => {
   const result = await apiGet('/search', params);
-  return result.items || [];
+  return result;
 };
 
 export const getVideoDetails = async (videoId) => {

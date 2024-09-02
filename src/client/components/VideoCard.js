@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 
@@ -47,15 +47,49 @@ const ChannelName = styled.p`
   color: ${({ theme }) => theme.colors.textSecondary};
 `;
 
+const ErrorMessage = styled.p`
+  color: ${({ theme }) => theme.colors.error};
+  font-size: ${({ theme }) => theme.fontSizes.small};
+`;
+
 const VideoCard = ({ video }) => {
+  const [thumbnailUrl, setThumbnailUrl] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchThumbnail = async () => {
+      try {
+        const response = await fetch(`/api/image-proxy?url=${encodeURIComponent('https://picsum.photos/320/180')}`);
+        if (!response.ok) {
+          throw new Error('Failed to load thumbnail');
+        }
+        const blob = await response.blob();
+        setThumbnailUrl(URL.createObjectURL(blob));
+      } catch (err) {
+        console.error('Error fetching thumbnail:', err);
+        setError('Failed to load thumbnail');
+      }
+    };
+    
+  
+    fetchThumbnail();
+  }, [video.thumbnail]);
+  
+
   return (
     <Card to={`/video/${video.id}`}>
       <ThumbnailWrapper>
-        <Thumbnail
-          src={video.thumbnail}
-          alt={`${video.title} のサムネイル`}
-          loading="lazy"
-        />
+        {thumbnailUrl ? (
+          <Thumbnail
+            src={thumbnailUrl}
+            alt={`${video.title} のサムネイル`}
+            loading="lazy"
+          />
+        ) : error ? (
+          <ErrorMessage>{error}</ErrorMessage>
+        ) : (
+          <div>Loading...</div>
+        )}
       </ThumbnailWrapper>
       <Content>
         <Title>{video.title}</Title>

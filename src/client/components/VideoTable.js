@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import ErrorBoundary from './ErrorBoundary';
@@ -12,6 +12,7 @@ const MESSAGES = {
   VIEW_COUNT: '再生回数',
   PUBLISHED_AT: '投稿日',
   DURATION: '長さ',
+  CATEGORY: 'カテゴリー',
   UNKNOWN: '不明',
   NO_TITLE: 'タイトルなし'
 };
@@ -101,7 +102,8 @@ const performanceTest = (videoCount) => {
     thumbnails: { medium: { url: 'https://via.placeholder.com/120x67' } },
     statistics: { viewCount: Math.floor(Math.random() * 1000000).toString() },
     publishedAt: new Date(Date.now() - Math.random() * 10000000000).toISOString(),
-    contentDetails: { duration: `PT${Math.floor(Math.random() * 120)}M${Math.floor(Math.random() * 60)}S` }
+    contentDetails: { duration: `PT${Math.floor(Math.random() * 120)}M${Math.floor(Math.random() * 60)}S` },
+    category: ['音楽', 'スポーツ', 'ゲーム', '教育', 'エンターテイメント', 'ニュース', 'その他'][Math.floor(Math.random() * 7)]
   }));
   console.timeEnd('Generate Test Data');
   return testVideos;
@@ -110,7 +112,7 @@ const performanceTest = (videoCount) => {
 const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      const testVideos = performanceTest(1000); // 1000個のテストデータを生成
+      const testVideos = performanceTest(1000);
       console.log('Test videos generated:', testVideos.length);
     }
   }, []);
@@ -136,7 +138,7 @@ const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
     }
   };
 
-  const RowRenderer = React.useCallback(({ index, style }) => {
+  const RowRenderer = useCallback(({ index, style }) => {
     const video = videos[index];
     const thumbnailUrl = video.thumbnails?.medium?.url || 
                          video.thumbnails?.default?.url || 
@@ -144,11 +146,15 @@ const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
                          video.snippet?.thumbnails?.default?.url ||
                          defaultThumbnail;
     
+    // プロキシを使用してサムネイル画像を取得
+    const proxyThumbnailUrl = `/api/image-proxy?url=${encodeURIComponent(thumbnailUrl)}`;
+    
     const title = video.title || video.snippet?.title || MESSAGES.NO_TITLE;
     const channelTitle = video.channelTitle || video.snippet?.channelTitle || MESSAGES.UNKNOWN;
     const viewCount = (video.statistics?.viewCount || video.viewCount || 0).toLocaleString();
     const publishedAt = new Date(video.publishedAt || video.snippet?.publishedAt || Date.now()).toLocaleDateString();
     const duration = formatDuration(video.contentDetails?.duration);
+    const category = video.category || MESSAGES.UNKNOWN;
 
     const uniqueKey = video.id || video.videoId || `video-${video.etag}`;
 
@@ -156,7 +162,7 @@ const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
       <Row key={uniqueKey} style={style}>
         <Cell $flex={2}>
           <StyledLink to={`/video/${video.id || video.videoId}`}>
-            <ThumbnailImage src={thumbnailUrl} alt={title} />
+            <ThumbnailImage src={proxyThumbnailUrl} alt={title} />
           </StyledLink>
         </Cell>
         <Cell $flex={4}>
@@ -166,11 +172,10 @@ const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
         <Cell $flex={1}>{viewCount}</Cell>
         <Cell $flex={1}>{publishedAt}</Cell>
         <Cell $flex={1}>{duration}</Cell>
+        <Cell $flex={1}>{category}</Cell>
       </Row>
     );
   }, [videos]);
-
-  console.log('Videos prop:', videos); // デバッグ用
 
   return (
     <ErrorBoundary>
@@ -191,6 +196,9 @@ const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
           </HeaderCell>
           <HeaderCell $flex={1} onClick={() => onSort('duration')}>
             {MESSAGES.DURATION} {getSortIndicator('duration', sortConfig)}
+          </HeaderCell>
+          <HeaderCell $flex={1} onClick={() => onSort('category')}>
+            {MESSAGES.CATEGORY} {getSortIndicator('category', sortConfig)}
           </HeaderCell>
         </TableHeader>
         <List

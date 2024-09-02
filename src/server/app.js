@@ -9,6 +9,7 @@ const userRoutes = require('./routes/user');
 const commentRoutes = require('./routes/comment');
 const authRoutes = require('./routes/auth');
 const featuredVideoRoutes = require('./routes/featuredVideos');
+const adVideoRoutes = require('./routes/adVideoRoutes'); // 新しく追加
 const youtubeService = require('./services/youtubeService');
 
 // ミドルウェア
@@ -39,6 +40,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/featured-videos', featuredVideoRoutes);
+app.use('/api/ad-videos', adVideoRoutes); // 新しく追加
 
 // 動画詳細を取得するエンドポイント
 app.get("/api/videos/:id", async (req, res) => {
