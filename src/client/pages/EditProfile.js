@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAuth } from '../contexts/AuthContext';
 import { updateUser, changeEmail, changePassword } from '../api/userApi';
@@ -64,8 +64,19 @@ const SuccessMessage = styled.p`
   margin-top: 10px;
 `;
 
+const StyledLink = styled(Link)`
+  display: block;
+  margin-top: 20px;
+  color: ${({ theme }) => theme.colors.primary};
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+`;
+
 const EditProfile = () => {
-  const { currentUser, setCurrentUser } = useAuth();
+  const { user, setUser } = useAuth();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [bio, setBio] = useState('');
@@ -77,12 +88,12 @@ const EditProfile = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (currentUser) {
-      setUsername(currentUser.username || '');
-      setEmail(currentUser.email || '');
-      setBio(currentUser.bio || '');
+    if (user) {
+      setUsername(user.username || '');
+      setEmail(user.email || '');
+      setBio(user.bio || '');
     }
-  }, [currentUser]);
+  }, [user]);
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
@@ -95,7 +106,7 @@ const EditProfile = () => {
         email,
         bio,
       });
-      setCurrentUser(updatedUser);
+      setUser(updatedUser);
       setSuccess('プロフィールが更新されました');
     } catch (error) {
       setError('プロフィールの更新に失敗しました: ' + error.message);
@@ -109,7 +120,7 @@ const EditProfile = () => {
 
     try {
       await changeEmail(email);
-      setSuccess('メールアドレスが更新されました');
+      setSuccess('メールアドレスが更新されました。確認メールをチェックしてください。');
     } catch (error) {
       setError('メールアドレスの更新に失敗しました: ' + error.message);
     }
@@ -131,12 +142,15 @@ const EditProfile = () => {
         newPassword,
       });
       setSuccess('パスワードが変更されました');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
     } catch (error) {
       setError('パスワードの変更に失敗しました: ' + error.message);
     }
   };
 
-  if (!currentUser) {
+  if (!user) {
     return <div>読み込み中...</div>;
   }
 
@@ -171,9 +185,9 @@ const EditProfile = () => {
       </Form>
 
       <Form onSubmit={handleChangeEmail}>
-        <Label htmlFor="email">新しいメールアドレス</Label>
+        <Label htmlFor="newEmail">新しいメールアドレス</Label>
         <Input
-          id="email"
+          id="newEmail"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -182,7 +196,7 @@ const EditProfile = () => {
       </Form>
 
       <Form onSubmit={handleChangePassword}>
-        <Label htmlFor="currentPassword">現在のパスワード（変更する場合）</Label>
+        <Label htmlFor="currentPassword">現在のパスワード</Label>
         <Input
           id="currentPassword"
           type="password"
@@ -190,7 +204,7 @@ const EditProfile = () => {
           onChange={(e) => setCurrentPassword(e.target.value)}
         />
 
-        <Label htmlFor="newPassword">新しいパスワード（オプション）</Label>
+        <Label htmlFor="newPassword">新しいパスワード</Label>
         <Input
           id="newPassword"
           type="password"
@@ -211,8 +225,17 @@ const EditProfile = () => {
 
       {error && <ErrorMessage>{error}</ErrorMessage>}
       {success && <SuccessMessage>{success}</SuccessMessage>}
+
+      <StyledLink to="/two-factor-auth">2要素認証の設定</StyledLink>
     </FormContainer>
   );
 };
 
 export default React.memo(EditProfile);
+
+// TODO: プロフィール画像のアップロード機能の追加
+// TODO: ソーシャルメディアアカウントのリンク機能の追加
+// TODO: アカウント削除機能の追加
+// TODO: ユーザーの活動履歴の表示
+// TODO: プライバシー設定の追加
+// TODO: 通知設定の追加

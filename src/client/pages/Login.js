@@ -95,12 +95,14 @@ const Login = () => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
+    twoFactorCode: "",
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
@@ -122,6 +124,10 @@ const Login = () => {
       setError("有効なメールアドレスを入力してください。");
       return false;
     }
+    if (requiresTwoFactor && !formData.twoFactorCode) {
+      setError("2要素認証コードは必須です");
+      return false;
+    }
     return true;
   };
 
@@ -135,8 +141,11 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const result = await login(formData.email, formData.password, rememberMe);
-      if (result.success) {
+      const result = await login(formData.email, formData.password, rememberMe, formData.twoFactorCode);
+      if (result.requiresTwoFactor) {
+        setRequiresTwoFactor(true);
+        setError("2要素認証コードを入力してください。");
+      } else if (result.success) {
         setSuccess("ログインに成功しました");
         const from = location.state?.from?.pathname || "/";
         setTimeout(() => navigate(from, { replace: true }), 1500);
@@ -187,6 +196,20 @@ const Login = () => {
             </PasswordToggle>
           </PasswordInputContainer>
         </InputGroup>
+        {requiresTwoFactor && (
+          <InputGroup>
+            <Label htmlFor="twoFactorCode">2要素認証コード</Label>
+            <Input
+              type="text"
+              id="twoFactorCode"
+              name="twoFactorCode"
+              value={formData.twoFactorCode}
+              onChange={handleChange}
+              required
+              aria-label="2要素認証コード"
+            />
+          </InputGroup>
+        )}
         <RememberMeContainer>
           <input
             type="checkbox"

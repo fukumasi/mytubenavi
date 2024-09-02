@@ -78,12 +78,17 @@ const FilterSortContainer = styled.div`
   }
 `;
 
+const ResultSummary = styled.p`
+  margin-bottom: 20px;
+  font-style: italic;
+`;
+
 const VIDEOS_PER_PAGE = 20;
 
 const SearchResults = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get("q") || "";
-  const [selectedGenre, setSelectedGenre] = useState("all");
+  const [selectedGenre, setSelectedGenre] = useState(searchParams.get("genre") || "all");
   const [currentPage, setCurrentPage] = useState(
     parseInt(searchParams.get("page") || "1", 10)
   );
@@ -93,6 +98,7 @@ const SearchResults = () => {
   });
   const [dateFilter, setDateFilter] = useState(searchParams.get("date") || "any");
   const [durationFilter, setDurationFilter] = useState(searchParams.get("duration") || "any");
+  const [categoryFilter, setCategoryFilter] = useState(searchParams.get("category") || "");
 
   const searchQueryConfig = useMemo(() => ({
     q: query,
@@ -101,7 +107,8 @@ const SearchResults = () => {
     sort: `${sortConfig.key},${sortConfig.direction}`,
     date: dateFilter,
     duration: durationFilter,
-  }), [query, selectedGenre, currentPage, sortConfig, dateFilter, durationFilter]);
+    category: categoryFilter,
+  }), [query, selectedGenre, currentPage, sortConfig, dateFilter, durationFilter, categoryFilter]);
 
   const {
     data: searchData,
@@ -114,12 +121,6 @@ const SearchResults = () => {
       enabled: !!query,
       retry: 3,
       onError: (error) => console.error("Search error:", error),
-      select: (data) => {
-        if (!Array.isArray(data)) {
-          throw new Error("Invalid data format: expected an array");
-        }
-        return data;
-      },
     }
   );
 
@@ -131,12 +132,6 @@ const SearchResults = () => {
     staleTime: Infinity,
     retry: 3,
     onError: (error) => console.error("Dummy videos error:", error),
-    select: (data) => {
-      if (!Array.isArray(data)) {
-        throw new Error("Invalid dummy data format: expected an array");
-      }
-      return data;
-    },
   });
 
   const updateSearchParams = useCallback((params) => {
@@ -185,10 +180,19 @@ const SearchResults = () => {
   );
 
   const handleFilterChange = useCallback((filterType, value) => {
-    if (filterType === 'date') {
-      setDateFilter(value);
-    } else if (filterType === 'duration') {
-      setDurationFilter(value);
+    switch (filterType) {
+      case 'date':
+        setDateFilter(value);
+        break;
+      case 'duration':
+        setDurationFilter(value);
+        break;
+      case 'category':
+        setCategoryFilter(value);
+        break;
+      default:
+        console.warn(`Unknown filter type: ${filterType}`);
+        return;
     }
     setCurrentPage(1);
     updateSearchParams({ [filterType]: value, page: "1" });
@@ -213,22 +217,28 @@ const SearchResults = () => {
     dummyError,
   ]);
 
-  const displayVideos = useMemo(() => {
-    if (query && searchData && searchData.length > 0) {
-      return searchData;
+  const { videos, totalVideos, totalPages, paginatedVideos } = useMemo(() => {
+    let videosData, total, pages;
+    if (query && searchData) {
+      videosData = searchData.videos || [];
+      total = searchData.totalVideos || 0;
+      pages = searchData.totalPages || 1;
+    } else {
+      videosData = dummyVideos || [];
+      total = videosData.length;
+      pages = Math.ceil(total / VIDEOS_PER_PAGE);
     }
-    return dummyVideos || [];
-  }, [query, searchData, dummyVideos]);
-
-  const { totalVideos, totalPages, paginatedVideos } = useMemo(() => {
-    const total = displayVideos.length;
-    const pages = Math.ceil(total / VIDEOS_PER_PAGE);
-    const paginated = displayVideos.slice(
+    const paginated = videosData.slice(
       (currentPage - 1) * VIDEOS_PER_PAGE,
       currentPage * VIDEOS_PER_PAGE
     );
-    return { totalVideos: total, totalPages: pages, paginatedVideos: paginated };
-  }, [displayVideos, currentPage]);
+    return { 
+      videos: videosData, 
+      totalVideos: total, 
+      totalPages: pages, 
+      paginatedVideos: paginated 
+    };
+  }, [query, searchData, dummyVideos, currentPage]);
 
   if (isSearchLoading || isDummyLoading) return <LoadingSpinner data-testid="loading-spinner" />;
 
@@ -243,7 +253,7 @@ const SearchResults = () => {
     return <ErrorMessage message={errorMessage} />;
   }
 
-  if (!displayVideos || displayVideos.length === 0) {
+  if (!videos || videos.length === 0) {
     return <ErrorMessage message="動画が見つかりませんでした。検索条件を変更してお試しください。" />;
   }
 
@@ -259,10 +269,14 @@ const SearchResults = () => {
 
       <MainContent>
         <h2>{query ? `「${query}」の検索結果` : "おすすめ動画"}</h2>
+        <ResultSummary>
+          {totalVideos}件の動画が見つかりました（{currentPage} / {totalPages}ページ）
+        </ResultSummary>
         <FilterSortContainer>
           <FilterOptions
             dateFilter={dateFilter}
             durationFilter={durationFilter}
+            categoryFilter={categoryFilter}
             onFilterChange={handleFilterChange}
           />
           <SortOptions
