@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import styled, { ThemeProvider, css } from "styled-components";
@@ -5,6 +6,14 @@ import SearchBar from "./SearchBar";
 import { useAuth } from "../contexts/AuthContext";
 import { FaUser, FaSignOutAlt, FaSignInAlt, FaUserPlus, FaMoon, FaSun, FaBars, FaTimes, FaAd, FaLock, FaTachometerAlt } from 'react-icons/fa';
 import theme from "../styles/theme";
+=======
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import styled from "styled-components";
+import SearchBar from "./SearchBar";
+import { useAuth } from "../contexts/AuthContext";
+import { FaUser, FaSignOutAlt, FaSignInAlt, FaUserPlus, FaMoon, FaSun } from 'react-icons/fa';
+>>>>>>> 075d44ea1ec84ab720070539729f61c535d4b034
 
 const HeaderContainer = styled.header`
   background-color: ${({ theme }) => theme.colors.backgroundLight};
@@ -86,6 +95,7 @@ const NavLink = styled(Link)`
   }
 `;
 
+<<<<<<< HEAD
 const Button = styled.button`
   background-color: ${({ theme }) => theme.colors.primary};
   color: ${({ theme }) => theme.colors.background};
@@ -113,6 +123,8 @@ const Button = styled.button`
   }
 `;
 
+=======
+>>>>>>> 075d44ea1ec84ab720070539729f61c535d4b034
 const UserMenu = styled.div`
   position: relative;
 `;
@@ -216,13 +228,14 @@ const SearchBarWrapper = styled.div`
   }
 `;
 
-const Header = () => {
+const Header = ({ toggleTheme, isDarkMode }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+<<<<<<< HEAD
   const [currentTheme, setCurrentTheme] = useState(theme.light);
   const userMenuRef = useRef(null);
 
@@ -242,6 +255,8 @@ const Header = () => {
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location]);
+=======
+>>>>>>> 075d44ea1ec84ab720070539729f61c535d4b034
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -261,6 +276,7 @@ const Header = () => {
     }
   };
 
+<<<<<<< HEAD
   const toggleTheme = () => {
     setCurrentTheme((prevTheme) =>
       prevTheme === theme.light ? theme.dark : theme.light
@@ -323,6 +339,44 @@ const Header = () => {
         </HeaderContent>
       </HeaderContainer>
     </ThemeProvider>
+=======
+  return (
+    <HeaderContainer>
+      <HeaderContent>
+        <Logo to="/">MyTubeNavi</Logo>
+        <SearchBar
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onSubmit={handleSearch}
+        />
+        <Nav>
+          <ThemeToggle onClick={toggleTheme}>
+            {isDarkMode ? <FaSun /> : <FaMoon />}
+          </ThemeToggle>
+          {user ? (
+            <UserMenu>
+              <UserMenuButton onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}>
+                <FaUser /> {user.username}
+              </UserMenuButton>
+              <UserMenuDropdown $isOpen={isUserMenuOpen}>
+                <UserMenuLink to="/profile" onClick={() => setIsUserMenuOpen(false)}>
+                  <FaUser /> プロフィール
+                </UserMenuLink>
+                <UserMenuLink as="button" onClick={handleLogout}>
+                  <FaSignOutAlt /> ログアウト
+                </UserMenuLink>
+              </UserMenuDropdown>
+            </UserMenu>
+          ) : (
+            <>
+              <NavLink to="/login"><FaSignInAlt /> ログイン</NavLink>
+              <NavLink to="/register"><FaUserPlus /> 登録</NavLink>
+            </>
+          )}
+        </Nav>
+      </HeaderContent>
+    </HeaderContainer>
+>>>>>>> 075d44ea1ec84ab720070539729f61c535d4b034
   );
 };
 
