@@ -1,3 +1,4 @@
+// src\client\components\PaginationButton.js
 import styled from "styled-components";
 
 const PaginationButton = styled.button`

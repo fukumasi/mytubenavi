@@ -1,6 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { useTheme } from '../contexts/ThemeContext';
+import themes from '../styles/theme';
 
 const ToggleButton = styled.button`
   background-color: ${({ theme }) => theme.colors.background};

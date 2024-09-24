@@ -1,60 +1,20 @@
-import React from "react";
-import styled from "styled-components";
+// src\client\components\ErrorBoundary.js
+import React from 'react';
+import styled from 'styled-components';
 
 const ErrorContainer = styled.div`
   padding: 20px;
-  margin: 20px;
-  background-color: #ffebee;
-  border: 1px solid #ffcdd2;
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
   border-radius: 4px;
-  color: #b71c1c;
-`;
-
-const ErrorTitle = styled.h1`
-  font-size: 24px;
-  margin-bottom: 10px;
-`;
-
-const ErrorMessage = styled.p`
-  font-size: 16px;
-  margin-bottom: 15px;
-`;
-
-const ReloadButton = styled.button`
-  background-color: #2196f3;
-  color: white;
-  border: none;
-  padding: 10px 15px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 16px;
-
-  &:hover {
-    background-color: #1976d2;
-  }
-`;
-
-const ErrorDetails = styled.details`
-  margin-top: 20px;
-  
-  summary {
-    cursor: pointer;
-    color: #2196f3;
-  }
-  
-  pre {
-    margin-top: 10px;
-    padding: 10px;
-    background-color: #f5f5f5;
-    border-radius: 4px;
-    overflow-x: auto;
-  }
+  margin: 20px 0;
 `;
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
+    this.state = { hasError: false };
   }
 
   static getDerivedStateFromError(error) {
@@ -62,37 +22,16 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    this.setState({ error, errorInfo });
-    console.error("Uncaught error:", error, errorInfo);
-    // ここでエラーログサービスにエラーを送信できます
-    // 例: logErrorToMyService(error, errorInfo);
+    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    // ここでエラーログを送信するロジックを追加できます
   }
-
-  handleReload = () => {
-    window.location.reload();
-  };
 
   render() {
     if (this.state.hasError) {
       return (
         <ErrorContainer>
-          <ErrorTitle>エラーが発生しました</ErrorTitle>
-          <ErrorMessage>
-            申し訳ありません。予期せぬエラーが発生しました。問題が解決しない場合は、サポートまでお問い合わせください。
-          </ErrorMessage>
-          <ReloadButton onClick={this.handleReload}>
-            ページを再読み込み
-          </ReloadButton>
-          {process.env.NODE_ENV === 'development' && (
-            <ErrorDetails>
-              <summary>エラーの詳細（開発モードのみ）</summary>
-              <pre>
-                {this.state.error && this.state.error.toString()}
-                <br />
-                {this.state.errorInfo && this.state.errorInfo.componentStack}
-              </pre>
-            </ErrorDetails>
-          )}
+          <h1>Something went wrong.</h1>
+          <p>We're sorry for the inconvenience. Please try refreshing the page or contact support if the problem persists.</p>
         </ErrorContainer>
       );
     }

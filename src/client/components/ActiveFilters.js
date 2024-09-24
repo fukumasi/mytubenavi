@@ -1,3 +1,4 @@
+// src\client\components\ActiveFilters.js
 import React from "react";
 import styled from "styled-components";
 import { X } from "lucide-react";
@@ -23,10 +24,18 @@ const RemoveFilterButton = styled.button`
   border: none;
   margin-left: ${({ theme }) => theme.spacing.xsmall};
   cursor: pointer;
+  padding: 0; // ボタンのデフォルトパディングを削除
+  display: flex; // アイコンを中央に配置
+  align-items: center;
+  justify-content: center;
 `;
 
 const ActiveFilters = ({ children }) => {
   return <ActiveFiltersContainer>{children}</ActiveFiltersContainer>;
 };
 
-export { ActiveFilters, ActiveFilter, RemoveFilterButton };
+const RemoveFilterIcon = () => (
+  <X size={16} aria-hidden="true" />
+);
+
+export { ActiveFilters, ActiveFilter, RemoveFilterButton, RemoveFilterIcon };

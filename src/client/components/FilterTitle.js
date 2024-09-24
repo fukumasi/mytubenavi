@@ -1,3 +1,4 @@
+// src\client\components\FilterTitle.js
 import styled from "styled-components";
 
 const FilterTitle = styled.h3`

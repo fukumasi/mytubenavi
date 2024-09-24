@@ -1,52 +1,72 @@
-import React from "react";
-import styled from "styled-components";
+import React, { useState, useEffect } from 'react';
+import styled from 'styled-components';
+import { Link } from 'react-router-dom';
+import { useFirebase } from '../contexts/FirebaseContext';
+import { collection, getDocs } from 'firebase/firestore';
 
-const GenreListContainer = styled.ul`
-  list-style-type: none;
-  padding: 0;
+const GenreListContainer = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
 `;
 
-const GenreItem = styled.li`
-  margin-bottom: 10px;
-  cursor: pointer;
+const GenreItem = styled(Link)`
+  background-color: ${({ theme }) => theme.colors.primary};
+  color: white;
+  padding: 5px 10px;
+  border-radius: 15px;
+  text-decoration: none;
+  font-size: 14px;
+  transition: background-color 0.3s ease;
+
   &:hover {
-    text-decoration: underline;
+    background-color: ${({ theme }) => theme.colors.primaryDark};
   }
-  ${({ selected }) =>
-    selected &&
-    `
-    font-weight: bold;
-    color: #007bff;
-  `}
 `;
 
-const genres = [
-  { id: "all", name: "すべて" },
-  { id: "entertainment", name: "エンターテイメント" },
-  { id: "music", name: "音楽" },
-  { id: "sports", name: "スポーツ" },
-  { id: "gaming", name: "ゲーム" },
-  { id: "education", name: "教育" },
-  { id: "science", name: "科学と技術" },
-  { id: "travel", name: "旅行" },
-];
+const GenreList = () => {
+  const [genres, setGenres] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { db } = useFirebase();
 
-const GenreList = ({ onGenreChange, selectedGenre }) => {
+  useEffect(() => {
+    const fetchGenres = async () => {
+      try {
+        const genresCollection = collection(db, 'genres');
+        const genresSnapshot = await getDocs(genresCollection);
+        const genresList = genresSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setGenres(genresList);
+        setLoading(false);
+      } catch (err) {
+        setError('ジャンルの読み込みに失敗しました');
+        setLoading(false);
+      }
+    };
+
+    fetchGenres();
+  }, [db]);
+
+  if (loading) return <div>ジャンルを読み込んでいます...</div>;
+  if (error) return <div>{error}</div>;
+
   return (
     <GenreListContainer>
-      {genres.map((genre) => (
-        <GenreItem
-          key={genre.id}
-          onClick={() => onGenreChange(genre.id)}
-          selected={selectedGenre === genre.id}
-          role="option"
-          aria-selected={selectedGenre === genre.id}
-        >
-          {genre.name}
-        </GenreItem>
-      ))}
+      {genres && genres.length > 0 ? (
+        genres.map(genre => (
+          <GenreItem key={genre.id} to={`/genre/${genre.id}`}>
+            {genre.name}
+          </GenreItem>
+        ))
+      ) : (
+        <div>ジャンルがありません</div>
+      )}
     </GenreListContainer>
   );
 };
 
-export default React.memo(GenreList);
+export default GenreList;

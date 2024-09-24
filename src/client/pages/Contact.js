@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 import { FaEnvelope, FaPhone, FaMapMarkerAlt } from 'react-icons/fa';
+import { useFirebase } from '../contexts/FirebaseContext';
+import { collection, addDoc } from 'firebase/firestore';
 
 const ContactContainer = styled.div`
   max-width: 800px;
@@ -84,11 +86,42 @@ const SubmitButton = styled.button`
   }
 `;
 
+const Message = styled.p`
+  color: ${({ isError, theme }) => isError ? theme.colors.error : theme.colors.success};
+  font-size: ${({ theme }) => theme.fontSizes.medium};
+  margin-top: ${({ theme }) => theme.spacing.medium};
+`;
+
 const Contact = () => {
-  const handleSubmit = (e) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    subject: '',
+    message: ''
+  });
+  const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+  const { db } = useFirebase();
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // フォーム送信のロジックをここに実装
-    alert('お問い合わせありがとうございます。まもなくご連絡いたします。');
+    try {
+      await addDoc(collection(db, 'contacts'), {
+        ...formData,
+        createdAt: new Date()
+      });
+      setMessage('お問い合わせありがとうございます。まもなくご連絡いたします。');
+      setIsError(false);
+      setFormData({ name: '', email: '', subject: '', message: '' });
+    } catch (error) {
+      console.error('Error submitting contact form:', error);
+      setMessage('エラーが発生しました。後でもう一度お試しください。');
+      setIsError(true);
+    }
   };
 
   return (
@@ -119,12 +152,13 @@ const Contact = () => {
       <Section>
         <SectionTitle>お問い合わせフォーム</SectionTitle>
         <Form onSubmit={handleSubmit}>
-          <Input type="text" placeholder="お名前" required />
-          <Input type="email" placeholder="メールアドレス" required />
-          <Input type="text" placeholder="件名" required />
-          <Textarea placeholder="お問い合わせ内容" required />
+          <Input type="text" name="name" placeholder="お名前" required value={formData.name} onChange={handleChange} />
+          <Input type="email" name="email" placeholder="メールアドレス" required value={formData.email} onChange={handleChange} />
+          <Input type="text" name="subject" placeholder="件名" required value={formData.subject} onChange={handleChange} />
+          <Textarea name="message" placeholder="お問い合わせ内容" required value={formData.message} onChange={handleChange} />
           <SubmitButton type="submit">送信</SubmitButton>
         </Form>
+        {message && <Message isError={isError}>{message}</Message>}
       </Section>
     </ContactContainer>
   );

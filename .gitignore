@@ -15,6 +15,9 @@ yarn-error.log
 .env.development.local
 .env.test.local
 .env.production.local
+.env.test
+.env.development
+.env.production
 
 # ログ
 *.log
@@ -28,6 +31,9 @@ yarn-error.log
 .idea/
 *.sublime-project
 *.sublime-workspace
+*.iml
+*.swp
+.history/
 
 # OS生成ファイル
 .DS_Store
@@ -49,5 +55,56 @@ yarn-error.log*
 .cache/
 .npm/
 
+# TypeScript
+*.tsbuildinfo
+
+# Next.js
+.next/
+
+# 一時ディレクトリ
+/temp
+/tmp
+
+# 証明書と鍵
+*.pem
+*.key
+
+# アーカイブ
+*.zip
+*.tar.gz
+*.rar
+
+# Firebase
+.firebase/
+firebase-debug.log
+
+# その他のビルド関連
+.eslintcache
+.stylelintcache
+
+# バックアップファイル
+*.bak
+*.gho
+*.ori
+*.orig
+
 # オプション: プロジェクト固有の無視ファイル
 # /path/to/project/specific/file
+
+# Ignore the specific file (using relative path)
+../mytubenavifirebasesecretkey/mytubenavi-firebase-adminsdk.json
+
+# Ignore all files containing 'firebase-adminsdk' in the name
+*firebase-adminsdk*.json
+
+# Ignore the entire directory containing Firebase secret keys
+/mytubenavifirebasesecretkey/
+
+# Ignore environment files that might contain secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+client_secret_538403581977-vgr02pdml0vnt7kpc65eav49sofsddl5.apps.googleusercontent.com.json

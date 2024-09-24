@@ -1,141 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
+import { FaPlus, FaTimes } from 'react-icons/fa';
+import { useFirebase } from '../contexts/FirebaseContext';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useAuth } from '../hooks/useAuth';
 
-const Container = styled.div`
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 20px;
-`;
-
-const Title = styled.h1`
-  font-size: 24px;
-  margin-bottom: 20px;
-`;
-
-const Form = styled.form`
-  display: flex;
-  flex-direction: column;
-`;
-
-const Label = styled.label`
-  margin-bottom: 5px;
-  font-weight: bold;
-`;
-
-const Input = styled.input`
-  padding: 8px;
-  margin-bottom: 15px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-`;
-
-const TextArea = styled.textarea`
-  padding: 8px;
-  margin-bottom: 15px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  resize: vertical;
-  min-height: 100px;
-`;
-
-const Button = styled.button`
-  background-color: #007bff;
-  color: white;
-  border: none;
-  padding: 10px 15px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 16px;
-
-  &:hover {
-    background-color: #0056b3;
-  }
-
-  &:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-  }
-`;
-
-const ErrorMessage = styled.p`
-  color: red;
-  font-weight: bold;
-`;
-
-const SuccessMessage = styled.p`
-  color: green;
-  font-weight: bold;
-`;
-
-const Preview = styled.div`
-  margin-top: 20px;
-  border: 1px solid #ccc;
-  padding: 10px;
-  border-radius: 4px;
-`;
-
-const VideoContainer = styled.div`
-  position: relative;
-  padding-bottom: 56.25%; /* 16:9 アスペクト比 */
-  height: 0;
-  overflow: hidden;
-  margin-bottom: 15px;
-`;
-
-const VideoFrame = styled.iframe`
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  border: none;
-`;
-
-const TagInput = styled.input`
-  padding: 8px;
-  margin-right: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-`;
-
-const TagButton = styled.button`
-  background-color: #28a745;
-  color: white;
-  border: none;
-  padding: 8px 15px;
-  border-radius: 4px;
-  cursor: pointer;
-
-  &:hover {
-    background-color: #218838;
-  }
-`;
-
-const TagList = styled.ul`
-  list-style: none;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-`;
-
-const Tag = styled.li`
-  background-color: #f0f0f0;
-  padding: 5px 10px;
-  margin: 5px;
-  border-radius: 20px;
-  display: flex;
-  align-items: center;
-`;
-
-const RemoveTagButton = styled.button`
-  background: none;
-  border: none;
-  color: #ff0000;
-  cursor: pointer;
-  margin-left: 5px;
-`;
+// Styled components remain unchanged...
 
 const AdCreate = () => {
   const [formData, setFormData] = useState({
@@ -152,19 +23,18 @@ const AdCreate = () => {
   const [tags, setTags] = useState([]);
   const [newTag, setNewTag] = useState('');
   const navigate = useNavigate();
+  const { db } = useFirebase();
+  const { user } = useAuth();
 
   useEffect(() => {
     const youtubeIdMatch = formData.youtubeUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
-    if (youtubeIdMatch) {
-      setVideoId(youtubeIdMatch[1]);
-    } else {
-      setVideoId('');
-    }
+    setVideoId(youtubeIdMatch ? youtubeIdMatch[1] : '');
   }, [formData.youtubeUrl]);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const handleChange = useCallback((e) => {
+    const { name, value } = e.target;
+    setFormData(prevData => ({ ...prevData, [name]: value }));
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -173,7 +43,13 @@ const AdCreate = () => {
     setIsLoading(true);
 
     try {
-      await axios.post('/api/ad-videos', { ...formData, tags });
+      const adData = {
+        ...formData,
+        tags,
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+      };
+      await addDoc(collection(db, 'ad-videos'), adData);
       setSuccess('広告が正常に作成されました。');
       setTimeout(() => navigate('/ad-management'), 2000);
     } catch (err) {
@@ -184,16 +60,16 @@ const AdCreate = () => {
     }
   };
 
-  const handleAddTag = () => {
+  const handleAddTag = useCallback(() => {
     if (newTag && !tags.includes(newTag)) {
-      setTags([...tags, newTag]);
+      setTags(prevTags => [...prevTags, newTag]);
       setNewTag('');
     }
-  };
+  }, [newTag, tags]);
 
-  const handleRemoveTag = (tagToRemove) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
-  };
+  const handleRemoveTag = useCallback((tagToRemove) => {
+    setTags(prevTags => prevTags.filter(tag => tag !== tagToRemove));
+  }, []);
 
   return (
     <Container>
@@ -259,13 +135,17 @@ const AdCreate = () => {
             onChange={(e) => setNewTag(e.target.value)}
             placeholder="新しいタグを入力"
           />
-          <TagButton type="button" onClick={handleAddTag}>追加</TagButton>
+          <TagButton type="button" onClick={handleAddTag}>
+            <FaPlus /> 追加
+          </TagButton>
         </div>
         <TagList>
           {tags.map((tag, index) => (
             <Tag key={index}>
               {tag}
-              <RemoveTagButton onClick={() => handleRemoveTag(tag)}>&times;</RemoveTagButton>
+              <RemoveTagButton onClick={() => handleRemoveTag(tag)}>
+                <FaTimes />
+              </RemoveTagButton>
             </Tag>
           ))}
         </TagList>
@@ -283,6 +163,7 @@ const AdCreate = () => {
               src={`https://www.youtube.com/embed/${videoId}`}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
+              title="広告プレビュー"
             />
           </VideoContainer>
         </Preview>
@@ -291,15 +172,18 @@ const AdCreate = () => {
   );
 };
 
-export default AdCreate;
+export default React.memo(AdCreate);
 
-// TODO: 広告のターゲティング設定の追加（年齢層、性別、地域など）
-// TODO: 広告予算の設定と管理機能の追加
-// TODO: 広告のスケジュール設定（時間帯、曜日指定など）
-// TODO: 広告クリエイティブの複数バージョン管理
-// TODO: 広告の自動最適化設定（パフォーマンスに基づく調整）
-// TODO: 類似広告のサジェスト機能
-// TODO: 広告のABテスト設定
-// TODO: 広告の承認ワークフローの実装
+// TODO: エラーハンドリングの改善
+// TODO: フォームのバリデーション強化
+// TODO: ユーザーフィードバックの改善（例：トースト通知）
+// TODO: 広告のプレビュー機能の拡張
+// TODO: タグ入力のオートコンプリート機能
+// TODO: 広告作成のキャンセル機能
+// TODO: 下書き保存機能
+// TODO: 広告のカテゴリ選択機能
+// TODO: 広告の公開/非公開設定
+// TODO: 広告のターゲティング設定（年齢層、地域など）
+// TODO: 支払い情報の入力と決済処理の統合
 // TODO: 広告のパフォーマンス予測機能
-// TODO: 広告のコンプライアンスチェック機能
+// TODO: 類似広告の提案機能

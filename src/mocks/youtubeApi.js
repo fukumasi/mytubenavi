@@ -10,13 +10,26 @@ const generateMockVideo = () => ({
   duration: faker.time.minute(),
 });
 
-export const searchVideos = async (searchParams) => {
-  await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
+// eslint-disable-next-line no-unused-vars
+export const searchVideos = async (_searchParams) => {
+  await new Promise(resolve => setTimeout(resolve, 500));
   const videos = Array.from({ length: 20 }, generateMockVideo);
   return videos;
 };
 
-export const getSuggestions = async (query) => {
+// eslint-disable-next-line no-unused-vars
+export const getSuggestions = async (_query) => {
   await new Promise(resolve => setTimeout(resolve, 200));
   return Array.from({ length: 5 }, () => faker.lorem.words(3));
+};
+
+// eslint-disable-next-line no-unused-vars
+export const mockSignIn = async (email, _password) => {
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  return { user: { uid: faker.string.uuid(), email } };
+};
+
+export const mockSignOut = async () => {
+  await new Promise(resolve => setTimeout(resolve, 500));
+  return true;
 };

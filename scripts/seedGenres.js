@@ -1,114 +1,71 @@
-const mongoose = require("mongoose");
-const Genre = require("../src/models/Genre");
-require("dotenv").config();
+const admin = require('firebase-admin');
+const serviceAccount = require('C:\\Users\\owner\\Desktop\\mytubenavifirebasesecretkey\\mytubenavi-firebase-adminsdk.json');
 
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
 });
+
+const db = admin.firestore();
 
 const seedGenres = async () => {
   try {
-    await Genre.deleteMany({}); // 既存のジャンルをクリア
+    // Delete existing genres
+    const genresRef = db.collection('genres');
+    const snapshot = await genresRef.get();
+    const batch = db.batch();
+    snapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+    console.log("Existing genres deleted successfully");
 
+    // Seed large genres
     const largeGenres = [
       { name: "Music", level: "large", slug: "music" },
       { name: "Movies", level: "large", slug: "movies" },
       { name: "Games", level: "large", slug: "games" },
     ];
 
-    const savedLargeGenres = await Genre.insertMany(largeGenres);
+    const largeGenreRefs = await Promise.all(largeGenres.map(genre => 
+      genresRef.add(genre)
+    ));
     console.log("Large genres seeded successfully");
 
+    // Seed medium genres
     const mediumGenres = [
-      {
-        name: "Rock",
-        level: "medium",
-        slug: "rock",
-        parent: savedLargeGenres[0]._id,
-      },
-      {
-        name: "Pop",
-        level: "medium",
-        slug: "pop",
-        parent: savedLargeGenres[0]._id,
-      },
-      {
-        name: "Action",
-        level: "medium",
-        slug: "action",
-        parent: savedLargeGenres[1]._id,
-      },
-      {
-        name: "Comedy",
-        level: "medium",
-        slug: "comedy",
-        parent: savedLargeGenres[1]._id,
-      },
-      {
-        name: "RPG",
-        level: "medium",
-        slug: "rpg",
-        parent: savedLargeGenres[2]._id,
-      },
-      {
-        name: "FPS",
-        level: "medium",
-        slug: "fps",
-        parent: savedLargeGenres[2]._id,
-      },
+      { name: "Rock", level: "medium", slug: "rock", parent: largeGenreRefs[0].id },
+      { name: "Pop", level: "medium", slug: "pop", parent: largeGenreRefs[0].id },
+      { name: "Action", level: "medium", slug: "action", parent: largeGenreRefs[1].id },
+      { name: "Comedy", level: "medium", slug: "comedy", parent: largeGenreRefs[1].id },
+      { name: "RPG", level: "medium", slug: "rpg", parent: largeGenreRefs[2].id },
+      { name: "FPS", level: "medium", slug: "fps", parent: largeGenreRefs[2].id },
     ];
 
-    const savedMediumGenres = await Genre.insertMany(mediumGenres);
+    const mediumGenreRefs = await Promise.all(mediumGenres.map(genre => 
+      genresRef.add(genre)
+    ));
     console.log("Medium genres seeded successfully");
 
+    // Seed small genres
     const smallGenres = [
-      {
-        name: "Classic Rock",
-        level: "small",
-        slug: "classic-rock",
-        parent: savedMediumGenres[0]._id,
-      },
-      {
-        name: "K-pop",
-        level: "small",
-        slug: "k-pop",
-        parent: savedMediumGenres[1]._id,
-      },
-      {
-        name: "Superhero",
-        level: "small",
-        slug: "superhero",
-        parent: savedMediumGenres[2]._id,
-      },
-      {
-        name: "Romantic Comedy",
-        level: "small",
-        slug: "romantic-comedy",
-        parent: savedMediumGenres[3]._id,
-      },
-      {
-        name: "JRPG",
-        level: "small",
-        slug: "jrpg",
-        parent: savedMediumGenres[4]._id,
-      },
-      {
-        name: "Battle Royale",
-        level: "small",
-        slug: "battle-royale",
-        parent: savedMediumGenres[5]._id,
-      },
+      { name: "Classic Rock", level: "small", slug: "classic-rock", parent: mediumGenreRefs[0].id },
+      { name: "K-pop", level: "small", slug: "k-pop", parent: mediumGenreRefs[1].id },
+      { name: "Superhero", level: "small", slug: "superhero", parent: mediumGenreRefs[2].id },
+      { name: "Romantic Comedy", level: "small", slug: "romantic-comedy", parent: mediumGenreRefs[3].id },
+      { name: "JRPG", level: "small", slug: "jrpg", parent: mediumGenreRefs[4].id },
+      { name: "Battle Royale", level: "small", slug: "battle-royale", parent: mediumGenreRefs[5].id },
     ];
 
-    await Genre.insertMany(smallGenres);
+    await Promise.all(smallGenres.map(genre => 
+      genresRef.add(genre)
+    ));
     console.log("Small genres seeded successfully");
 
     console.log("All genres seeded successfully");
-    mongoose.connection.close();
   } catch (error) {
     console.error("Error seeding genres:", error);
-    mongoose.connection.close();
+  } finally {
+    admin.app().delete();
   }
 };
 

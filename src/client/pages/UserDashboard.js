@@ -1,32 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
-import { useAuth } from '../contexts/AuthContext';
-import { FaUser, FaLock, FaAd, FaHistory, FaCog, FaSearch, FaVideo } from 'react-icons/fa';
-import api from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';  // この行を変更
+import { FaUser, FaAd, FaHistory, FaCog, FaSearch, FaVideo } from 'react-icons/fa';
+import ErrorMessage from '../components/ErrorMessage';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 const DashboardContainer = styled.div`
-  max-width: 1000px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
 `;
 
 const DashboardTitle = styled.h1`
-  font-size: 2rem;
+  font-size: 24px;
   margin-bottom: 20px;
-  color: ${({ theme }) => theme.colors.primary};
 `;
 
 const DashboardSection = styled.section`
-  background-color: ${({ theme }) => theme.colors.backgroundLight};
+  background-color: #f5f5f5;
   border-radius: 8px;
   padding: 20px;
   margin-bottom: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 `;
 
 const SectionTitle = styled.h2`
-  font-size: 1.5rem;
+  font-size: 18px;
   margin-bottom: 15px;
   display: flex;
   align-items: center;
@@ -36,40 +37,36 @@ const SectionTitle = styled.h2`
 const UserInfo = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
+  gap: 15px;
 `;
 
 const InfoItem = styled.div`
-  background-color: ${({ theme }) => theme.colors.background};
-  padding: 15px;
-  border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background-color: white;
+  padding: 10px;
+  border-radius: 4px;
 `;
 
 const InfoLabel = styled.span`
   font-weight: bold;
   display: block;
   margin-bottom: 5px;
-  color: ${({ theme }) => theme.colors.textLight};
 `;
 
 const InfoValue = styled.span`
   display: block;
-  color: ${({ theme }) => theme.colors.text};
 `;
 
 const ButtonLink = styled(Link)`
   display: inline-block;
-  background-color: ${({ theme }) => theme.colors.primary};
+  background-color: #007bff;
   color: white;
   padding: 10px 15px;
   border-radius: 4px;
   text-decoration: none;
   margin-top: 10px;
-  transition: background-color 0.3s ease;
 
   &:hover {
-    background-color: ${({ theme }) => theme.colors.primaryDark};
+    background-color: #0056b3;
   }
 `;
 
@@ -79,20 +76,10 @@ const ActivityList = styled.ul`
 `;
 
 const ActivityItem = styled.li`
-  background-color: ${({ theme }) => theme.colors.background};
-  padding: 15px;
-  border-radius: 6px;
+  background-color: white;
+  padding: 10px;
   margin-bottom: 10px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-`;
-
-const SettingsList = styled.ul`
-  list-style-type: none;
-  padding: 0;
-`;
-
-const SettingsItem = styled.li`
-  margin-bottom: 15px;
+  border-radius: 4px;
 `;
 
 const SearchHistoryList = styled.ul`
@@ -101,28 +88,25 @@ const SearchHistoryList = styled.ul`
 `;
 
 const SearchHistoryItem = styled.li`
-  background-color: ${({ theme }) => theme.colors.background};
-  padding: 10px 15px;
-  border-radius: 6px;
-  margin-bottom: 8px;
+  background-color: white;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 4px;
   display: flex;
   justify-content: space-between;
   align-items: center;
 `;
 
-const RecommendedVideosList = styled.ul`
-  list-style-type: none;
-  padding: 0;
+const RecommendedVideosList = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 15px;
 `;
 
-const RecommendedVideoItem = styled.li`
-  background-color: ${({ theme }) => theme.colors.background};
+const RecommendedVideoItem = styled.div`
+  background-color: white;
   padding: 10px;
-  border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
 `;
 
 const VideoThumbnail = styled.img`
@@ -132,68 +116,69 @@ const VideoThumbnail = styled.img`
 `;
 
 const VideoTitle = styled.h3`
-  font-size: 1rem;
+  font-size: 14px;
   margin: 10px 0 5px;
 `;
 
 const VideoChannel = styled.p`
-  font-size: 0.9rem;
-  color: ${({ theme }) => theme.colors.textLight};
+  font-size: 12px;
+  color: #666;
 `;
 
-const LoadingMessage = styled.p`
-  color: ${({ theme }) => theme.colors.textLight};
-  text-align: center;
-  padding: 20px;
+const SettingsList = styled.ul`
+  list-style-type: none;
+  padding: 0;
 `;
 
-const ErrorMessage = styled.p`
-  color: ${({ theme }) => theme.colors.error};
-  text-align: center;
-  padding: 20px;
+const SettingsItem = styled.li`
+  margin-bottom: 10px;
 `;
 
 const UserDashboard = () => {
   const { user } = useAuth();
-  const [loginHistory, setLoginHistory] = useState([]);
-  const [searchHistory, setSearchHistory] = useState([]);
-  const [recommendedVideos, setRecommendedVideos] = useState([]);
+  const [dashboardData, setDashboardData] = useState({
+    loginHistory: [],
+    searchHistory: [],
+    recommendedVideos: []
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const [loginHistoryResponse, searchHistoryResponse, recommendedVideosResponse] = await Promise.all([
-          api.get('/user/login-history'),
-          api.get('/user/search-history'),
-          api.get('/user/recommended-videos')
-        ]);
-
-        setLoginHistory(loginHistoryResponse.data);
-        setSearchHistory(searchHistoryResponse.data);
-        setRecommendedVideos(recommendedVideosResponse.data);
-      } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-        setError('ダッシュボードデータの取得中にエラーが発生しました。');
-      } finally {
-        setLoading(false);
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        setDashboardData(prevData => ({
+          ...prevData,
+          ...userData,
+          loginHistory: userData.loginHistory || [],
+          searchHistory: userData.searchHistory || [],
+          recommendedVideos: userData.recommendedVideos || []
+        }));
+      } else {
+        throw new Error('ユーザーデータが見つかりません。');
       }
-    };
+    } catch (err) {
+      setError('ダッシュボードデータの取得中にエラーが発生しました。');
+    } finally {
+      setLoading(false);
+    }
+  }, [user.uid]);
 
+  useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [fetchDashboardData]);
 
-  if (loading) {
-    return <LoadingMessage>データを読み込んでいます...</LoadingMessage>;
-  }
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message={error} />;
 
-  if (error) {
-    return <ErrorMessage>{error}</ErrorMessage>;
-  }
+  const { loginHistory, searchHistory, recommendedVideos } = dashboardData;
 
   return (
     <DashboardContainer>
@@ -204,7 +189,7 @@ const UserDashboard = () => {
         <UserInfo>
           <InfoItem>
             <InfoLabel>ユーザー名</InfoLabel>
-            <InfoValue>{user.username}</InfoValue>
+            <InfoValue>{user.displayName || 'Not set'}</InfoValue>
           </InfoItem>
           <InfoItem>
             <InfoLabel>メールアドレス</InfoLabel>
@@ -212,14 +197,14 @@ const UserDashboard = () => {
           </InfoItem>
           <InfoItem>
             <InfoLabel>アカウント作成日</InfoLabel>
-            <InfoValue>{new Date(user.createdAt).toLocaleDateString()}</InfoValue>
+            <InfoValue>{user.metadata.creationTime ? new Date(user.metadata.creationTime).toLocaleDateString() : 'Unknown'}</InfoValue>
           </InfoItem>
           <InfoItem>
-            <InfoLabel>2要素認証</InfoLabel>
-            <InfoValue>{user.isTwoFactorEnabled ? '有効' : '無効'}</InfoValue>
-            <ButtonLink to="/two-factor-auth">
-              {user.isTwoFactorEnabled ? '2要素認証を無効にする' : '2要素認証を有効にする'}
-            </ButtonLink>
+            <InfoLabel>メール認証</InfoLabel>
+            <InfoValue>{user.emailVerified ? '完了' : '未完了'}</InfoValue>
+            {!user.emailVerified && (
+              <ButtonLink to="/verify-email">メールアドレスを認証する</ButtonLink>
+            )}
           </InfoItem>
         </UserInfo>
       </DashboardSection>
@@ -229,7 +214,7 @@ const UserDashboard = () => {
         <ActivityList>
           {loginHistory.slice(0, 5).map((login, index) => (
             <ActivityItem key={index}>
-              {new Date(login.timestamp).toLocaleString()} - {login.ipAddress}
+              {new Date(login.timestamp.toDate()).toLocaleString()} - {login.ipAddress}
             </ActivityItem>
           ))}
         </ActivityList>
@@ -239,10 +224,10 @@ const UserDashboard = () => {
       <DashboardSection>
         <SectionTitle><FaSearch /> 最近の検索履歴</SectionTitle>
         <SearchHistoryList>
-          {searchHistory.slice(0, 5).map((search) => (
-            <SearchHistoryItem key={search._id}>
+          {searchHistory.slice(0, 5).map((search, index) => (
+            <SearchHistoryItem key={index}>
               <span>{search.query}</span>
-              <small>{new Date(search.timestamp).toLocaleString()}</small>
+              <small>{new Date(search.timestamp.toDate()).toLocaleString()}</small>
             </SearchHistoryItem>
           ))}
         </SearchHistoryList>
@@ -252,8 +237,8 @@ const UserDashboard = () => {
       <DashboardSection>
         <SectionTitle><FaVideo /> おすすめ動画</SectionTitle>
         <RecommendedVideosList>
-          {recommendedVideos.slice(0, 6).map((video) => (
-            <RecommendedVideoItem key={video._id}>
+          {recommendedVideos.slice(0, 6).map((video, index) => (
+            <RecommendedVideoItem key={index}>
               <VideoThumbnail src={video.thumbnail} alt={video.title} />
               <VideoTitle>{video.title}</VideoTitle>
               <VideoChannel>{video.channel.name}</VideoChannel>
@@ -287,9 +272,8 @@ const UserDashboard = () => {
   );
 };
 
-export default UserDashboard;
+export default React.memo(UserDashboard);
 
-// 将来的な機能拡張のためのコメント
 // TODO: ユーザーの視聴履歴セクションの追加
 // TODO: お気に入り動画リストの表示
 // TODO: ユーザーの投稿したコメントの表示

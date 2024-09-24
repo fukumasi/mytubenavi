@@ -1,3 +1,4 @@
+// src\client\components\LargeGenreList.js
 import React from 'react';
 import styled from 'styled-components';
 

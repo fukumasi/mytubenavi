@@ -1,10 +1,11 @@
+// src\client\components\IndexPage.js
 console.log("IndexPage.js is being imported");
 console.log("IndexPage rendering");
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import { Link } from "react-router-dom";
 import styled from "styled-components";
 import AdSpace from "./AdSpace";
+import { getFirestore, collection, getDocs } from "firebase/firestore";
 
 const PageContainer = styled.div`
   max-width: 1200px;
@@ -53,8 +54,13 @@ const IndexPage = () => {
   useEffect(() => {
     const fetchLargeGenres = async () => {
       try {
-        const response = await axios.get("/api/genres/large");
-        setLargeGenres(response.data);
+        const db = getFirestore();
+        const genresCollection = collection(db, "genres");
+        const genresSnapshot = await getDocs(genresCollection);
+        const genresData = genresSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(genre => genre.type === "large");
+        setLargeGenres(genresData);
       } catch (error) {
         console.error("Error fetching large genres:", error);
       }
@@ -78,7 +84,7 @@ const IndexPage = () => {
           <h3>ジャンル一覧</h3>
           <GenreGrid>
             {largeGenres.map((genre) => (
-              <GenreItem key={genre._id} to={`/genre/${genre.slug}`}>
+              <GenreItem key={genre.id} to={`/genre/${genre.slug}`}>
                 {genre.name}
               </GenreItem>
             ))}
@@ -92,5 +98,6 @@ const IndexPage = () => {
     </PageContainer>
   );
 };
+
 const ForceBuild = () => <div>Force Rebuild</div>;
 export default IndexPage;

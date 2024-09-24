@@ -1,3 +1,4 @@
+// src\client\components\MediumGenreList.js
 import React from 'react';
 import styled from 'styled-components';
 

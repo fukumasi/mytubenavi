@@ -1,3 +1,4 @@
+// src\client\components\FilterInput.js
 import styled from "styled-components";
 
 const FilterInput = styled.input`

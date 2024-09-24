@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import axios from "axios";
 import styled from "styled-components";
+import { collection, addDoc } from "firebase/firestore";
+import { db } from "../../firebase"; // Firebaseの設定ファイルからdbをインポート
 
 const UploadForm = styled.form`
   display: flex;
@@ -43,7 +44,11 @@ const UploadFeaturedVideo = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post("/api/featured-videos", videoData);
+      // Firestoreに新しいドキュメントを追加
+      await addDoc(collection(db, "featuredVideos"), {
+        ...videoData,
+        createdAt: new Date(),
+      });
       alert("動画が正常にアップロードされました。");
       setVideoData({
         videoId: "",
@@ -54,6 +59,7 @@ const UploadFeaturedVideo = () => {
         endDate: "",
       });
     } catch (error) {
+      console.error("Error adding document: ", error);
       alert("動画のアップロード中にエラーが発生しました。");
     }
   };

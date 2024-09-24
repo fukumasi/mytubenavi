@@ -1,3 +1,4 @@
+// src\client\components\FilterToggle.js
 import styled from "styled-components";
 
 const FilterToggle = styled.button`

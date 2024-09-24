@@ -90,14 +90,14 @@ const Privacy = () => {
       <Section>
         <SectionTitle>5. 情報の保護</SectionTitle>
         <Paragraph>
-          当社は、収集した個人情報の安全性を確保するために、適切な物理的、技術的、管理的措置を講じています。ただし、インターネット上での完全な安全性を保証することはできません。
+          当社は、収集した個人情報の安全性を確保するために、適切な物理的、技術的、管理的措置を講じています。また、当社はGoogle Firebaseのセキュアなクラウドインフラストラクチャを使用してデータを保存しています。ただし、インターネット上での完全な安全性を保証することはできません。
         </Paragraph>
       </Section>
 
       <Section>
-        <SectionTitle>6. Cookieの使用</SectionTitle>
+        <SectionTitle>6. Cookieと分析ツールの使用</SectionTitle>
         <Paragraph>
-          当社は、ユーザー体験の向上やサービスの改善のために、Cookieおよび類似の技術を使用することがあります。ユーザーはブラウザの設定でCookieを無効にすることができますが、一部のサービス機能が制限される場合があります。
+          当社は、ユーザー体験の向上やサービスの改善のために、Cookieおよび類似の技術を使用することがあります。また、Firebase Analyticsを使用してサービスの利用状況を分析しています。ユーザーはブラウザの設定でCookieを無効にすることができますが、一部のサービス機能が制限される場合があります。
         </Paragraph>
       </Section>
 
@@ -136,8 +136,15 @@ const Privacy = () => {
         </Paragraph>
       </Section>
 
+      <Section>
+        <SectionTitle>11. 第三者サービスの利用</SectionTitle>
+        <Paragraph>
+          当社は、ユーザー認証やデータストレージにGoogle Firebaseを使用しています。Firebaseのプライバシーポリシーについては、Googleのプライバシーポリシーをご確認ください。
+        </Paragraph>
+      </Section>
+
       <Paragraph>
-        最終更新日：2024年4月1日
+        最終更新日：2024年9月22日
       </Paragraph>
     </PrivacyContainer>
   );

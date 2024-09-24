@@ -1,48 +1,70 @@
-import React, { useCallback } from 'react';
-import styled from 'styled-components';
+import React, { useState } from 'react';
 import { useDropzone } from 'react-dropzone';
+import styled from 'styled-components';
+import { storage } from '../../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { v4 as uuidv4 } from 'uuid';
 
-// ... (既存のスタイルコンポーネント)
+const DropzoneContainer = styled.div`
+  border: 2px dashed #cccccc;
+  border-radius: 4px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  margin-bottom: 20px;
+`;
+
+const UploadedImage = styled.img`
+  max-width: 100%;
+  max-height: 200px;
+  margin-top: 20px;
+`;
+
+const ErrorMessage = styled.p`
+  color: red;
+  margin-top: 10px;
+`;
 
 const ImageUploader = ({ onImageUpload }) => {
-  const [preview, setPreview] = React.useState(null);
-  const [error, setError] = React.useState(null);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState(null);
+  const [error, setError] = useState(null);
 
-  const onDrop = useCallback((acceptedFiles) => {
-    setError(null);
+  const onDrop = async (acceptedFiles) => {
     const file = acceptedFiles[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setError('ファイルサイズは5MB以下にしてください。');
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result);
-        onImageUpload(file);
-      };
-      reader.readAsDataURL(file);
+    if (!file) {
+      setError('ファイルがアップロードされませんでした。');
+      return;
     }
-  }, [onImageUpload]);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: 'image/*',
-    multiple: false
-  });
+    try {
+      const fileExtension = file.name.split('.').pop();
+      const fileName = `${uuidv4()}.${fileExtension}`;
+      const storageRef = ref(storage, `images/${fileName}`);
+
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      setUploadedImageUrl(downloadURL);
+      onImageUpload(downloadURL);
+      setError(null);
+    } catch (err) {
+      setError('画像のアップロードに失敗しました。もう一度お試しください。');
+    }
+  };
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
 
   return (
     <div>
-      <UploadContainer {...getRootProps()}>
+      <DropzoneContainer {...getRootProps()}>
         <input {...getInputProps()} />
         {isDragActive ? (
           <p>ここにファイルをドロップしてください...</p>
         ) : (
-          <p>クリックまたはドラッグ＆ドロップで画像をアップロード</p>
+          <p>ここをクリックするか、ファイルをドラッグ＆ドロップしてください</p>
         )}
-      </UploadContainer>
-      {preview && <Preview src={preview} alt="プレビュー" />}
+      </DropzoneContainer>
+      {uploadedImageUrl && <UploadedImage src={uploadedImageUrl} alt="Uploaded" />}
       {error && <ErrorMessage>{error}</ErrorMessage>}
     </div>
   );

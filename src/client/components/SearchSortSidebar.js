@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import styled from "styled-components";
 import SearchBar from "./SearchBar";
 
@@ -19,12 +19,31 @@ const SortSelect = styled.select`
   color: ${(props) => props.theme.colors.text};
 `;
 
-const SearchSortSidebar = () => {
+const SearchSortSidebar = ({ onSearch, onSort }) => {
+  const [searchValue, setSearchValue] = useState("");
+
+  const handleSearchChange = (e) => {
+    setSearchValue(e.target.value);
+  };
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    onSearch(searchValue);
+  };
+
+  const handleSortChange = (e) => {
+    onSort(e.target.value);
+  };
+
   return (
     <SidebarContainer>
-      <SearchBar />
+      <SearchBar
+        value={searchValue}
+        onChange={handleSearchChange}
+        onSubmit={handleSearchSubmit}
+      />
       <SortContainer>
-        <SortSelect>
+        <SortSelect onChange={handleSortChange}>
           <option value="">並び替え</option>
           <option value="newest">最新順</option>
           <option value="popular">人気順</option>

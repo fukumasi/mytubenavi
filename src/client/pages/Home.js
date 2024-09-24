@@ -1,103 +1,87 @@
-import React, { useEffect, useState } from "react";
-import styled from "styled-components";
-import AdSpace from "../components/AdSpace";
-import GenreGrid from "../components/GenreGrid";
-import VideoList from "../components/VideoList";
-import { dummyVideos } from "../dummyData";
-import { useTheme } from "../hooks/useTheme";
-import axios from "axios";
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import styled from 'styled-components';
+import { useTheme } from '../hooks/useTheme';
+import SearchBar from '../components/SearchBar';
+import VideoList from '../components/VideoList';
+import PopularVideos from '../components/PopularVideos';
+import GenreList from '../components/GenreList';
+import FeaturedVideos from '../components/FeaturedVideos';
+import { searchVideos } from '../api/youtube';
 
-const Container = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  max-width: ${({ theme }) => theme.maxWidth || '1200px'};
+const HomeContainer = styled.div`
+  max-width: 1200px;
   margin: 0 auto;
-  padding: ${({ theme }) => theme.spacing?.medium || '20px'};
-
-  @media (max-width: ${({ theme }) => theme.breakpoints?.tablet || '768px'}) {
-    flex-direction: column;
-  }
+  padding: 20px;
 `;
 
-const Sidebar = styled.aside`
-  width: 20%;
-
-  @media (max-width: ${({ theme }) => theme.breakpoints?.tablet || '768px'}) {
-    width: 100%;
-    margin-bottom: ${({ theme }) => theme.spacing?.medium || '20px'};
-  }
+const Title = styled.h1`
+  font-size: 24px;
+  margin-bottom: 20px;
 `;
 
-const MainContent = styled.main`
-  width: 55%;
-
-  @media (max-width: ${({ theme }) => theme.breakpoints?.tablet || '768px'}) {
-    width: 100%;
-    order: -1;
-  }
+const ContentWrapper = styled.div`
+  display: flex;
+  gap: 20px;
 `;
 
-const SectionTitle = styled.h2`
-  font-size: ${({ theme }) => theme.fontSize?.large || '24px'};
-  color: ${({ theme }) => theme.colors?.text || '#000'};
-  margin-bottom: ${({ theme }) => theme.spacing?.medium || '20px'};
+const MainContent = styled.div`
+  flex: 1;
+`;
+
+const Sidebar = styled.div`
+  width: 300px;
 `;
 
 const Home = () => {
-  const theme = useTheme();
-  const [activeAds, setActiveAds] = useState([]);
+  const { t } = useTranslation();
+  const { theme } = useTheme();
+  const [searchResults, setSearchResults] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchActiveAds = async () => {
-      try {
-        const response = await axios.get("/api/ad-videos/active");
-        if (response.data && response.data.data && response.data.data.activeAdVideo) {
-          setActiveAds([response.data.data.activeAdVideo]);
-        }
-      } catch (error) {
-        console.error("Error fetching active ads:", error);
-      }
-    };
+    document.body.setAttribute('data-theme', theme);
+  }, [theme]);
 
-    fetchActiveAds();
-  }, []);
+  const handleSearch = async (query) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const results = await searchVideos(query);
+      setSearchResults(results);
+    } catch (err) {
+      setError(t('searchError'));
+      // エラーログ出力の代わりに適切なエラーハンドリングを行う
+      // 例: エラーメッセージを表示する状態を更新する
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <Container theme={theme}>
-      <Sidebar theme={theme}>
-        {activeAds.length > 0 ? (
-          activeAds.map((ad, index) => (
-            <AdSpace key={ad._id} adId={ad._id} />
-          ))
-        ) : (
-          <AdSpace text="広告枠" />
-        )}
-        <AdSpace text="有料掲載枠" />
-      </Sidebar>
-      <MainContent>
-        <SectionTitle theme={theme}>ジャンル一覧</SectionTitle>
-        <GenreGrid />
-        <SectionTitle theme={theme}>おすすめ動画</SectionTitle>
-        <VideoList videos={dummyVideos} loading={false} error={null} />
-      </MainContent>
-      <Sidebar theme={theme}>
-        <AdSpace text="広告枠" />
-        <AdSpace text="有料掲載枠" />
-      </Sidebar>
-    </Container>
+    <HomeContainer>
+      <Title>{t('welcome')}</Title>
+      <SearchBar onSearch={handleSearch} />
+      <ContentWrapper>
+        <MainContent>
+          {isLoading && <p>{t('loading')}</p>}
+          {error && <p>{error}</p>}
+          {searchResults.length > 0 ? (
+            <VideoList videos={searchResults} />
+          ) : (
+            <>
+              <PopularVideos />
+              <FeaturedVideos />
+            </>
+          )}
+        </MainContent>
+        <Sidebar>
+          <GenreList />
+        </Sidebar>
+      </ContentWrapper>
+    </HomeContainer>
   );
 };
 
 export default Home;
-
-// TODO: 動的なおすすめ動画の取得と表示
-// TODO: ユーザーの興味に基づいたパーソナライズされたコンテンツの表示
-// TODO: 広告の効果測定機能の実装
-// TODO: ページネーションの追加
-
-// プレースホルダーコメント（行数を維持するため）
-// ...
-// ...
-// ...
-// ...

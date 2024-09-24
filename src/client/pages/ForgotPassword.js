@@ -1,150 +1,74 @@
-import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import styled from "styled-components";
-import { useAuth } from "../contexts/AuthContext";
+import { useFirebase } from "../contexts/FirebaseContext";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import VideoCard from "../components/VideoCard"; // このコンポーネントは別途作成する必要があります
 
-const Container = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
+const GenreContainer = styled.div`
   padding: 20px;
-  background-color: ${({ theme }) => theme.colors.background};
 `;
 
-const Form = styled.form`
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 400px;
-  padding: 40px;
-  background-color: ${({ theme }) => theme.colors.card};
-  border-radius: 8px;
-  box-shadow: 0 4px 6px ${({ theme }) => theme.colors.shadow};
+const GenreTitle = styled.h1`
+  font-size: 24px;
+  margin-bottom: 20px;
 `;
 
-const Title = styled.h2`
-  margin-bottom: 24px;
-  color: ${({ theme }) => theme.colors.primary};
-  text-align: center;
+const VideoGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
 `;
 
-const Input = styled.input`
-  width: 100%;
-  padding: 12px;
-  margin-bottom: 16px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 4px;
-  font-size: 16px;
+const GenrePage = () => {
+  const { genreSlug } = useParams();
+  const [videos, setVideos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { db } = useFirebase();
 
-  &:focus {
-    outline: none;
-    border-color: ${({ theme }) => theme.colors.primary};
+  useEffect(() => {
+    const fetchVideos = async () => {
+      try {
+        const videosRef = collection(db, "videos");
+        const q = query(videosRef, where("genre", "==", genreSlug));
+        const querySnapshot = await getDocs(q);
+        
+        const fetchedVideos = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        setVideos(fetchedVideos);
+      } catch (err) {
+        console.error("Error fetching videos:", err);
+        setError("動画の取得中にエラーが発生しました。");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchVideos();
+  }, [db, genreSlug]);
+
+  if (loading) {
+    return <div>Loading...</div>;
   }
-`;
 
-const Button = styled.button`
-  width: 100%;
-  padding: 12px;
-  background-color: ${({ theme }) => theme.colors.primary};
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 16px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-
-  &:hover {
-    background-color: ${({ theme }) => theme.colors.primaryDark};
+  if (error) {
+    return <div>{error}</div>;
   }
-
-  &:disabled {
-    background-color: ${({ theme }) => theme.colors.disabled};
-    cursor: not-allowed;
-  }
-`;
-
-const Message = styled.p`
-  margin-top: 16px;
-  text-align: center;
-  color: ${({ isError, theme }) => isError ? theme.colors.error : theme.colors.success};
-`;
-
-const BackToLogin = styled(Link)`
-  margin-top: 16px;
-  text-align: center;
-  color: ${({ theme }) => theme.colors.primary};
-  text-decoration: none;
-
-  &:hover {
-    text-decoration: underline;
-  }
-`;
-
-const ForgotPassword = () => {
-  const [email, setEmail] = useState("");
-  const [message, setMessage] = useState({ text: "", isError: false });
-  const [isLoading, setIsLoading] = useState(false);
-  const { resetPassword } = useAuth() || {}; // useAuthがundefinedの場合でもエラーを防ぐ
-  const navigate = useNavigate();
-
-  const validateEmail = (email) => {
-    const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    return re.test(String(email).toLowerCase());
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setMessage({ text: "", isError: false });
-
-    const trimmedEmail = email.trim();
-    if (!validateEmail(trimmedEmail)) {
-      setMessage({ text: "有効なメールアドレスを入力してください。", isError: true });
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      await resetPassword(trimmedEmail);
-      setMessage({ text: "パスワードリセットリンクをメールで送信しました。", isError: false });
-      setTimeout(() => navigate("/login"), 5000);
-    } catch (error) {
-      setMessage({ text: error.response?.data?.message || "パスワードリセットリンクの送信に失敗しました。", isError: true });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
-    <Container>
-      <Form onSubmit={handleSubmit}>
-        <Title>パスワードをお忘れの方</Title>
-        <Input
-          type="email"
-          placeholder="メールアドレス"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          aria-label="メールアドレス"
-          aria-describedby="email-error"
-        />
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? "送信中..." : "リセットリンクを送信"}
-        </Button>
-        {message.text && (
-          <Message 
-            isError={message.isError} 
-            role={message.isError ? "alert" : "status"}
-            aria-live="polite"
-          >
-            {message.text}
-          </Message>
-        )}
-        <BackToLogin to="/login">ログインページに戻る</BackToLogin>
-      </Form>
-    </Container>
+    <GenreContainer>
+      <GenreTitle>{genreSlug} Videos</GenreTitle>
+      <VideoGrid>
+        {videos.map(video => (
+          <VideoCard key={video.id} video={video} />
+        ))}
+      </VideoGrid>
+    </GenreContainer>
   );
 };
 
-export default ForgotPassword;
+export default GenrePage;

@@ -1,0 +1,38 @@
+# MongoDB files
+*.mongodb.js
+
+# Dependency directories
+node_modules/
+
+# Build outputs
+build/
+dist/
+
+# Firebase
+firebase-functions/lib/
+.firebase/
+
+# Configuration files
+*.config.js
+!.eslintrc.js
+
+# Test files
+**/*.test.js
+**/*.spec.js
+
+# Generated files
+*.min.js
+
+# Coverage directory
+coverage/
+
+# Temporary files
+*.log
+*.tmp
+*.temp
+
+# Public directory (if you have static assets)
+public/
+
+# Environment files
+.env*

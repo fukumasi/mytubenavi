@@ -1,7 +1,8 @@
+// src\client\components\AdSpace.js
 import React, { useState, useEffect } from "react";
-import axios from "axios";
 import AdVideoDisplay from "./AdVideoDisplay";
 import styled from "styled-components";
+import { getFirestore, collection, query, where, limit, getDocs } from "firebase/firestore";
 
 // スタイル定義
 const AdContainer = styled.div`
@@ -36,23 +37,22 @@ const AdSpace = () => {
   useEffect(() => {
     const fetchActiveAd = async () => {
       try {
-        // アクティブな広告を取得するAPIを呼び出し
-        const response = await axios.get("/api/ad-videos/active");
-        
-        // レスポンスからアクティブな広告のIDを取得
-        if (response.data && response.data.data && response.data.data.activeAdVideo) {
-          setActiveAdId(response.data.data.activeAdVideo._id);
+        const db = getFirestore();
+        const adsRef = collection(db, "ads");
+        const q = query(adsRef, where("active", "==", true), limit(1));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+          const activeAd = querySnapshot.docs[0];
+          setActiveAdId(activeAd.id);
         } else {
           // アクティブな広告が見つからない場合はエラーを設定
           setError("No active ad videos available");
         }
       } catch (error) {
-        // APIリクエスト中にエラーが発生した場合の処理
-        console.error("Error fetching active ad video:", error.response || error);
-        setError(error.response 
-          ? `Error: ${error.response.status} ${error.response.statusText}` 
-          : error.message
-        );
+        // Firestoreリクエスト中にエラーが発生した場合の処理
+        console.error("Error fetching active ad video:", error);
+        setError(`広告の取得中にエラーが発生しました: ${error.message}`);
       }
     };
 
@@ -83,14 +83,4 @@ const AdSpace = () => {
 // AdSpaceコンポーネントをエクスポート
 export default AdSpace;
 
-// 以下、将来の拡張のためのプレースホルダー
-// TODO: 広告のパフォーマンス分析機能を追加
-// TODO: 複数の広告をローテーションで表示する機能を実装
-// TODO: ユーザーの興味に基づいてパーソナライズされた広告を表示する機能を追加
 
-// プレースホルダーの行
-// ...
-// ...
-// ...
-// ...
-// ...

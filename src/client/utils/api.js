@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { getAuth } from 'firebase/auth';
+import { error } from './logger';
 
 const api = axios.create({
   baseURL: '/api',
@@ -8,25 +10,33 @@ const api = axios.create({
 });
 
 // リクエストインターセプター
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
+api.interceptors.request.use(async (config) => {
+  const auth = getAuth();
+  const user = auth.currentUser;
+  if (user) {
+    const token = await user.getIdToken();
     config.headers['Authorization'] = `Bearer ${token}`;
   }
   return config;
-}, (error) => {
-  return Promise.reject(error);
+}, (err) => {
+  return Promise.reject(err);
 });
 
 // レスポンスインターセプター
 api.interceptors.response.use((response) => {
   return response;
-}, (error) => {
-  if (error.response && error.response.status === 401) {
+}, async (err) => {
+  if (err.response && err.response.status === 401) {
     // トークンが無効な場合、ユーザーをログアウトさせる
-    // TODO: ログアウト処理を実装
+    const auth = getAuth();
+    try {
+      await auth.signOut();
+      // TODO: ログアウト後の処理（例：ログインページへのリダイレクト）
+    } catch (signOutError) {
+      error('Sign out failed', signOutError);
+    }
   }
-  return Promise.reject(error);
+  return Promise.reject(err);
 });
 
 export default api;
