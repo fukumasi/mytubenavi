@@ -1,3 +1,4 @@
+// src\client\components\FilterLabel.js
 import styled from "styled-components";
 
 const FilterLabel = styled.label`

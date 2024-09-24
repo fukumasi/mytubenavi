@@ -2,32 +2,41 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "react-query";
 import styled from "styled-components";
-import { getVideoDetails, getRelatedVideos, getVideoComments } from "../api/youtube";
+import { formatDistance, isValid } from 'date-fns';
+import { ja } from 'date-fns/locale';
+import { getVideoDetails, getRelatedVideos } from "../api/youtube";
 import ErrorMessage from "../components/ErrorMessage";
 import RelatedVideos from "../components/RelatedVideos";
+import CommentSection from "../components/CommentSection";
 import { useTheme } from "../hooks";
 import SkeletonLoader from "../components/SkeletonLoader";
+import { useAuth } from "../contexts/AuthContext";
+import { doc, setDoc, arrayUnion, getFirestore, serverTimestamp } from "firebase/firestore";
 
-const VideoContainer = styled.main`
-  max-width: ${({ theme }) => theme.maxWidth};
-  margin: 0 auto;
-  padding: ${({ theme }) => theme.spacing.large};
-  display: grid;
-  grid-template-columns: 2fr 1fr;
+const VideoContainer = styled.div`
+  display: flex;
+  flex-direction: column;
   gap: ${({ theme }) => theme.spacing.medium};
+  padding: ${({ theme }) => theme.spacing.large};
   background-color: ${({ theme }) => theme.colors.background};
   color: ${({ theme }) => theme.colors.text};
 
-  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
-    grid-template-columns: 1fr;
+  @media (min-width: 768px) {
+    flex-direction: row;
   }
 `;
 
-const MainContent = styled.article``;
+const MainContent = styled.main`
+  flex: 2;
+`;
+
+const Sidebar = styled.aside`
+  flex: 1;
+`;
 
 const VideoPlayer = styled.div`
   position: relative;
-  padding-bottom: 56.25%; /* 16:9 アスペクト比 */
+  padding-bottom: 56.25%;
   height: 0;
   overflow: hidden;
   margin-bottom: ${({ theme }) => theme.spacing.medium};
@@ -42,30 +51,24 @@ const VideoIframe = styled.iframe`
   border: none;
 `;
 
-const VideoInfo = styled.section`
+const VideoInfo = styled.div`
   background-color: ${({ theme }) => theme.colors.backgroundLight};
   padding: ${({ theme }) => theme.spacing.medium};
   border-radius: ${({ theme }) => theme.borderRadius};
+  transition: background-color 0.3s ease;
 `;
 
 const VideoTitle = styled.h1`
   font-size: ${({ theme }) => theme.fontSizes.large};
   margin-bottom: ${({ theme }) => theme.spacing.small};
-  color: ${({ theme }) => theme.colors.text};
 `;
 
 const VideoMeta = styled.div`
   display: flex;
   justify-content: space-between;
-  margin-bottom: ${({ theme }) => theme.spacing.medium};
   font-size: ${({ theme }) => theme.fontSizes.small};
   color: ${({ theme }) => theme.colors.textSecondary};
-`;
-
-const VideoDescription = styled.p`
-  white-space: pre-wrap;
-  font-size: ${({ theme }) => theme.fontSizes.medium};
-  color: ${({ theme }) => theme.colors.text};
+  margin-bottom: ${({ theme }) => theme.spacing.small};
 `;
 
 const ChannelInfo = styled.div`
@@ -79,61 +82,33 @@ const ChannelThumbnail = styled.img`
   height: 48px;
   border-radius: 50%;
   margin-right: ${({ theme }) => theme.spacing.small};
-  background-color: ${({ theme }) => theme.colors.backgroundLight};
 `;
 
 const ChannelName = styled.span`
+  font-size: ${({ theme }) => theme.fontSizes.medium};
   font-weight: bold;
-  font-size: ${({ theme }) => theme.fontSizes.medium};
-  color: ${({ theme }) => theme.colors.text};
 `;
 
-const Sidebar = styled.aside``;
-
-const CommentSection = styled.section`
-  margin-top: ${({ theme }) => theme.spacing.large};
+const VideoDescription = styled.p`
+  font-size: ${({ theme }) => theme.fontSizes.small};
+  white-space: pre-wrap;
 `;
 
-const CommentForm = styled.form`
+const VideoStats = styled.div`
   display: flex;
-  margin-bottom: ${({ theme }) => theme.spacing.medium};
-`;
-
-const CommentInput = styled.input`
-  flex-grow: 1;
-  padding: ${({ theme }) => theme.spacing.small};
-  font-size: ${({ theme }) => theme.fontSizes.medium};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.borderRadius};
-`;
-
-const CommentButton = styled.button`
-  padding: ${({ theme }) => theme.spacing.small} ${({ theme }) => theme.spacing.medium};
-  background-color: ${({ theme }) => theme.colors.primary};
-  color: ${({ theme }) => theme.colors.white};
-  border: none;
-  border-radius: ${({ theme }) => theme.borderRadius};
-  cursor: pointer;
-  margin-left: ${({ theme }) => theme.spacing.small};
-`;
-
-const CommentList = styled.ul`
-  list-style-type: none;
-  padding: 0;
-`;
-
-const CommentItem = styled.li`
-  margin-bottom: ${({ theme }) => theme.spacing.medium};
-  padding: ${({ theme }) => theme.spacing.small};
-  background-color: ${({ theme }) => theme.colors.backgroundLight};
-  border-radius: ${({ theme }) => theme.borderRadius};
+  justify-content: space-between;
+  margin-top: ${({ theme }) => theme.spacing.small};
+  font-size: ${({ theme }) => theme.fontSizes.small};
+  color: ${({ theme }) => theme.colors.textSecondary};
 `;
 
 const VideoDetail = () => {
   const { id } = useParams();
   const [playerReady, setPlayerReady] = useState(false);
-  const [newComment, setNewComment] = useState("");
   const theme = useTheme();
+  const { user } = useAuth();
+  const db = getFirestore();
+  const [error, setError] = useState(null);
 
   const {
     data: video,
@@ -141,7 +116,22 @@ const VideoDetail = () => {
     error: videoError
   } = useQuery(["video", id], () => getVideoDetails(id), {
     retry: 3,
-    onError: (error) => console.error("Video details fetching error:", error)
+    onError: (error) => setError("動画詳細の取得エラー: " + error.message),
+    staleTime: 5 * 60 * 1000, // 5分
+    onSuccess: (data) => {
+      if (user) {
+        const userRef = doc(db, "users", user.uid);
+        setDoc(userRef, {
+          watchHistory: arrayUnion({
+            videoId: id,
+            title: data.snippet?.title,
+            watchedAt: serverTimestamp()
+          })
+        }, { merge: true }).catch(error => {
+          setError("視聴履歴の保存エラー: " + error.message);
+        });
+      }
+    }
   });
 
   const {
@@ -151,22 +141,11 @@ const VideoDetail = () => {
   } = useQuery(["relatedVideos", id], () => getRelatedVideos(id), {
     enabled: !!id,
     retry: 3,
-    onError: (error) => console.error("Related videos fetching error:", error)
-  });
-
-  const {
-    data: comments,
-    isLoading: isLoadingComments,
-    error: commentsError,
-    refetch: refetchComments
-  } = useQuery(["comments", id], () => getVideoComments(id), {
-    enabled: !!id,
-    retry: 3,
-    onError: (error) => console.error("Comments fetching error:", error)
+    onError: (error) => setError("関連動画の取得エラー: " + error.message),
+    staleTime: 5 * 60 * 1000, // 5分
   });
 
   const onPlayerReady = useCallback(() => {
-    console.log("Player is ready");
     setPlayerReady(true);
   }, []);
 
@@ -191,26 +170,35 @@ const VideoDetail = () => {
     if (video?.statistics?.viewCount) {
       return parseInt(video.statistics.viewCount).toLocaleString();
     }
-    return "N/A";
+    return "不明";
   }, [video?.statistics?.viewCount]);
 
   const formattedPublishDate = useMemo(() => {
     if (video?.snippet?.publishedAt) {
-      return new Date(video.snippet.publishedAt).toLocaleDateString();
+      const date = new Date(video.snippet.publishedAt);
+      if (isValid(date)) {
+        return formatDistance(date, new Date(), { addSuffix: true, locale: ja });
+      }
     }
-    return "N/A";
+    return "日付不明";
   }, [video?.snippet?.publishedAt]);
 
-  const handleCommentSubmit = (e) => {
-    e.preventDefault();
-    if (newComment.trim()) {
-      console.log("Adding comment:", newComment);
-      setNewComment("");
+  const formattedLikeCount = useMemo(() => {
+    if (video?.statistics?.likeCount) {
+      return parseInt(video.statistics.likeCount).toLocaleString();
     }
-  };
+    return "不明";
+  }, [video?.statistics?.likeCount]);
 
-  if (isLoadingVideo || isLoadingRelated || isLoadingComments) return <SkeletonLoader />;
-  if (videoError) return <ErrorMessage message={`動画の読み込み中にエラーが発生しました: ${videoError.message || '不明なエラー'}`} />;
+  const formattedCommentCount = useMemo(() => {
+    if (video?.statistics?.commentCount) {
+      return parseInt(video.statistics.commentCount).toLocaleString();
+    }
+    return "不明";
+  }, [video?.statistics?.commentCount]);
+
+  if (isLoadingVideo || isLoadingRelated) return <SkeletonLoader aria-label="コンテンツを読み込み中" />;
+  if (videoError || relatedError || error) return <ErrorMessage message={error || videoError?.message || relatedError?.message || "エラーが発生しました"} />;
   if (!video) return <ErrorMessage message="動画が見つかりません。" />;
 
   return (
@@ -220,64 +208,44 @@ const VideoDetail = () => {
           {playerReady && (
             <VideoIframe
               src={`https://www.youtube-nocookie.com/embed/${id}?enablejsapi=1&rel=0&modestbranding=1`}
-              title={video.snippet?.title || "YouTube video"}
+              title={video.snippet?.title || "YouTube動画"}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
-              aria-label="YouTube video player"
+              aria-label="YouTube動画プレーヤー"
             />
           )}
         </VideoPlayer>
         <VideoInfo theme={theme}>
           <VideoTitle theme={theme}>{video.snippet?.title || "タイトルなし"}</VideoTitle>
-          <VideoMeta theme={theme} aria-label="Video metadata">
+          <VideoMeta theme={theme} aria-label="動画のメタデータ">
             <span>{`${formattedViewCount} 回視聴`}</span>
             <span>{formattedPublishDate}</span>
           </VideoMeta>
           <ChannelInfo theme={theme}>
             <ChannelThumbnail 
-              src={video.snippet?.thumbnails?.default?.url}
-              alt={`${video.snippet?.channelTitle || "Channel"} thumbnail`}
+              src={video.snippet?.thumbnails?.default?.url || 'https://via.placeholder.com/48x48.png?text=No+Image'}
+              alt={`${video.snippet?.channelTitle || "チャンネル"} のサムネイル`}
               loading="lazy"
               onError={(e) => {
-                console.error('Error loading channel thumbnail:', e);
-                e.target.style.display = 'none';
+                setError('チャンネルサムネイルの読み込みエラー: ' + e.message);
+                e.target.src = 'https://via.placeholder.com/48x48.png?text=No+Image';
               }}
               theme={theme}
             />
             <ChannelName theme={theme}>{video.snippet?.channelTitle || "チャンネル名不明"}</ChannelName>
           </ChannelInfo>
-          <VideoDescription theme={theme} aria-label="Video description">
+          <VideoDescription theme={theme} aria-label="動画の説明">
             {video.snippet?.description || "説明がありません。"}
           </VideoDescription>
+          <VideoStats theme={theme}>
+            <span>{`👍 ${formattedLikeCount}`}</span>
+            <span>{`💬 ${formattedCommentCount}`}</span>
+          </VideoStats>
         </VideoInfo>
-        <CommentSection theme={theme}>
-          <h2>コメント</h2>
-          <CommentForm onSubmit={handleCommentSubmit}>
-            <CommentInput
-              type="text"
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="コメントを追加..."
-              theme={theme}
-            />
-            <CommentButton type="submit" theme={theme}>投稿</CommentButton>
-          </CommentForm>
-          {commentsError ? (
-            <ErrorMessage message={`コメントの読み込み中にエラーが発生しました: ${commentsError.message || '不明なエラー'}`} />
-          ) : (
-            <CommentList theme={theme}>
-              {comments?.map((comment, index) => (
-                <CommentItem key={index} theme={theme}>
-                  <strong>{comment.author}: </strong>
-                  {comment.text}
-                </CommentItem>
-              ))}
-            </CommentList>
-          )}
-        </CommentSection>
+        <CommentSection videoId={id} />
       </MainContent>
       <Sidebar theme={theme}>
-        <h2 id="related-videos-heading" className="sr-only">関連動画</h2>
+        <h2 id="related-videos-heading">関連動画</h2>
         {relatedError ? (
           <ErrorMessage message={`関連動画の読み込み中にエラーが発生しました: ${relatedError.message || '不明なエラー'}`} />
         ) : (
@@ -288,4 +256,10 @@ const VideoDetail = () => {
   );
 };
 
-export default VideoDetail;
+export default React.memo(VideoDetail);
+
+// TODO: 再生リストへの追加機能
+// TODO: 動画のホバープレビュー機能
+// TODO: パフォーマンス測定と最適化
+// TODO: アクセシビリティテストと改善
+// TODO: SEO対策の強化

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import styled from "styled-components";
-import { useAuth } from "../contexts/AuthContext";
+import { getAuth, confirmPasswordReset, verifyPasswordResetCode } from "firebase/auth";
 
 const Container = styled.div`
   display: flex;
@@ -23,7 +23,8 @@ const Form = styled.form`
   box-shadow: 0 4px 6px ${({ theme }) => theme.colors.shadow};
 `;
 
-const Title = styled.h2`
+const Title = styled.h1`
+  font-size: 24px;
   margin-bottom: 24px;
   color: ${({ theme }) => theme.colors.primary};
   text-align: center;
@@ -100,8 +101,19 @@ const ResetPassword = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
   const { resetToken } = useParams();
-  const { confirmResetPassword } = useAuth();
   const navigate = useNavigate();
+  const auth = getAuth();
+
+  useEffect(() => {
+    const verifyCode = async () => {
+      try {
+        await verifyPasswordResetCode(auth, resetToken);
+      } catch (error) {
+        setMessage({ text: "無効なパスワードリセットリンクです。再度パスワードリセットを申請してください。", isError: true });
+      }
+    };
+    verifyCode();
+  }, [auth, resetToken]);
 
   useEffect(() => {
     setPasswordStrength(calculatePasswordStrength(password));
@@ -140,11 +152,23 @@ const ResetPassword = () => {
     setIsLoading(true);
 
     try {
-      await confirmResetPassword(resetToken, password);
+      await confirmPasswordReset(auth, resetToken, password);
       setMessage({ text: "パスワードが正常にリセットされました。ログインページに移動します...", isError: false });
       setTimeout(() => navigate("/login"), 3000);
     } catch (error) {
-      setMessage({ text: error.response?.data?.message || "パスワードのリセットに失敗しました。", isError: true });
+      let errorMessage = "パスワードのリセットに失敗しました。";
+      if (error.code === 'auth/expired-action-code') {
+        errorMessage = "パスワードリセットリンクの有効期限が切れています。再度パスワードリセットを申請してください。";
+      } else if (error.code === 'auth/invalid-action-code') {
+        errorMessage = "無効なパスワードリセットリンクです。再度パスワードリセットを申請してください。";
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = "このアカウントは無効化されています。管理者にお問い合わせください。";
+      } else if (error.code === 'auth/user-not-found') {
+        errorMessage = "ユーザーが見つかりません。再度パスワードリセットを申請してください。";
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = "パスワードが弱すぎます。より強力なパスワードを設定してください。";
+      }
+      setMessage({ text: errorMessage, isError: true });
     } finally {
       setIsLoading(false);
     }

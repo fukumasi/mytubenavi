@@ -1,3 +1,4 @@
+// src\client\components\FilterGroup.js
 import styled from "styled-components";
 
 const FilterGroup = styled.div`

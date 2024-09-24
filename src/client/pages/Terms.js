@@ -42,6 +42,12 @@ const ListItem = styled.li`
 `;
 
 const Terms = () => {
+  const lastUpdated = new Date('2024-04-01').toLocaleDateString('ja-JP', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
   return (
     <TermsContainer>
       <Title>利用規約</Title>
@@ -117,7 +123,7 @@ const Terms = () => {
       </Section>
 
       <Paragraph>
-        最終更新日：2024年4月1日
+        最終更新日：{lastUpdated}
       </Paragraph>
     </TermsContainer>
   );

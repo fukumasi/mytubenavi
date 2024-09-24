@@ -1,0 +1,40 @@
+{
+  "app": {
+    "title": "MyTubeNavi"
+  },
+  "loading": {
+    "ariaLabel": "読み込み中",
+    "message": "コンテンツを読み込んでいます..."
+  },
+  "genreList": "ジャンル一覧",
+  "genres": {
+    "entertainment": "エンターテイメント",
+    "music": "音楽",
+    "gaming": "ゲーム",
+    "sports": "スポーツ",
+    "news": "ニュース",
+    "education": "教育",
+    "science": "科学",
+    "cooking": "料理",
+    "travel": "旅行",
+    "fashion": "ファッション",
+    "beauty": "美容",
+    "pets": "ペット",
+    "diy": "DIY",
+    "art": "アート",
+    "business": "ビジネス",
+    "technology": "テクノロジー",
+    "automotive": "自動車",
+    "health": "健康",
+    "movies": "映画",
+    "anime": "アニメ"
+  },
+  "appName": "MyTubeNavi",
+  "login": "ログイン",
+  "register": "新規登録",
+  "logout": "ログアウト",
+  "dashboard": "ダッシュボード",
+  "profile": "プロフィール",
+  "settings": "設定",
+  "signOut": "サインアウト"
+}

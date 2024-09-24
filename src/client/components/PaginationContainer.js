@@ -1,3 +1,4 @@
+// src\client\components\PaginationContainer.js
 import styled from "styled-components";
 
 const PaginationContainer = styled.div`

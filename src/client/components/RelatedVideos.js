@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import styled from 'styled-components';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../hooks';
 import { useInView } from 'react-intersection-observer';
 
@@ -62,11 +62,13 @@ const RelatedVideoItem = React.memo(({ video, theme, handleKeyDown }) => {
     rootMargin: '200px 0px',
   });
 
+  const videoId = video.id.videoId || video.id;
+
   return (
     <VideoItemWrapper ref={ref} theme={theme}>
       <VideoLink
-        to={`/video/${video.id.videoId || video.id}`}
-        onKeyDown={(e) => handleKeyDown(e, video.id.videoId || video.id)}
+        to={`/video/${videoId}`}
+        onKeyDown={(e) => handleKeyDown(e, videoId)}
         theme={theme}
       >
         {inView && (
@@ -88,13 +90,14 @@ const RelatedVideoItem = React.memo(({ video, theme, handleKeyDown }) => {
 
 const RelatedVideos = ({ videos }) => {
   const theme = useTheme();
+  const navigate = useNavigate();
 
   const handleKeyDown = useCallback((event, videoId) => {
     if (event.key === 'Enter') {
       event.preventDefault();
-      window.location.href = `/video/${videoId}`;
+      navigate(`/video/${videoId}`);
     }
-  }, []);
+  }, [navigate]);
 
   const memoizedVideos = useMemo(() => 
     videos.map((video) => (

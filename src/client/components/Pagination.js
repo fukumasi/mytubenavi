@@ -1,7 +1,10 @@
-import React from "react";
-import styled from "styled-components";
+// src\client\components\Pagination.js
+import React, { useMemo, useCallback } from "react";
+import styled, { ThemeProvider } from "styled-components";
+import { useTranslation } from 'react-i18next';
+import theme from "../styles/theme";
 
-const PaginationContainer = styled.div`
+const PaginationContainer = styled.nav`
   display: flex;
   justify-content: center;
   align-items: center;
@@ -11,18 +14,24 @@ const PaginationContainer = styled.div`
 const PageButton = styled.button`
   margin: 0 5px;
   padding: 5px 10px;
-  border: 1px solid #ccc;
-  background-color: ${(props) => (props.$active ? "#007bff" : "white")};
-  color: ${(props) => (props.$active ? "white" : "black")};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  background-color: ${(props) => (props.$active ? theme.colors.primary : theme.colors.background)};
+  color: ${(props) => (props.$active ? theme.colors.white : theme.colors.text)};
   cursor: pointer;
+  border-radius: ${({ theme }) => theme.borderRadius};
 
   &:hover {
-    background-color: ${(props) => (props.$active ? "#007bff" : "#e9ecef")};
+    background-color: ${(props) => (props.$active ? theme.colors.primaryDark : theme.colors.backgroundLight)};
   }
 
   &:disabled {
     cursor: not-allowed;
     opacity: 0.5;
+  }
+
+  &:focus {
+    outline: 2px solid ${({ theme }) => theme.colors.focus};
+    outline-offset: 2px;
   }
 `;
 
@@ -31,7 +40,9 @@ const Ellipsis = styled.span`
 `;
 
 const Pagination = ({ currentPage, totalPages, onPageChange }) => {
-  const getPageNumbers = () => {
+  const { t } = useTranslation();
+
+  const getPageNumbers = useCallback(() => {
     const pageNumbers = [];
     const maxVisiblePages = 5;
 
@@ -60,37 +71,54 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
     pageNumbers.push(totalPages);
 
     return pageNumbers;
-  };
+  }, [currentPage, totalPages]);
+
+  const pageNumbers = useMemo(() => getPageNumbers(), [getPageNumbers]);
 
   return (
-    <PaginationContainer>
-      <PageButton
-        onClick={() => onPageChange(currentPage - 1)}
-        disabled={currentPage === 1}
-      >
-        前へ
-      </PageButton>
-      {getPageNumbers().map((number, index) =>
-        number === "..." ? (
-          <Ellipsis key={`ellipsis-${index}`}>...</Ellipsis>
-        ) : (
-          <PageButton
-            key={number}
-            onClick={() => onPageChange(number)}
-            $active={currentPage === number}
-          >
-            {number}
-          </PageButton>
-        ),
-      )}
-      <PageButton
-        onClick={() => onPageChange(currentPage + 1)}
-        disabled={currentPage === totalPages}
-      >
-        次へ
-      </PageButton>
-    </PaginationContainer>
+    <ThemeProvider theme={theme}>
+      <PaginationContainer aria-label={t('pagination.label')}>
+        <PageButton
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          aria-label={t('pagination.previous')}
+        >
+          {t('pagination.previousShort')}
+        </PageButton>
+        {pageNumbers.map((number, index) =>
+          number === "..." ? (
+            <Ellipsis key={`ellipsis-${index}`} aria-hidden="true">...</Ellipsis>
+          ) : (
+            <PageButton
+              key={number}
+              onClick={() => onPageChange(number)}
+              $active={currentPage === number}
+              aria-label={t('pagination.page', { page: number })}
+              aria-current={currentPage === number ? 'page' : undefined}
+            >
+              {number}
+            </PageButton>
+          ),
+        )}
+        <PageButton
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          aria-label={t('pagination.next')}
+        >
+          {t('pagination.nextShort')}
+        </PageButton>
+      </PaginationContainer>
+    </ThemeProvider>
   );
 };
 
-export default Pagination;
+export default React.memo(Pagination);
+
+// TODO: ページサイズの選択機能の追加
+// TODO: ジャンプ to ページ 機能の実装
+// TODO: モバイルデバイス向けのレスポンシブデザインの改善
+// TODO: キーボードナビゲーションのサポート強化
+// TODO: スクリーンリーダー用のより詳細な説明の追加
+// TODO: ページネーションの状態をURLに反映させる機能の追加
+// TODO: アニメーション効果の追加
+// TODO: パフォーマンス最適化（例：ページ数が多い場合の仮想化）

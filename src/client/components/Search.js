@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
 import styled from "styled-components";
+import { collection, query, where, orderBy, limit, startAfter, getDocs } from "firebase/firestore";
+import { db, auth } from "../../firebase"; // Firebaseの設定ファイルからインポート
 
 const SearchContainer = styled.div`
   max-width: 800px;
@@ -74,23 +75,16 @@ const VideoTitle = styled.h3`
   font-size: 16px;
 `;
 
-const Pagination = styled.div`
-  display: flex;
-  justify-content: center;
+const LoadMoreButton = styled.button`
   margin-top: 20px;
-`;
-
-const PageButton = styled.button`
-  margin: 0 5px;
-  padding: 5px 10px;
-  background-color: ${(props) => (props.active ? "#0066cc" : "#f0f0f0")};
-  color: ${(props) => (props.active ? "white" : "black")};
+  padding: 10px 20px;
+  background-color: #0066cc;
+  color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+    background-color: #cccccc;
   }
 `;
 
@@ -116,8 +110,7 @@ const Search = () => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
+  const [lastVisible, setLastVisible] = useState(null);
   const [sortBy, setSortBy] = useState("relevance");
   const [dateRange, setDateRange] = useState("");
   const [duration, setDuration] = useState("");
@@ -130,29 +123,60 @@ const Search = () => {
     }
   }, []);
 
-  const handleSearch = async (page = 1) => {
+  const handleSearch = async (newSearch = true) => {
+    if (!auth.currentUser) {
+      setError("You must be logged in to search.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      const response = await axios.get("/api/videos/search", {
-        params: {
-          query,
-          page,
-          limit: 10,
-          sort: sortBy,
-          dateRange,
-          duration,
-        },
-      });
-      setResults(response.data.videos);
-      setCurrentPage(response.data.currentPage);
-      setTotalPages(response.data.totalPages);
+      let q = query(collection(db, "videos"), where("title", ">=", query), where("title", "<=", query + '\uf8ff'));
 
-      // 検索履歴を更新
-      const newHistory = [query, ...searchHistory.filter(item => item !== query)].slice(0, 5);
-      setSearchHistory(newHistory);
-      localStorage.setItem("searchHistory", JSON.stringify(newHistory));
+      if (sortBy === "date") {
+        q = query(q, orderBy("createdAt", "desc"));
+      } else if (sortBy === "viewCount") {
+        q = query(q, orderBy("viewCount", "desc"));
+      }
+
+      if (dateRange) {
+        const date = new Date();
+        date.setDate(date.getDate() - parseInt(dateRange));
+        q = query(q, where("createdAt", ">=", date));
+      }
+
+      if (duration) {
+        q = query(q, where("duration", "==", duration));
+      }
+
+      q = query(q, limit(10));
+
+      if (!newSearch && lastVisible) {
+        q = query(q, startAfter(lastVisible));
+      }
+
+      const querySnapshot = await getDocs(q);
+      
+      const newResults = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      if (newSearch) {
+        setResults(newResults);
+      } else {
+        setResults([...results, ...newResults]);
+      }
+
+      setLastVisible(querySnapshot.docs[querySnapshot.docs.length - 1]);
+
+      if (newSearch) {
+        const newHistory = [query, ...searchHistory.filter(item => item !== query)].slice(0, 5);
+        setSearchHistory(newHistory);
+        localStorage.setItem("searchHistory", JSON.stringify(newHistory));
+      }
     } catch (err) {
       setError("An error occurred while searching. Please try again.");
       console.error("Error searching videos:", err);
@@ -161,13 +185,13 @@ const Search = () => {
     }
   };
 
-  const handlePageChange = (newPage) => {
-    handleSearch(newPage);
+  const handleLoadMore = () => {
+    handleSearch(false);
   };
 
   const handleHistoryItemClick = (historyItem) => {
     setQuery(historyItem);
-    handleSearch(1);
+    handleSearch(true);
   };
 
   return (
@@ -176,7 +200,7 @@ const Search = () => {
       <SearchForm
         onSubmit={(e) => {
           e.preventDefault();
-          handleSearch(1);
+          handleSearch(true);
         }}
       >
         <SearchInput
@@ -213,25 +237,16 @@ const Search = () => {
       {error && <ErrorMessage>{error}</ErrorMessage>}
       <VideoGrid>
         {results.map((video) => (
-          <VideoCard key={video._id}>
+          <VideoCard key={video.id}>
             <VideoThumbnail src={video.thumbnailUrl} alt={video.title} />
             <VideoTitle>{video.title}</VideoTitle>
           </VideoCard>
         ))}
       </VideoGrid>
-      {totalPages > 1 && (
-        <Pagination>
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <PageButton
-              key={page}
-              onClick={() => handlePageChange(page)}
-              disabled={page === currentPage}
-              active={page === currentPage}
-            >
-              {page}
-            </PageButton>
-          ))}
-        </Pagination>
+      {results.length > 0 && (
+        <LoadMoreButton onClick={handleLoadMore} disabled={loading}>
+          {loading ? "Loading..." : "Load More"}
+        </LoadMoreButton>
       )}
       <SearchHistoryContainer>
         <h3>Recent Searches</h3>

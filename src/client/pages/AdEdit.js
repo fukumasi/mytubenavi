@@ -1,115 +1,78 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { useNavigate, useParams } from 'react-router-dom';
 import AdPayment from '../components/AdPayment';
 import AdVideoDisplay from '../components/AdVideoDisplay';
+import { FaSave, FaTimes } from 'react-icons/fa';
+import { useFirebase } from '../contexts/FirebaseContext';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
-const Container = styled.div`
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 20px;
-`;
+// Styled components remain unchanged...
 
-const Title = styled.h1`
-  font-size: 24px;
-  margin-bottom: 20px;
-`;
-
-const Form = styled.form`
+const ButtonGroup = styled.div`
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
+  margin-top: 20px;
 `;
 
-const Label = styled.label`
-  margin-bottom: 5px;
-  font-weight: bold;
-`;
-
-const Input = styled.input`
-  padding: 8px;
-  margin-bottom: 15px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-`;
-
-const TextArea = styled.textarea`
-  padding: 8px;
-  margin-bottom: 15px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  resize: vertical;
-  min-height: 100px;
-`;
-
-const Button = styled.button`
-  background-color: #007bff;
-  color: white;
-  border: none;
-  padding: 10px 15px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 16px;
+const CancelButton = styled(Button)`
+  background-color: #dc3545;
 
   &:hover {
-    background-color: #0056b3;
+    background-color: #c82333;
   }
-`;
-
-const ErrorMessage = styled.p`
-  color: red;
-  font-weight: bold;
-`;
-
-const SuccessMessage = styled.p`
-  color: green;
-  font-weight: bold;
-`;
-
-const PreviewContainer = styled.div`
-  margin-top: 20px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 15px;
 `;
 
 const AdEdit = () => {
   const [formData, setFormData] = useState({
     youtubeUrl: '',
-    displayDate: '',
+    displayDateStart: '',
+    displayDateEnd: '',
     price: '',
     description: ''
   });
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [isPaid, setIsPaid] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const { id } = useParams();
+  const { db } = useFirebase();
 
-  useEffect(() => {
-    const fetchAdData = async () => {
-      try {
-        const response = await axios.get(`/api/ad-videos/${id}`);
-        const adData = response.data.data.adVideo;
+  const fetchAdData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const adDocRef = doc(db, 'ad-videos', id);
+      const adDocSnap = await getDoc(adDocRef);
+      if (adDocSnap.exists()) {
+        const adData = adDocSnap.data();
         setFormData({
           youtubeUrl: `https://www.youtube.com/watch?v=${adData.youtubeId}`,
-          displayDate: new Date(adData.displayDate).toISOString().split('T')[0],
+          displayDateStart: new Date(adData.displayDateStart.toDate()).toISOString().split('T')[0],
+          displayDateEnd: new Date(adData.displayDateEnd.toDate()).toISOString().split('T')[0],
           price: adData.price,
           description: adData.description
         });
         setIsPaid(adData.isPaid);
-      } catch (err) {
-        setError('広告データの取得に失敗しました。');
-        console.error('Error fetching ad data:', err);
+      } else {
+        setError('広告が見つかりません。');
       }
-    };
+    } catch (err) {
+      setError('広告データの取得に失敗しました。');
+      console.error('Error fetching ad data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id, db]);
 
+  useEffect(() => {
     fetchAdData();
-  }, [id]);
+  }, [fetchAdData]);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const handleChange = useCallback((e) => {
+    const { name, value } = e.target;
+    setFormData(prevData => ({ ...prevData, [name]: value }));
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -117,18 +80,33 @@ const AdEdit = () => {
     setSuccess(null);
 
     try {
-      await axios.patch(`/api/ad-videos/${id}`, formData);
+      const adDocRef = doc(db, 'ad-videos', id);
+      await updateDoc(adDocRef, {
+        displayDateStart: new Date(formData.displayDateStart),
+        displayDateEnd: new Date(formData.displayDateEnd),
+        price: formData.price,
+        description: formData.description
+      });
       setSuccess('広告が正常に更新されました。');
+      setTimeout(() => navigate('/ad-management'), 2000);
     } catch (err) {
       setError('広告の更新に失敗しました。');
       console.error('Error updating ad:', err);
     }
   };
 
-  const handlePaymentComplete = () => {
+  const handlePaymentComplete = useCallback(() => {
     setIsPaid(true);
     setSuccess('支払いが完了し、広告がアクティブになりました。');
-  };
+  }, []);
+
+  const handleCancel = useCallback(() => {
+    navigate('/ad-management');
+  }, [navigate]);
+
+  if (isLoading) {
+    return <div>読み込み中...</div>;
+  }
 
   return (
     <Container>
@@ -147,12 +125,22 @@ const AdEdit = () => {
           disabled
         />
 
-        <Label htmlFor="displayDate">表示日:</Label>
+        <Label htmlFor="displayDateStart">表示開始日:</Label>
         <Input
           type="date"
-          id="displayDate"
-          name="displayDate"
-          value={formData.displayDate}
+          id="displayDateStart"
+          name="displayDateStart"
+          value={formData.displayDateStart}
+          onChange={handleChange}
+          required
+        />
+
+        <Label htmlFor="displayDateEnd">表示終了日:</Label>
+        <Input
+          type="date"
+          id="displayDateEnd"
+          name="displayDateEnd"
+          value={formData.displayDateEnd}
           onChange={handleChange}
           required
         />
@@ -177,7 +165,10 @@ const AdEdit = () => {
           required
         />
 
-        <Button type="submit">広告を更新</Button>
+        <ButtonGroup>
+          <Button type="submit"><FaSave /> 広告を更新</Button>
+          <CancelButton type="button" onClick={handleCancel}><FaTimes /> キャンセル</CancelButton>
+        </ButtonGroup>
       </Form>
 
       <PreviewContainer>
@@ -196,20 +187,18 @@ const AdEdit = () => {
   );
 };
 
-export default AdEdit;
+export default React.memo(AdEdit);
 
-// 将来的な機能拡張のためのコメント
-// TODO: 広告のパフォーマンス指標（表示回数、クリック数など）の表示
-// TODO: 広告の有効/無効切り替え機能の追加
-// TODO: 広告の複製機能の実装
-// TODO: 履歴管理機能の追加
-// TODO: 広告のスケジュール機能の追加（開始日と終了日の設定）
-// TODO: 広告のターゲティング設定（地域、年齢層、興味関心など）
-// TODO: 広告の自動最適化機能（パフォーマンスに基づいて表示回数を調整）
-// TODO: 複数の広告クリエイティブの管理（A/Bテスト）
-// TODO: 広告レポートの自動生成と定期的な送信機能
-
-// プレースホルダーコメント（行数を維持するため）
-// ...
-// ...
-// ...
+// TODO: エラーハンドリングの改善
+// TODO: フォームのバリデーション強化
+// TODO: ユーザーフィードバックの改善（例：トースト通知）
+// TODO: 広告のプレビュー機能の拡張
+// TODO: 広告編集履歴の追跡
+// TODO: 広告の公開/非公開切り替え機能
+// TODO: 広告のパフォーマンス分析機能
+// TODO: 広告のターゲティング設定の編集
+// TODO: 支払い情報の更新機能
+// TODO: 広告の複製機能
+// TODO: 広告の一時停止/再開機能
+// TODO: 関連広告の提案機能
+// TODO: 広告の自動最適化機能

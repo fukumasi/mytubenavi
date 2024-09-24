@@ -1,241 +1,221 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import styled from 'styled-components';
-import { useAuth } from '../contexts/AuthContext';
-import { updateUser, changeEmail, changePassword } from '../api/userApi';
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "../../firebase";
+import styled from "styled-components";
 
-// スタイルドコンポーネントの定義
 const FormContainer = styled.div`
   max-width: 500px;
   margin: 0 auto;
   padding: 20px;
-  background-color: ${({ theme }) => theme.colors.backgroundLight};
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 `;
 
 const Form = styled.form`
   display: flex;
   flex-direction: column;
+  margin-bottom: 20px;
 `;
 
 const Label = styled.label`
-  margin-top: 10px;
   margin-bottom: 5px;
 `;
 
 const Input = styled.input`
-  padding: 8px;
-  margin-bottom: 10px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 4px;
+  margin-bottom: 15px;
+  padding: 10px;
 `;
 
 const TextArea = styled.textarea`
-  padding: 8px;
-  margin-bottom: 10px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 4px;
-  min-height: 100px;
+  margin-bottom: 15px;
+  padding: 10px;
 `;
 
 const Button = styled.button`
   padding: 10px;
-  background-color: ${({ theme }) => theme.colors.primary};
+  background-color: #007bff;
   color: white;
   border: none;
-  border-radius: 4px;
   cursor: pointer;
-  margin-top: 10px;
-
   &:disabled {
-    background-color: ${({ theme }) => theme.colors.disabled};
+    background-color: #cccccc;
     cursor: not-allowed;
   }
 `;
 
 const ErrorMessage = styled.p`
-  color: ${({ theme }) => theme.colors.error};
-  margin-top: 10px;
+  color: red;
 `;
 
 const SuccessMessage = styled.p`
-  color: ${({ theme }) => theme.colors.success};
-  margin-top: 10px;
-`;
-
-const StyledLink = styled(Link)`
-  display: block;
-  margin-top: 20px;
-  color: ${({ theme }) => theme.colors.primary};
-  text-decoration: none;
-
-  &:hover {
-    text-decoration: underline;
-  }
+  color: green;
 `;
 
 const EditProfile = () => {
-  const { user, setUser } = useAuth();
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [bio, setBio] = useState('');
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const navigate = useNavigate();
+  const { user, updateUserEmail, updateUserPassword } = useAuth();
+  const [userData, setUserData] = useState({
+    displayName: "",
+    email: "",
+    bio: "",
+  });
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      setUsername(user.username || '');
-      setEmail(user.email || '');
-      setBio(user.bio || '');
-    }
+    const fetchUserData = async () => {
+      if (user) {
+        try {
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            setUserData({
+              displayName: data.displayName || "",
+              email: user.email || "",
+              bio: data.bio || "",
+            });
+          }
+        } catch (error) {
+          setError("ユーザーデータの取得に失敗しました。");
+        }
+      }
+    };
+    fetchUserData();
   }, [user]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setUserData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }));
+  };
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
+    setIsLoading(true);
 
     try {
-      const updatedUser = await updateUser({
-        username,
-        email,
-        bio,
+      await updateDoc(doc(db, "users", user.uid), {
+        displayName: userData.displayName,
+        bio: userData.bio,
       });
-      setUser(updatedUser);
-      setSuccess('プロフィールが更新されました');
+      setSuccess("プロフィールが更新されました。");
     } catch (error) {
-      setError('プロフィールの更新に失敗しました: ' + error.message);
+      setError("プロフィールの更新に失敗しました。");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleChangeEmail = async (e) => {
+  const handleUpdateEmail = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
+    setIsLoading(true);
 
     try {
-      await changeEmail(email);
-      setSuccess('メールアドレスが更新されました。確認メールをチェックしてください。');
+      await updateUserEmail(userData.email);
+      await updateDoc(doc(db, "users", user.uid), {
+        email: userData.email,
+      });
+      setSuccess("メールアドレスが更新されました。");
     } catch (error) {
-      setError('メールアドレスの更新に失敗しました: ' + error.message);
+      setError("メールアドレスの更新に失敗しました。");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleChangePassword = async (e) => {
+  const handleUpdatePassword = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
+    setIsLoading(true);
 
-    if (newPassword !== confirmPassword) {
-      setError('新しいパスワードが一致しません');
+    if (newPassword !== confirmNewPassword) {
+      setError("新しいパスワードが一致しません。");
+      setIsLoading(false);
       return;
     }
 
     try {
-      await changePassword({
-        currentPassword,
-        newPassword,
-      });
-      setSuccess('パスワードが変更されました');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
+      await updateUserPassword(newPassword);
+      setSuccess("パスワードが更新されました。");
+      setNewPassword("");
+      setConfirmNewPassword("");
     } catch (error) {
-      setError('パスワードの変更に失敗しました: ' + error.message);
+      setError("パスワードの更新に失敗しました。");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  if (!user) {
-    return <div>読み込み中...</div>;
-  }
-
   return (
     <FormContainer>
-      <h2>プロフィールを編集</h2>
+      <h2>プロフィール編集</h2>
       <Form onSubmit={handleUpdateProfile}>
-        <Label htmlFor="username">ユーザー名</Label>
+        <Label htmlFor="displayName">表示名</Label>
         <Input
-          id="username"
           type="text"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          id="displayName"
+          name="displayName"
+          value={userData.displayName}
+          onChange={handleChange}
         />
-
-        <Label htmlFor="email">メールアドレス</Label>
-        <Input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-
         <Label htmlFor="bio">自己紹介</Label>
         <TextArea
           id="bio"
-          value={bio}
-          onChange={(e) => setBio(e.target.value)}
+          name="bio"
+          value={userData.bio}
+          onChange={handleChange}
         />
-
-        <Button type="submit">更新</Button>
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? "更新中..." : "プロフィールを更新"}
+        </Button>
       </Form>
 
-      <Form onSubmit={handleChangeEmail}>
-        <Label htmlFor="newEmail">新しいメールアドレス</Label>
+      <Form onSubmit={handleUpdateEmail}>
+        <Label htmlFor="email">メールアドレス</Label>
         <Input
-          id="newEmail"
           type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          id="email"
+          name="email"
+          value={userData.email}
+          onChange={handleChange}
         />
-        <Button type="submit">メールアドレスを更新</Button>
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? "更新中..." : "メールアドレスを更新"}
+        </Button>
       </Form>
 
-      <Form onSubmit={handleChangePassword}>
-        <Label htmlFor="currentPassword">現在のパスワード</Label>
-        <Input
-          id="currentPassword"
-          type="password"
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
-        />
-
+      <Form onSubmit={handleUpdatePassword}>
         <Label htmlFor="newPassword">新しいパスワード</Label>
         <Input
-          id="newPassword"
           type="password"
+          id="newPassword"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
         />
-
-        <Label htmlFor="confirmPassword">新しいパスワード（確認）</Label>
+        <Label htmlFor="confirmNewPassword">新しいパスワード（確認）</Label>
         <Input
-          id="confirmPassword"
           type="password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
+          id="confirmNewPassword"
+          value={confirmNewPassword}
+          onChange={(e) => setConfirmNewPassword(e.target.value)}
         />
-
-        <Button type="submit">パスワードを変更</Button>
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? "更新中..." : "パスワードを更新"}
+        </Button>
       </Form>
 
       {error && <ErrorMessage>{error}</ErrorMessage>}
       {success && <SuccessMessage>{success}</SuccessMessage>}
-
-      <StyledLink to="/two-factor-auth">2要素認証の設定</StyledLink>
     </FormContainer>
   );
 };
 
-export default React.memo(EditProfile);
-
-// TODO: プロフィール画像のアップロード機能の追加
-// TODO: ソーシャルメディアアカウントのリンク機能の追加
-// TODO: アカウント削除機能の追加
-// TODO: ユーザーの活動履歴の表示
-// TODO: プライバシー設定の追加
-// TODO: 通知設定の追加
+export default EditProfile;

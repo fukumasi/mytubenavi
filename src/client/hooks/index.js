@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
-import axios from "axios";
 import { useTheme } from './useTheme';
+import { useFirebase } from '../contexts/FirebaseContext';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 export const useAsync = (asyncFunction) => {
   const [loading, setLoading] = useState(false);
@@ -42,32 +43,34 @@ export const useError = () => {
 };
 
 export const useYouTubeSearch = () => {
+  const { app } = useFirebase();
+  const functions = getFunctions(app);
+
   const searchVideos = useCallback(async (query) => {
     if (!query) return [];
 
     try {
-      const response = await axios.get(`/api/search`, {
-        params: { q: query }
-      });
+      const searchYouTubeVideos = httpsCallable(functions, 'searchYouTubeVideos');
+      const result = await searchYouTubeVideos({ query });
       
-      if (!response.data.items || !Array.isArray(response.data.items)) {
+      if (!result.data || !Array.isArray(result.data)) {
         throw new Error("Invalid API response");
       }
       
-      return response.data.items.map((item) => ({
-        id: item.id.videoId,
-        title: item.snippet.title,
-        channel: item.snippet.channelTitle,
-        thumbnail: item.snippet.thumbnails.medium.url,
-        views: "N/A",
-        rating: "N/A",
-        uploadDate: new Date(item.snippet.publishedAt).toLocaleDateString(),
+      return result.data.map((item) => ({
+        id: item.id,
+        title: item.title,
+        channel: item.channel,
+        thumbnail: item.thumbnail,
+        views: item.views || "N/A",
+        rating: item.rating || "N/A",
+        uploadDate: item.uploadDate,
       }));
     } catch (error) {
       console.error("Error in useYouTubeSearch:", error);
       throw error;
     }
-  }, []);
+  }, [functions]);
 
   return useAsync(searchVideos);
 };

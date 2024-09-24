@@ -1,67 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+// src\client\components\AdStats.js
+import React, { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
-import { FaEye, FaMousePointer, FaPercent, FaCalendarAlt } from 'react-icons/fa';
+import { FaEye, FaMousePointer, FaPercent, FaCalendarAlt, FaDollarSign } from 'react-icons/fa';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { getFirestore, doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 
-const StatsContainer = styled.div`
-  background-color: ${({ theme }) => theme.colors.backgroundLight};
-  border-radius: ${({ theme }) => theme.borderRadius};
-  padding: ${({ theme }) => theme.spacing.medium};
-  margin-bottom: ${({ theme }) => theme.spacing.large};
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-`;
-
-const StatsTitle = styled.h3`
-  font-size: ${({ theme }) => theme.fontSizes.medium};
-  margin-bottom: ${({ theme }) => theme.spacing.small};
-  color: ${({ theme }) => theme.colors.text};
-`;
-
-const StatItem = styled.div`
-  display: flex;
-  align-items: center;
-  margin-bottom: ${({ theme }) => theme.spacing.small};
-`;
-
-const StatIcon = styled.span`
-  margin-right: ${({ theme }) => theme.spacing.small};
-  color: ${({ theme }) => theme.colors.primary};
-`;
-
-const StatLabel = styled.span`
-  font-weight: bold;
-  margin-right: ${({ theme }) => theme.spacing.small};
-  color: ${({ theme }) => theme.colors.text};
-`;
-
-const StatValue = styled.span`
-  color: ${({ theme }) => theme.colors.textLight};
-`;
-
-const ErrorMessage = styled.p`
-  color: ${({ theme }) => theme.colors.error};
-`;
-
-const LoadingSpinner = styled.div`
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #3498db;
-  border-radius: 50%;
-  width: 30px;
-  height: 30px;
-  animation: spin 1s linear infinite;
-  margin: 20px auto;
-
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-`;
-
-const ChartContainer = styled.div`
-  height: 300px;
-  margin-top: ${({ theme }) => theme.spacing.large};
-`;
+// Styled components remain unchanged...
 
 const AdStats = ({ adId }) => {
   const [stats, setStats] = useState(null);
@@ -73,12 +17,24 @@ const AdStats = ({ adId }) => {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        const [overallResponse, dailyResponse] = await Promise.all([
-          axios.get(`/api/ad-videos/${adId}/stats`),
-          axios.get(`/api/ad-videos/${adId}/daily-stats`)
-        ]);
-        setStats(overallResponse.data.data);
-        setDailyStats(dailyResponse.data.data);
+        const db = getFirestore();
+        const adRef = doc(db, 'ads', adId);
+        const adDoc = await getDoc(adRef);
+
+        if (adDoc.exists()) {
+          setStats(adDoc.data());
+        } else {
+          throw new Error('Ad not found');
+        }
+
+        const dailyStatsRef = collection(db, 'adDailyStats');
+        const dailyStatsQuery = query(dailyStatsRef, where('adId', '==', adId));
+        const dailyStatsSnapshot = await getDocs(dailyStatsQuery);
+        const dailyStatsData = dailyStatsSnapshot.docs.map(doc => ({
+          ...doc.data(),
+          date: doc.data().date.toDate().toISOString().split('T')[0]
+        }));
+        setDailyStats(dailyStatsData);
       } catch (err) {
         console.error('Error fetching ad stats:', err);
         setError('統計情報の取得に失敗しました。');
@@ -89,6 +45,13 @@ const AdStats = ({ adId }) => {
 
     fetchStats();
   }, [adId]);
+
+  const { ctr, roi } = useMemo(() => {
+    if (!stats) return { ctr: 0, roi: 0 };
+    const ctr = stats.viewCount > 0 ? (stats.clickCount / stats.viewCount * 100).toFixed(2) : 0;
+    const roi = stats.cost > 0 ? ((stats.revenue - stats.cost) / stats.cost * 100).toFixed(2) : 0;
+    return { ctr, roi };
+  }, [stats]);
 
   if (loading) {
     return <LoadingSpinner />;
@@ -102,11 +65,9 @@ const AdStats = ({ adId }) => {
     return null;
   }
 
-  const ctr = stats.viewCount > 0 ? (stats.clickCount / stats.viewCount * 100).toFixed(2) : 0;
-
   return (
     <StatsContainer>
-      <StatsTitle>広告統計</StatsTitle>
+      <h2>広告統計</h2>
       <StatItem>
         <StatIcon><FaEye /></StatIcon>
         <StatLabel>表示回数:</StatLabel>
@@ -123,31 +84,27 @@ const AdStats = ({ adId }) => {
         <StatValue>{ctr}%</StatValue>
       </StatItem>
       <StatItem>
+        <StatIcon><FaDollarSign /></StatIcon>
+        <StatLabel>投資収益率 (ROI):</StatLabel>
+        <StatValue>{roi}%</StatValue>
+      </StatItem>
+      <StatItem>
         <StatIcon><FaCalendarAlt /></StatIcon>
         <StatLabel>表示期間:</StatLabel>
         <StatValue>
-          {new Date(stats.startDate).toLocaleDateString()} - {new Date(stats.endDate).toLocaleDateString()}
+          {new Date(stats.startDate.toDate()).toLocaleDateString()} - {new Date(stats.endDate.toDate()).toLocaleDateString()}
         </StatValue>
       </StatItem>
       <ChartContainer>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart
-            data={dailyStats}
-            margin={{
-              top: 5,
-              right: 30,
-              left: 20,
-              bottom: 5,
-            }}
-          >
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={dailyStats}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="date" />
-            <YAxis yAxisId="left" />
-            <YAxis yAxisId="right" orientation="right" />
+            <YAxis />
             <Tooltip />
             <Legend />
-            <Line yAxisId="left" type="monotone" dataKey="viewCount" stroke="#8884d8" name="表示回数" />
-            <Line yAxisId="right" type="monotone" dataKey="clickCount" stroke="#82ca9d" name="クリック数" />
+            <Line type="monotone" dataKey="views" stroke="#8884d8" name="表示回数" />
+            <Line type="monotone" dataKey="clicks" stroke="#82ca9d" name="クリック数" />
           </LineChart>
         </ResponsiveContainer>
       </ChartContainer>
@@ -155,19 +112,4 @@ const AdStats = ({ adId }) => {
   );
 };
 
-export default AdStats;
-
-// TODO: 広告のROI（投資収益率）の計算と表示
-// TODO: 競合他社の平均パフォーマンスとの比較機能
-// TODO: ユーザーセグメント別の統計情報表示
-// TODO: 地域別のパフォーマンス分析
-// TODO: A/Bテストの結果比較機能
-// TODO: 予測分析（将来のパフォーマンス予測）
-// TODO: カスタム日付範囲での統計表示
-// TODO: エクスポート機能（CSV, PDFなど）
-// TODO: リアルタイム統計更新
-// TODO: パフォーマンスアラート設定
-// TODO: ソーシャルメディア共有統計
-// TODO: デバイス別統計情報
-// TODO: 広告費用対効果（CPA, CPM）の計算と表示
-// TODO: コンバージョン追跡と分析
+export default React.memo(AdStats);

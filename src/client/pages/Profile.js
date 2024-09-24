@@ -2,72 +2,109 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import styled from "styled-components";
 import { useAuth } from "../contexts/AuthContext";
 import { useSettings } from "../contexts/SettingsContext";
-import { FaUser, FaTwitter, FaInstagram, FaYoutube } from "react-icons/fa";
+import { FaTwitter, FaInstagram, FaYoutube } from "react-icons/fa";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import ImageUploader from "../components/ImageUploader";
-import axios from "axios";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { db } from "../../firebase";
 
 // Styled components (既存のものをそのまま使用)
 const Container = styled.div`
-  // ...
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
 `;
 
 const Title = styled.h1`
-  // ...
+  font-size: 24px;
+  margin-bottom: 20px;
 `;
 
 const Form = styled.form`
-  // ...
+  display: flex;
+  flex-direction: column;
 `;
 
 const FormSection = styled.div`
-  // ...
+  margin-bottom: 20px;
 `;
 
 const SectionTitle = styled.h2`
-  // ...
+  font-size: 18px;
+  margin-bottom: 10px;
 `;
 
 const Input = styled.input`
-  // ...
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
 `;
 
 const Textarea = styled.textarea`
-  // ...
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+  min-height: 100px;
 `;
 
 const Select = styled.select`
-  // ...
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
 `;
 
 const CheckboxLabel = styled.label`
-  // ...
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
 `;
 
 const Checkbox = styled.input`
-  // ...
+  margin-right: 10px;
 `;
 
 const Button = styled.button`
-  // ...
+  padding: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+  &:disabled {
+    background-color: #cccccc;
+  }
 `;
 
-const ErrorMessage = styled.p`
-  // ...
+const ErrorMessage = styled.span`
+  color: red;
+  font-size: 14px;
+  margin-bottom: 10px;
 `;
 
-const SuccessMessage = styled.p`
-  // ...
+const SuccessMessage = styled.span`
+  color: green;
+  font-size: 14px;
+  margin-bottom: 10px;
 `;
 
 const InputWithIcon = styled.div`
-  // ...
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+
+  svg {
+    margin-right: 10px;
+  }
 `;
 
 const AvatarPreview = styled.img`
-  // ...
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 10px;
 `;
 
 const ProgressBar = styled.div`
@@ -75,15 +112,15 @@ const ProgressBar = styled.div`
   height: 10px;
   background-color: #e0e0e0;
   border-radius: 5px;
-  margin-top: 10px;
+  margin-bottom: 10px;
 `;
 
 const ProgressFill = styled.div`
-  height: 100%;
-  background-color: #4caf50;
-  border-radius: 5px;
   width: ${props => props.progress}%;
-  transition: width 0.3s ease;
+  height: 100%;
+  background-color: #007bff;
+  border-radius: 5px;
+  transition: width 0.3s ease-in-out;
 `;
 
 const schema = yup.object().shape({
@@ -102,14 +139,21 @@ const schema = yup.object().shape({
   }),
 });
 
-const Profile = React.memo(({ showToast }) => {
-  const { user, updateProfile } = useAuth();
-  const { theme, language, updateTheme, updateLanguage } = useSettings();
+const Profile = () => {
+  const { user, updateUserProfile } = useAuth();
+  const settings = useSettings();
+  const theme = settings?.theme ?? "light";
+  const language = settings?.language ?? "en";
+  const updateTheme = settings?.updateTheme ?? (() => {});
+  const updateLanguage = settings?.updateLanguage ?? (() => {});
+
   const [isLoading, setIsLoading] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm({
+  const { register, handleSubmit, formState: { errors }, setValue } = useForm({
     resolver: yupResolver(schema),
     defaultValues: useMemo(() => ({
       firstName: "",
@@ -121,28 +165,45 @@ const Profile = React.memo(({ showToast }) => {
   });
 
   useEffect(() => {
-    if (user) {
-      Object.entries(user).forEach(([key, value]) => {
-        setValue(key, value);
-      });
-      setValue("preferences.theme", theme);
-      setValue("preferences.language", language);
-      setAvatarPreview(user.avatar);
-    }
+    const fetchUserData = async () => {
+      if (user) {
+        const userDocRef = doc(db, "users", user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          Object.entries(userData).forEach(([key, value]) => {
+            setValue(key, value);
+          });
+        }
+        setValue("preferences.theme", theme);
+        setValue("preferences.language", language);
+        setAvatarPreview(user.photoURL);
+      }
+    };
+    fetchUserData();
   }, [user, theme, language, setValue]);
 
   const onSubmit = useCallback(async (data) => {
     setIsLoading(true);
+    setSuccessMessage("");
+    setErrorMessage("");
     try {
-      await updateProfile(data);
-      showToast("プロフィールが正常に更新されました", "success");
+      await updateUserProfile(data);
+      const userDocRef = doc(db, "users", user.uid);
+      await updateDoc(userDocRef, {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        bio: data.bio,
+        preferences: data.preferences,
+        socialLinks: data.socialLinks,
+      });
+      setSuccessMessage("プロフィールが正常に更新されました");
     } catch (error) {
-      showToast("プロフィールの更新中にエラーが発生しました", "error");
-      console.error("プロフィールの更新中にエラーが発生しました", error);
+      setErrorMessage("プロフィールの更新中にエラーが発生しました");
     } finally {
       setIsLoading(false);
     }
-  }, [updateProfile, showToast]);
+  }, [updateUserProfile, user?.uid]);
 
   const handlePreferenceChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
@@ -157,32 +218,44 @@ const Profile = React.memo(({ showToast }) => {
   }, [setValue, updateTheme, updateLanguage]);
 
   const handleImageUpload = useCallback(async (file) => {
-    const formData = new FormData();
-    formData.append('avatar', file);
+    const storage = getStorage();
+    const storageRef = ref(storage, `avatars/${user.uid}`);
 
     try {
       setIsLoading(true);
       setUploadProgress(0);
-      const response = await axios.post('/api/users/avatar', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
+      setSuccessMessage("");
+      setErrorMessage("");
+      
+      const uploadTask = uploadBytesResumable(storageRef, file);
+      
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(progress);
         },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setUploadProgress(percentCompleted);
+        (error) => {
+          throw error;
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          setAvatarPreview(downloadURL);
+          await updateUserProfile({ photoURL: downloadURL });
+
+          const userDocRef = doc(db, "users", user.uid);
+          await updateDoc(userDocRef, { avatar: downloadURL });
+
+          setSuccessMessage("プロフィール画像が正常に更新されました");
+          setIsLoading(false);
+          setUploadProgress(0);
         }
-      });
-      setAvatarPreview(response.data.avatar);
-      await updateProfile({ avatar: response.data.avatar });
-      showToast("プロフィール画像が正常に更新されました", "success");
+      );
     } catch (error) {
-      showToast("プロフィール画像のアップロード中にエラーが発生しました", "error");
-      console.error('アバターのアップロード中にエラーが発生しました', error);
-    } finally {
+      setErrorMessage("プロフィール画像のアップロード中にエラーが発生しました");
       setIsLoading(false);
       setUploadProgress(0);
     }
-  }, [updateProfile, showToast]);
+  }, [updateUserProfile, user?.uid]);
 
   const memoizedImageUploader = useMemo(() => (
     <ImageUploader onImageUpload={handleImageUpload} />
@@ -191,13 +264,15 @@ const Profile = React.memo(({ showToast }) => {
   return (
     <Container>
       <Title>ユーザープロフィール</Title>
+      {successMessage && <SuccessMessage>{successMessage}</SuccessMessage>}
+      {errorMessage && <ErrorMessage>{errorMessage}</ErrorMessage>}
       <Form onSubmit={handleSubmit(onSubmit)}>
         <FormSection>
           <SectionTitle>基本情報</SectionTitle>
           {memoizedImageUploader}
           {avatarPreview && (
             <AvatarPreview
-              src={`/avatars/${avatarPreview}`}
+              src={avatarPreview}
               alt="ユーザーアバター"
             />
           )}
@@ -298,6 +373,6 @@ const Profile = React.memo(({ showToast }) => {
       </Form>
     </Container>
   );
-});
+};
 
 export default Profile;

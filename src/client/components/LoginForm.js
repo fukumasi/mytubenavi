@@ -1,98 +1,88 @@
-import React, { useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
-import styled from "styled-components";
+// src/client/components/LoginForm.js
 
-const Form = styled.form`
-  // ... styles ...
-`;
-
-const Input = styled.input`
-  // ... styles ...
-`;
-
-const Button = styled.button`
-  // ... styles ...
-`;
-
-const ErrorMessage = styled.div`
-  color: red;
-  margin-top: 1rem;
-`;
-
-const SuccessMessage = styled.div`
-  color: green;
-  margin-top: 1rem;
-`;
+import React, { useState } from 'react';
+import { Form, Button } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+import { handleFirebaseError } from '../../firebase';
 
 const LoginForm = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [twoFactorToken, setTwoFactorToken] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [showTwoFactor, setShowTwoFactor] = useState(false);
-  const { login } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const { signIn, googleLogin } = useAuth();
 
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    setError("");
-    setSuccess("");
-
-    if (!email || !password) {
-      setError("メールアドレスとパスワードを入力してください。");
-      return;
-    }
-
+    setLoading(true);
     try {
-      const response = await login(email, password, twoFactorToken);
-      if (response.requireTwoFactor) {
-        setShowTwoFactor(true);
-        setSuccess("2要素認証コードを入力してください。");
-        return;
-      }
-      setSuccess("ログインに成功しました。リダイレクトします...");
-      // リダイレクトロジックをここに追加
-    } catch (error) {
-      console.error("Login error:", error);
-      setError(error.message || "ログインに失敗しました。入力情報を確認してください。");
+      await signIn(email, password);
+      setSuccess('ログインに成功しました');
+      setError('');
+      navigate('/dashboard');
+    } catch (err) {
+      handleFirebaseError(err);
+      setError('ログインに失敗しました: ' + err.message);
+      setSuccess('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    try {
+      await googleLogin();
+      setSuccess('Googleアカウントでログインに成功しました');
+      setError('');
+      navigate('/dashboard');
+    } catch (err) {
+      handleFirebaseError(err);
+      setError('Googleログインに失敗しました: ' + err.message);
+      setSuccess('');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <Form onSubmit={handleSubmit}>
-      <Input
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="メールアドレス"
-        required
-      />
-      <Input
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="パスワード"
-        required
-        minLength={12}
-      />
-      {showTwoFactor && (
-        <Input
-          type="text"
-          value={twoFactorToken}
-          onChange={(e) => setTwoFactorToken(e.target.value)}
-          placeholder="2要素認証コード"
+    <Form onSubmit={handleLogin}>
+      <Form.Group className="mb-3" controlId="formBasicEmail">
+        <Form.Label>Email address</Form.Label>
+        <Form.Control
+          type="email"
+          placeholder="Enter email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           required
+          disabled={loading}
         />
-      )}
-      <Button type="submit">ログイン</Button>
-      {error && <ErrorMessage>{error}</ErrorMessage>}
-      {success && <SuccessMessage>{success}</SuccessMessage>}
-      <div>
-        <a href="/forgot-password">パスワードをお忘れですか？</a>
-      </div>
-      <div>
-        <a href="/register">アカウントをお持ちでない方はこちら</a>
-      </div>
+      </Form.Group>
+
+      <Form.Group className="mb-3" controlId="formBasicPassword">
+        <Form.Label>Password</Form.Label>
+        <Form.Control
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          disabled={loading}
+        />
+      </Form.Group>
+
+      <Button variant="primary" type="submit" disabled={loading}>
+        {loading ? 'ログイン中...' : 'ログイン'}
+      </Button>
+      <Button variant="secondary" onClick={handleGoogleLogin} disabled={loading}>
+        {loading ? 'ログイン中...' : 'Googleでログイン'}
+      </Button>
+
+      {error && <div className="text-danger mt-2">{error}</div>}
+      {success && <div className="text-success mt-2">{success}</div>}
     </Form>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import ErrorBoundary from './ErrorBoundary';
@@ -14,7 +14,8 @@ const MESSAGES = {
   DURATION: '長さ',
   CATEGORY: 'カテゴリー',
   UNKNOWN: '不明',
-  NO_TITLE: 'タイトルなし'
+  NO_TITLE: 'タイトルなし',
+  ERROR_LOADING: '動画の読み込み中にエラーが発生しました'
 };
 
 const TableContainer = styled.div.attrs({ 
@@ -34,12 +35,6 @@ const TableHeader = styled.div.attrs({ role: 'row' })`
 const HeaderCell = styled.div.attrs({ role: 'columnheader' })`
   flex: ${props => props.$flex || 1};
   padding: 10px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-  
-  &:hover {
-    background-color: ${({ theme }) => theme.colors?.backgroundHover || '#e9ecef'};
-  }
 `;
 
 const Row = styled.div.attrs({ role: 'row' })`
@@ -74,56 +69,24 @@ const NoVideosMessage = styled.p`
   color: ${({ theme }) => theme.colors?.textLight || '#6c757d'};
 `;
 
-const SortIndicator = styled.span`
-  margin-left: 5px;
-`;
-
 const StyledLink = styled(Link)`
   color: ${({ theme }) => theme.colors?.primary || '#007bff'};
   text-decoration: none;
-  &:hover {
+  &:hover, &:focus {
     text-decoration: underline;
+    outline: 2px solid ${({ theme }) => theme.colors?.primary || '#007bff'};
+    outline-offset: 2px;
   }
 `;
 
-const getSortIndicator = (columnName, sortConfig) => {
-  if (sortConfig.key === columnName) {
-    return sortConfig.direction === 'ascending' ? '▲' : '▼';
-  }
-  return '';
-};
-
-const performanceTest = (videoCount) => {
-  console.time('Generate Test Data');
-  const testVideos = Array(videoCount).fill().map((_, index) => ({
-    id: `test-${index}`,
-    title: `Test Video ${index}`,
-    channelTitle: `Test Channel ${index}`,
-    thumbnails: { medium: { url: 'https://via.placeholder.com/120x67' } },
-    statistics: { viewCount: Math.floor(Math.random() * 1000000).toString() },
-    publishedAt: new Date(Date.now() - Math.random() * 10000000000).toISOString(),
-    contentDetails: { duration: `PT${Math.floor(Math.random() * 120)}M${Math.floor(Math.random() * 60)}S` },
-    category: ['音楽', 'スポーツ', 'ゲーム', '教育', 'エンターテイメント', 'ニュース', 'その他'][Math.floor(Math.random() * 7)]
-  }));
-  console.timeEnd('Generate Test Data');
-  return testVideos;
-};
-
-const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      const testVideos = performanceTest(1000);
-      console.log('Test videos generated:', testVideos.length);
-    }
-  }, []);
-
+const VideoTable = React.memo(({ videos }) => {
   if (!videos || videos.length === 0) {
     return <NoVideosMessage>{MESSAGES.NO_VIDEOS}</NoVideosMessage>;
   }
 
   const defaultThumbnail = 'https://via.placeholder.com/120x67.png?text=No+Image';
 
-  const formatDuration = (duration) => {
+  const formatDuration = useCallback((duration) => {
     if (!duration) return MESSAGES.UNKNOWN;
     const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
     if (!match) return MESSAGES.UNKNOWN;
@@ -136,11 +99,16 @@ const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
     } else {
       return `${minutes}:${String(seconds).padStart(2, '0')}`;
     }
-  };
+  }, []);
 
   const RowRenderer = useCallback(({ index, style }) => {
     const video = videos[index];
-    const thumbnailUrl = video.thumbnails?.medium?.url || 
+    if (!video) {
+      return <Row style={style}><Cell>{MESSAGES.ERROR_LOADING}</Cell></Row>;
+    }
+
+    const thumbnailUrl = video.thumbnailUrl || 
+                         video.thumbnails?.medium?.url || 
                          video.thumbnails?.default?.url || 
                          video.snippet?.thumbnails?.medium?.url ||
                          video.snippet?.thumbnails?.default?.url ||
@@ -153,7 +121,7 @@ const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
     const channelTitle = video.channelTitle || video.snippet?.channelTitle || MESSAGES.UNKNOWN;
     const viewCount = (video.statistics?.viewCount || video.viewCount || 0).toLocaleString();
     const publishedAt = new Date(video.publishedAt || video.snippet?.publishedAt || Date.now()).toLocaleDateString();
-    const duration = formatDuration(video.contentDetails?.duration);
+    const duration = formatDuration(video.contentDetails?.duration || video.duration);
     const category = video.category || MESSAGES.UNKNOWN;
 
     const uniqueKey = video.id || video.videoId || `video-${video.etag}`;
@@ -161,45 +129,35 @@ const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
     return (
       <Row key={uniqueKey} style={style}>
         <Cell $flex={2}>
-          <StyledLink to={`/video/${video.id || video.videoId}`}>
-            <ThumbnailImage src={proxyThumbnailUrl} alt={title} />
+          <StyledLink to={`/video/${video.id || video.videoId}`} aria-label={`${title}のサムネイル`}>
+            <ThumbnailImage src={proxyThumbnailUrl} alt="" /> {/* 装飾的な画像のため、alt属性は空に */}
           </StyledLink>
         </Cell>
         <Cell $flex={4}>
           <StyledLink to={`/video/${video.id || video.videoId}`}>{title}</StyledLink>
         </Cell>
-        <Cell $flex={2}>{channelTitle}</Cell>
-        <Cell $flex={1}>{viewCount}</Cell>
-        <Cell $flex={1}>{publishedAt}</Cell>
-        <Cell $flex={1}>{duration}</Cell>
-        <Cell $flex={1}>{category}</Cell>
+        <Cell $flex={2} aria-label={`チャンネル: ${channelTitle}`}>{channelTitle}</Cell>
+        <Cell $flex={1} aria-label={`再生回数: ${viewCount}`}>{viewCount}</Cell>
+        <Cell $flex={1} aria-label={`投稿日: ${publishedAt}`}>{publishedAt}</Cell>
+        <Cell $flex={1} aria-label={`動画の長さ: ${duration}`}>{duration}</Cell>
+        <Cell $flex={1} aria-label={`カテゴリー: ${category}`}>{category}</Cell>
       </Row>
     );
-  }, [videos]);
+  }, [videos, formatDuration]);
+
+  const memoizedRowRenderer = useMemo(() => RowRenderer, [RowRenderer]);
 
   return (
     <ErrorBoundary>
       <TableContainer>
         <TableHeader>
           <HeaderCell $flex={2}>{MESSAGES.THUMBNAIL}</HeaderCell>
-          <HeaderCell $flex={4} onClick={() => onSort('title')}>
-            {MESSAGES.TITLE} {getSortIndicator('title', sortConfig)}
-          </HeaderCell>
-          <HeaderCell $flex={2} onClick={() => onSort('channelTitle')}>
-            {MESSAGES.CHANNEL} {getSortIndicator('channelTitle', sortConfig)}
-          </HeaderCell>
-          <HeaderCell $flex={1} onClick={() => onSort('viewCount')}>
-            {MESSAGES.VIEW_COUNT} {getSortIndicator('viewCount', sortConfig)}
-          </HeaderCell>
-          <HeaderCell $flex={1} onClick={() => onSort('publishedAt')}>
-            {MESSAGES.PUBLISHED_AT} {getSortIndicator('publishedAt', sortConfig)}
-          </HeaderCell>
-          <HeaderCell $flex={1} onClick={() => onSort('duration')}>
-            {MESSAGES.DURATION} {getSortIndicator('duration', sortConfig)}
-          </HeaderCell>
-          <HeaderCell $flex={1} onClick={() => onSort('category')}>
-            {MESSAGES.CATEGORY} {getSortIndicator('category', sortConfig)}
-          </HeaderCell>
+          <HeaderCell $flex={4}>{MESSAGES.TITLE}</HeaderCell>
+          <HeaderCell $flex={2}>{MESSAGES.CHANNEL}</HeaderCell>
+          <HeaderCell $flex={1}>{MESSAGES.VIEW_COUNT}</HeaderCell>
+          <HeaderCell $flex={1}>{MESSAGES.PUBLISHED_AT}</HeaderCell>
+          <HeaderCell $flex={1}>{MESSAGES.DURATION}</HeaderCell>
+          <HeaderCell $flex={1}>{MESSAGES.CATEGORY}</HeaderCell>
         </TableHeader>
         <List
           height={600}
@@ -207,7 +165,7 @@ const VideoTable = React.memo(({ videos, onSort, sortConfig }) => {
           itemSize={100}
           width="100%"
         >
-          {RowRenderer}
+          {memoizedRowRenderer}
         </List>
       </TableContainer>
     </ErrorBoundary>

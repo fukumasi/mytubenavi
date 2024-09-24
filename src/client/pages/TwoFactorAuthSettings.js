@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api from '../utils/api';
 import styled from 'styled-components';
-import { FaQrcode, FaKey, FaShieldAlt, FaExclamationTriangle, FaDownload, FaSync } from 'react-icons/fa';
+import { FaShieldAlt, FaKey } from 'react-icons/fa';
+import { getAuth, multiFactor, PhoneAuthProvider, PhoneMultiFactorGenerator } from "firebase/auth";
+import { getFirestore, doc, updateDoc, getDoc, setDoc } from "firebase/firestore";
 
 const Container = styled.div`
   max-width: 600px;
@@ -100,45 +101,58 @@ const TwoFactorAuthSettings = () => {
   const [qrCode, setQrCode] = useState('');
   const [secret, setSecret] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const [message, setMessage] = useState({ text: "", isError: false });
+  const [error, setError] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState([]);
+  const [showRecoveryCodes, setShowRecoveryCodes] = useState(false);
+
+  const auth = getAuth();
+  const db = getFirestore();
 
   useEffect(() => {
-    if (user) {
-      setIsEnabled(user.isTwoFactorEnabled);
-      if (user.isTwoFactorEnabled) {
-        fetchRecoveryCodes();
+    const checkMfaStatus = async () => {
+      if (user) {
+        const isMultiFactorAuth = user.multiFactor.enrolledFactors.length > 0;
+        setIsEnabled(isMultiFactorAuth);
+        if (isMultiFactorAuth) {
+          await fetchRecoveryCodes();
+        }
       }
-    }
+    };
+    checkMfaStatus();
   }, [user]);
 
   const fetchRecoveryCodes = async () => {
     try {
-      const response = await api.get('/auth/recovery-codes');
-      if (response.data.recoveryCodes) {
-        setRecoveryCodes(response.data.recoveryCodes);
+      const userDocRef = doc(db, "users", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      if (userDocSnap.exists() && userDocSnap.data().recoveryCodes) {
+        setRecoveryCodes(userDocSnap.data().recoveryCodes);
       }
     } catch (error) {
-      setError('リカバリーコードの取得に失敗しました。');
+      setError("リカバリーコードの取得に失敗しました。");
     }
   };
 
   const handleEnable2FA = async () => {
     try {
       setIsEnabling(true);
-      setError('');
-      setMessage('');
-      const response = await api.post('/auth/enable-2fa');
-      if (response.data.qrCode && response.data.secret) {
-        setQrCode(response.data.qrCode);
-        setSecret(response.data.secret);
-        setMessage('QRコードをスキャンして確認コードを入力してください。');
-      } else {
-        setError('2要素認証の設定開始に失敗しました。');
-      }
+      setError("");
+      setMessage({ text: "", isError: false });
+      
+      const session = await multiFactor(user).getSession();
+      const phoneInfoOptions = {
+        phoneNumber: user.phoneNumber,
+        session
+      };
+      const phoneAuthProvider = new PhoneAuthProvider(auth);
+      const verificationId = await phoneAuthProvider.verifyPhoneNumber(phoneInfoOptions, auth);
+      
+      setQrCode('QR code placeholder');
+      setSecret(verificationId);
+      setMessage({ text: "QRコードをスキャンして確認コードを入力してください。", isError: false });
     } catch (error) {
-      setError('2要素認証の設定開始中にエラーが発生しました。');
+      setError("2要素認証の設定開始中にエラーが発生しました。");
     } finally {
       setIsEnabling(false);
     }
@@ -146,39 +160,38 @@ const TwoFactorAuthSettings = () => {
 
   const handleDisable2FA = async () => {
     try {
-      setError('');
-      setMessage('');
-      const response = await api.post('/auth/disable-2fa');
-      if (response.data.message) {
-        setIsEnabled(false);
-        setUser({ ...user, isTwoFactorEnabled: false });
-        setMessage(response.data.message);
-        setRecoveryCodes([]);
-      } else {
-        setError('2要素認証の無効化に失敗しました。');
-      }
+      setError("");
+      setMessage({ text: "", isError: false });
+      await multiFactor(user).unenroll(user.multiFactor.enrolledFactors[0].uid);
+      setIsEnabled(false);
+      setUser({ ...user, multiFactor: { enrolledFactors: [] } });
+      setMessage({ text: "2要素認証が無効化されました。", isError: false });
+      setRecoveryCodes([]);
+      setShowRecoveryCodes(false);
+
+      const userDocRef = doc(db, "users", user.uid);
+      await updateDoc(userDocRef, { recoveryCodes: [] });
     } catch (error) {
-      setError('2要素認証の無効化中にエラーが発生しました。');
+      setError("2要素認証の無効化中にエラーが発生しました。");
     }
   };
 
   const handleVerification = async () => {
     try {
-      setError('');
-      setMessage('');
-      const response = await api.post('/auth/verify-2fa', { verificationCode });
-      if (response.data.message) {
-        setIsEnabled(true);
-        setUser({ ...user, isTwoFactorEnabled: true });
-        setMessage(response.data.message);
-        setQrCode('');
-        setSecret('');
-        fetchRecoveryCodes(); // リカバリーコードを取得
-      } else {
-        setError('2要素認証の確認に失敗しました。');
-      }
+      setError("");
+      setMessage({ text: "", isError: false });
+      const cred = PhoneAuthProvider.credential(secret, verificationCode);
+      const multiFactorAssertion = PhoneMultiFactorGenerator.assertion(cred);
+      await multiFactor(user).enroll(multiFactorAssertion, "My Phone Number");
+      setIsEnabled(true);
+      setUser({ ...user, multiFactor: { enrolledFactors: [{ uid: "My Phone Number" }] } });
+      setMessage({ text: "2要素認証が有効化されました。", isError: false });
+      setQrCode('');
+      setSecret('');
+      await generateRecoveryCodes();
+      setShowRecoveryCodes(true);
     } catch (error) {
-      setError('確認コードが無効です。もう一度お試しください。');
+      setError("確認コードが無効です。もう一度お試しください。");
     }
   };
 
@@ -195,23 +208,31 @@ const TwoFactorAuthSettings = () => {
     URL.revokeObjectURL(url);
   };
 
+  const generateRecoveryCodes = async () => {
+    const newCodes = Array.from({ length: 10 }, () => Math.random().toString(36).substr(2, 8));
+    setRecoveryCodes(newCodes);
+
+    const userDocRef = doc(db, "users", user.uid);
+    await setDoc(userDocRef, { recoveryCodes: newCodes }, { merge: true });
+  };
+
   const handleRegenerateRecoveryCodes = async () => {
     try {
       setIsRegenerating(true);
-      setError('');
-      setMessage('');
-      const response = await api.post('/auth/regenerate-recovery-codes');
-      if (response.data.recoveryCodes) {
-        setRecoveryCodes(response.data.recoveryCodes);
-        setMessage('リカバリーコードが再生成されました。');
-      } else {
-        setError('リカバリーコードの再生成に失敗しました。');
-      }
+      setError("");
+      setMessage({ text: "", isError: false });
+      await generateRecoveryCodes();
+      setMessage({ text: "リカバリーコードが再生成されました。", isError: false });
+      setShowRecoveryCodes(true);
     } catch (error) {
-      setError('リカバリーコードの再生成中にエラーが発生しました。');
+      setError("リカバリーコードの再生成中にエラーが発生しました。");
     } finally {
       setIsRegenerating(false);
     }
+  };
+
+  const toggleRecoveryCodesVisibility = () => {
+    setShowRecoveryCodes(!showRecoveryCodes);
   };
 
   return (
@@ -229,7 +250,7 @@ const TwoFactorAuthSettings = () => {
 
       {qrCode && (
         <QRCodeContainer>
-          <h2><FaQrcode /> QRコード</h2>
+          <h2>QRコード</h2>
           <img src={qrCode} alt="2要素認証QRコード" />
           <p>シークレットキー: <SecretKey>{secret}</SecretKey></p>
           <Input
@@ -245,24 +266,29 @@ const TwoFactorAuthSettings = () => {
 
       {isEnabled && recoveryCodes.length > 0 && (
         <RecoveryCodesContainer>
-          <h2><FaKey /> リカバリーコード</h2>
+          <h2>リカバリーコード</h2>
           <p>以下のリカバリーコードを安全な場所に保存してください。各コードは1回のみ使用できます。</p>
-          <RecoveryCodesList>
-            {recoveryCodes.map((code, index) => (
-              <RecoveryCode key={index}>{code}</RecoveryCode>
-            ))}
-          </RecoveryCodesList>
+          <Button onClick={toggleRecoveryCodesVisibility}>
+            {showRecoveryCodes ? "コードを隠す" : "コードを表示"}
+          </Button>
+          {showRecoveryCodes && (
+            <RecoveryCodesList>
+              {recoveryCodes.map((code, index) => (
+                <RecoveryCode key={index}>{code}</RecoveryCode>
+              ))}
+            </RecoveryCodesList>
+          )}
           <Button onClick={handleDownloadRecoveryCodes}>
-            <FaDownload /> リカバリーコードをダウンロード
+            リカバリーコードをダウンロード
           </Button>
           <Button onClick={handleRegenerateRecoveryCodes} disabled={isRegenerating}>
-            <FaSync /> {isRegenerating ? '再生成中...' : 'リカバリーコードを再生成'}
+            {isRegenerating ? '再生成中...' : 'リカバリーコードを再生成'}
           </Button>
         </RecoveryCodesContainer>
       )}
 
-      {message && <Message><FaShieldAlt /> {message}</Message>}
-      {error && <Message error><FaExclamationTriangle /> {error}</Message>}
+      {message.text && <Message error={message.isError}>{message.text}</Message>}
+      {error && <Message error>{error}</Message>}
 
       <InfoText>
         2要素認証を有効にすると、ログイン時にスマートフォンなどの認証アプリで生成された
