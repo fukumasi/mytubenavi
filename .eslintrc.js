@@ -26,8 +26,8 @@ module.exports = {
   ],
   "rules": {
     "react/prop-types": "off",
-    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
-    "no-console": process.env.NODE_ENV === 'production' ? 'error' : 'warn',
+    "no-unused-vars": "warn",
+    "no-console": "warn",
     "react/react-in-jsx-scope": "off",
     "react/display-name": "off",
     "react/jsx-key": "error"
