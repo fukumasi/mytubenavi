@@ -8,8 +8,9 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import ImageUploader from "../components/ImageUploader";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { doc, updateDoc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../../firebase";
+import { useTranslation } from "react-i18next";
 
 // Styled components (既存のものをそのまま使用)
 const Container = styled.div`
@@ -123,24 +124,9 @@ const ProgressFill = styled.div`
   transition: width 0.3s ease-in-out;
 `;
 
-const schema = yup.object().shape({
-  firstName: yup.string().required("名前は必須です"),
-  lastName: yup.string().required("姓は必須です"),
-  bio: yup.string().max(500, "自己紹介は500文字以内で入力してください"),
-  preferences: yup.object().shape({
-    theme: yup.string().oneOf(["light", "dark"]),
-    language: yup.string().oneOf(["en", "ja"]),
-    notifications: yup.boolean(),
-  }),
-  socialLinks: yup.object().shape({
-    twitter: yup.string().url("有効なTwitter URLを入力してください"),
-    instagram: yup.string().url("有効なInstagram URLを入力してください"),
-    youtube: yup.string().url("有効なYouTube URLを入力してください"),
-  }),
-});
-
 const Profile = () => {
-  const { user, updateUserProfile } = useAuth();
+  const { t } = useTranslation();
+  const { currentUser, updateUserProfile } = useAuth();
   const settings = useSettings();
   const theme = settings?.theme ?? "light";
   const language = settings?.language ?? "en";
@@ -152,6 +138,22 @@ const Profile = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+
+  const schema = yup.object().shape({
+    firstName: yup.string().required(t("firstNameRequired")),
+    lastName: yup.string().required(t("lastNameRequired")),
+    bio: yup.string().max(500, t("bioMaxLength")),
+    preferences: yup.object().shape({
+      theme: yup.string().oneOf(["light", "dark"]),
+      language: yup.string().oneOf(["en", "ja"]),
+      notifications: yup.boolean(),
+    }),
+    socialLinks: yup.object().shape({
+      twitter: yup.string().url(t("invalidTwitterUrl")),
+      instagram: yup.string().url(t("invalidInstagramUrl")),
+      youtube: yup.string().url(t("invalidYoutubeUrl")),
+    }),
+  });
 
   const { register, handleSubmit, formState: { errors }, setValue } = useForm({
     resolver: yupResolver(schema),
@@ -166,44 +168,60 @@ const Profile = () => {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      if (user) {
-        const userDocRef = doc(db, "users", user.uid);
+      if (currentUser) {
+        const userDocRef = doc(db, "users", currentUser.uid);
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
           Object.entries(userData).forEach(([key, value]) => {
             setValue(key, value);
           });
+        } else {
+          // If the user document doesn't exist, create it with default values
+          const defaultUserData = {
+            firstName: "",
+            lastName: "",
+            bio: "",
+            preferences: { theme, language, notifications: true },
+            socialLinks: { twitter: "", instagram: "", youtube: "" },
+          };
+          await setDoc(userDocRef, defaultUserData);
+          Object.entries(defaultUserData).forEach(([key, value]) => {
+            setValue(key, value);
+          });
         }
         setValue("preferences.theme", theme);
         setValue("preferences.language", language);
-        setAvatarPreview(user.photoURL);
+        setAvatarPreview(currentUser.photoURL);
       }
     };
     fetchUserData();
-  }, [user, theme, language, setValue]);
+  }, [currentUser, theme, language, setValue]);
 
   const onSubmit = useCallback(async (data) => {
     setIsLoading(true);
     setSuccessMessage("");
     setErrorMessage("");
     try {
-      await updateUserProfile(data);
-      const userDocRef = doc(db, "users", user.uid);
-      await updateDoc(userDocRef, {
+      await updateUserProfile({
+        displayName: `${data.firstName} ${data.lastName}`,
+      });
+      const userDocRef = doc(db, "users", currentUser.uid);
+      await setDoc(userDocRef, {
         firstName: data.firstName,
         lastName: data.lastName,
         bio: data.bio,
         preferences: data.preferences,
         socialLinks: data.socialLinks,
-      });
-      setSuccessMessage("プロフィールが正常に更新されました");
+      }, { merge: true });
+      setSuccessMessage(t("profileUpdatedSuccess"));
     } catch (error) {
-      setErrorMessage("プロフィールの更新中にエラーが発生しました");
+      console.error("Error updating profile:", error);
+      setErrorMessage(t("profileUpdateError"));
     } finally {
       setIsLoading(false);
     }
-  }, [updateUserProfile, user?.uid]);
+  }, [updateUserProfile, currentUser?.uid, t]);
 
   const handlePreferenceChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
@@ -219,7 +237,7 @@ const Profile = () => {
 
   const handleImageUpload = useCallback(async (file) => {
     const storage = getStorage();
-    const storageRef = ref(storage, `avatars/${user.uid}`);
+    const storageRef = ref(storage, `avatars/${currentUser.uid}`);
 
     try {
       setIsLoading(true);
@@ -242,20 +260,21 @@ const Profile = () => {
           setAvatarPreview(downloadURL);
           await updateUserProfile({ photoURL: downloadURL });
 
-          const userDocRef = doc(db, "users", user.uid);
-          await updateDoc(userDocRef, { avatar: downloadURL });
+          const userDocRef = doc(db, "users", currentUser.uid);
+          await setDoc(userDocRef, { avatar: downloadURL }, { merge: true });
 
-          setSuccessMessage("プロフィール画像が正常に更新されました");
+          setSuccessMessage(t("avatarUpdateSuccess"));
           setIsLoading(false);
           setUploadProgress(0);
         }
       );
     } catch (error) {
-      setErrorMessage("プロフィール画像のアップロード中にエラーが発生しました");
+      console.error("Error uploading avatar:", error);
+      setErrorMessage(t("avatarUpdateError"));
       setIsLoading(false);
       setUploadProgress(0);
     }
-  }, [updateUserProfile, user?.uid]);
+  }, [updateUserProfile, currentUser?.uid, t]);
 
   const memoizedImageUploader = useMemo(() => (
     <ImageUploader onImageUpload={handleImageUpload} />
@@ -263,17 +282,17 @@ const Profile = () => {
 
   return (
     <Container>
-      <Title>ユーザープロフィール</Title>
+      <Title>{t("userProfile")}</Title>
       {successMessage && <SuccessMessage>{successMessage}</SuccessMessage>}
       {errorMessage && <ErrorMessage>{errorMessage}</ErrorMessage>}
       <Form onSubmit={handleSubmit(onSubmit)}>
         <FormSection>
-          <SectionTitle>基本情報</SectionTitle>
+          <SectionTitle>{t("basicInfo")}</SectionTitle>
           {memoizedImageUploader}
           {avatarPreview && (
             <AvatarPreview
               src={avatarPreview}
-              alt="ユーザーアバター"
+              alt={t("userAvatar")}
             />
           )}
           {uploadProgress > 0 && uploadProgress < 100 && (
@@ -283,41 +302,41 @@ const Profile = () => {
           )}
           <Input
             {...register("firstName")}
-            placeholder="名"
-            aria-label="名"
+            placeholder={t("firstName")}
+            aria-label={t("firstName")}
             aria-invalid={errors.firstName ? "true" : "false"}
           />
           {errors.firstName && <ErrorMessage role="alert">{errors.firstName.message}</ErrorMessage>}
           <Input
             {...register("lastName")}
-            placeholder="姓"
-            aria-label="姓"
+            placeholder={t("lastName")}
+            aria-label={t("lastName")}
             aria-invalid={errors.lastName ? "true" : "false"}
           />
           {errors.lastName && <ErrorMessage role="alert">{errors.lastName.message}</ErrorMessage>}
           <Textarea
             {...register("bio")}
-            placeholder="自己紹介（500文字以内）"
-            aria-label="自己紹介"
+            placeholder={t("bioPlaceholder")}
+            aria-label={t("bio")}
             aria-invalid={errors.bio ? "true" : "false"}
           />
           {errors.bio && <ErrorMessage role="alert">{errors.bio.message}</ErrorMessage>}
         </FormSection>
 
         <FormSection>
-          <SectionTitle>設定</SectionTitle>
+          <SectionTitle>{t("settings")}</SectionTitle>
           <Select
             {...register("preferences.theme")}
             onChange={handlePreferenceChange}
-            aria-label="テーマ"
+            aria-label={t("theme")}
           >
-            <option value="light">ライト</option>
-            <option value="dark">ダーク</option>
+            <option value="light">{t("lightTheme")}</option>
+            <option value="dark">{t("darkTheme")}</option>
           </Select>
           <Select
             {...register("preferences.language")}
             onChange={handlePreferenceChange}
-            aria-label="言語"
+            aria-label={t("language")}
           >
             <option value="en">English</option>
             <option value="ja">日本語</option>
@@ -327,14 +346,14 @@ const Profile = () => {
               type="checkbox"
               {...register("preferences.notifications")}
               onChange={handlePreferenceChange}
-              aria-label="通知設定"
+              aria-label={t("notificationSettings")}
             />
-            通知を受け取る
+            {t("receiveNotifications")}
           </CheckboxLabel>
         </FormSection>
 
         <FormSection>
-          <SectionTitle>ソーシャルリンク</SectionTitle>
+          <SectionTitle>{t("socialLinks")}</SectionTitle>
           <InputWithIcon>
             <FaTwitter aria-hidden="true" />
             <Input
@@ -368,7 +387,7 @@ const Profile = () => {
         </FormSection>
 
         <Button type="submit" disabled={isLoading}>
-          {isLoading ? "更新中..." : "プロフィールを更新"}
+          {isLoading ? t("updating") : t("updateProfile")}
         </Button>
       </Form>
     </Container>
