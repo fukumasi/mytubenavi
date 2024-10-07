@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import styled from 'styled-components';
+import { searchVideos } from '../api/youtube';
 
 const SearchContainer = styled.div`
   display: flex;
@@ -31,11 +33,21 @@ const SearchButton = styled.button`
 
 const SearchBar = ({ onSearch }) => {
   const { t } = useTranslation();
-  const [query, setQuery] = React.useState('');
+  const [query, setQuery] = useState('');
+  const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSearch(query);
+    if (query.trim()) {
+      try {
+        const results = await searchVideos(query);
+        onSearch(results);
+        navigate(`/search?q=${encodeURIComponent(query)}`);
+      } catch (error) {
+        console.error('Search error:', error);
+        // エラーハンドリングを追加する（例：エラーメッセージの表示）
+      }
+    }
   };
 
   return (

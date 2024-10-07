@@ -103,16 +103,29 @@ const VideoCard = ({ video }) => {
     duration
   } = video;
 
-  const formattedDate = (() => {
+  const formattedDate = React.useMemo(() => {
     if (!publishedAt) return '日付不明';
     const date = new Date(publishedAt);
     if (isValid(date)) {
       return formatDistance(date, new Date(), { addSuffix: true, locale: ja });
     }
     return '日付不明';
-  })();
+  }, [publishedAt]);
 
-  const formattedViewCount = typeof viewCount === 'number' ? `${viewCount.toLocaleString()} 回視聴` : '視聴回数不明';
+  const formattedViewCount = React.useMemo(() => 
+    viewCount ? `${parseInt(viewCount).toLocaleString()} 回視聴` : '視聴回数不明'
+  , [viewCount]);
+
+  const formatDuration = React.useCallback((duration) => {
+    if (!duration) return '';
+    const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+    const hours = (match[1] || '').replace('H', '');
+    const minutes = (match[2] || '').replace('M', '');
+    const seconds = (match[3] || '').replace('S', '');
+    return `${hours ? hours + ':' : ''}${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`;
+  }, []);
+
+  const formattedDuration = React.useMemo(() => formatDuration(duration), [duration, formatDuration]);
 
   return (
     <Card to={`/video/${id}`}>
@@ -122,7 +135,7 @@ const VideoCard = ({ video }) => {
           alt={`${title}のサムネイル`}
           loading="lazy"
         />
-        {duration && <Duration aria-label={`動画の長さ: ${duration}`}>{duration}</Duration>}
+        {formattedDuration && <Duration aria-label={`動画の長さ: ${formattedDuration}`}>{formattedDuration}</Duration>}
       </ThumbnailWrapper>
       <Content>
         <Title>{title}</Title>
@@ -146,10 +159,9 @@ VideoCard.propTypes = {
     channelTitle: PropTypes.string,
     thumbnailUrl: PropTypes.string,
     publishedAt: PropTypes.string,
-    viewCount: PropTypes.number,
+    viewCount: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     duration: PropTypes.string,
   }).isRequired,
 };
 
 export default React.memo(VideoCard);
-

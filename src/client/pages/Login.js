@@ -66,6 +66,9 @@ const Login = () => {
           <div className="w-100 text-center mt-3">
             <Link to="/register">{t('noAccount')}</Link>
           </div>
+          <div className="w-100 text-center mt-2">
+            <Link to="/forgot-password">{t('forgotPassword')}</Link>
+          </div>
         </Col>
       </Row>
     </Container>

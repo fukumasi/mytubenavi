@@ -1,4 +1,4 @@
-// src\client\components\AdSpace.js
+// src/client/components/AdSpace.js
 import React, { useState, useEffect } from "react";
 import AdVideoDisplay from "./AdVideoDisplay";
 import styled from "styled-components";
@@ -6,18 +6,20 @@ import { getFirestore, collection, query, where, limit, getDocs } from "firebase
 
 // スタイル定義
 const AdContainer = styled.div`
-  background-color: #f0f0f0;
-  padding: 20px;
-  margin-bottom: 20px;
+  background-color: ${({ theme }) => theme.colors.backgroundLight};
+  padding: ${({ theme }) => theme.spacing.medium};
+  margin-bottom: ${({ theme }) => theme.spacing.large};
   text-align: center;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border-radius: ${({ theme }) => theme.borderRadius.medium};
+  box-shadow: 0 2px 4px ${({ theme }) => theme.colors.shadow};
+  width: 100%;
+  max-width: ${({ theme }) => theme.layout.sideColumnWidth};
 `;
 
 const ErrorMessage = styled.div`
-  color: #ff0000;
+  color: ${({ theme }) => theme.colors.error};
   font-weight: bold;
-  padding: 10px;
+  padding: ${({ theme }) => theme.spacing.medium};
 `;
 
 /**
@@ -82,5 +84,3 @@ const AdSpace = () => {
 
 // AdSpaceコンポーネントをエクスポート
 export default AdSpace;
-
-

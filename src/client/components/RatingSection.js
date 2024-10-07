@@ -2,16 +2,58 @@
 import React, { useState, useEffect } from "react";
 import { getFirestore, doc, getDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import styled from "styled-components";
+import { useAuth } from "../contexts/AuthContext";
+import ErrorMessage from "./ErrorMessage";
+
+const RatingSectionContainer = styled.div`
+  margin-top: 20px;
+  padding: 15px;
+  background-color: ${({ theme }) => theme.colors.backgroundLight};
+  border-radius: 8px;
+`;
+
+const RatingTitle = styled.h2`
+  font-size: 1.2em;
+  margin-bottom: 10px;
+`;
+
+const AverageRating = styled.p`
+  font-size: 1em;
+  margin-bottom: 15px;
+`;
+
+const UserRating = styled.div`
+  display: flex;
+  align-items: center;
+`;
+
+const Star = styled.span`
+  font-size: 1.5em;
+  cursor: pointer;
+  color: ${({ active, theme }) => active ? theme.colors.accent1 : theme.colors.textSecondary};
+  transition: color 0.2s ease-in-out;
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.accent1};
+  }
+`;
+
+const LoginPrompt = styled.p`
+  font-size: 0.9em;
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
 
 const RatingSection = ({ videoId }) => {
   const [rating, setRating] = useState(0);
   const [userRating, setUserRating] = useState(0);
+  const [error, setError] = useState(null);
   const db = getFirestore();
-  const auth = getAuth();
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchRating();
-  }, [videoId]);
+  }, [videoId, user]);
 
   const fetchRating = async () => {
     try {
@@ -20,19 +62,20 @@ const RatingSection = ({ videoId }) => {
       if (videoDoc.exists()) {
         const videoData = videoDoc.data();
         setRating(videoData.averageRating || 0);
-        if (auth.currentUser) {
+        if (user) {
           const userRatings = videoData.userRatings || {};
-          setUserRating(userRatings[auth.currentUser.uid] || 0);
+          setUserRating(userRatings[user.uid] || 0);
         }
       }
     } catch (error) {
+      setError("評価の取得中にエラーが発生しました。");
       console.error("Error fetching rating:", error);
     }
   };
 
   const handleRating = async (newRating) => {
-    if (!auth.currentUser) {
-      console.error("User must be logged in to rate");
+    if (!user) {
+      setError("評価するにはログインが必要です。");
       return;
     }
 
@@ -42,8 +85,8 @@ const RatingSection = ({ videoId }) => {
       if (videoDoc.exists()) {
         const videoData = videoDoc.data();
         const userRatings = videoData.userRatings || {};
-        const oldRating = userRatings[auth.currentUser.uid] || 0;
-        userRatings[auth.currentUser.uid] = newRating;
+        const oldRating = userRatings[user.uid] || 0;
+        userRatings[user.uid] = newRating;
 
         // Calculate new average rating
         const totalRatings = Object.values(userRatings).reduce((a, b) => a + b, 0);
@@ -52,37 +95,41 @@ const RatingSection = ({ videoId }) => {
         await updateDoc(videoRef, {
           userRatings: userRatings,
           averageRating: newAverageRating,
-          [`ratingCounts.${newRating}`]: arrayUnion(auth.currentUser.uid),
-          ...(oldRating && { [`ratingCounts.${oldRating}`]: arrayRemove(auth.currentUser.uid) })
+          [`ratingCounts.${newRating}`]: arrayUnion(user.uid),
+          ...(oldRating && { [`ratingCounts.${oldRating}`]: arrayRemove(user.uid) })
         });
 
         setRating(newAverageRating);
         setUserRating(newRating);
+        setError(null);
       }
     } catch (error) {
+      setError("評価の投稿中にエラーが発生しました。");
       console.error("Error posting rating:", error);
     }
   };
 
   return (
-    <div className="rating-section">
-      <h2>評価</h2>
-      <p>平均評価: {rating.toFixed(1)}</p>
-      <div className="user-rating">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <span
-            key={star}
-            onClick={() => handleRating(star)}
-            style={{
-              cursor: "pointer",
-              color: star <= userRating ? "gold" : "gray",
-            }}
-          >
-            ★
-          </span>
-        ))}
-      </div>
-    </div>
+    <RatingSectionContainer>
+      <RatingTitle>評価</RatingTitle>
+      <AverageRating>平均評価: {rating.toFixed(1)}</AverageRating>
+      {error && <ErrorMessage message={error} />}
+      {user ? (
+        <UserRating>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <Star
+              key={star}
+              onClick={() => handleRating(star)}
+              active={star <= userRating}
+            >
+              ★
+            </Star>
+          ))}
+        </UserRating>
+      ) : (
+        <LoginPrompt>評価するにはログインしてください。</LoginPrompt>
+      )}
+    </RatingSectionContainer>
   );
 };
 

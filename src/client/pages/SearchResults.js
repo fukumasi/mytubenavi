@@ -15,50 +15,12 @@ import SortOptions from "../components/SortOptions";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, setDoc, arrayUnion, getFirestore, serverTimestamp } from "firebase/firestore";
+import ThreeColumnLayout from "../components/ThreeColumnLayout";
 
 const SearchContainer = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 4fr;
-  gap: 20px;
-  max-width: 1200px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 20px;
-
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const LeftColumn = styled.div`
-  grid-column: 1;
-
-  @media (max-width: 768px) {
-    grid-column: auto;
-  }
-`;
-
-const MainContent = styled.div`
-  grid-column: 2;
-  display: flex;
-  flex-direction: column;
-
-  @media (max-width: 768px) {
-    grid-column: auto;
-  }
-`;
-
-const VideoTableContainer = styled.div`
-  margin-bottom: 20px;
-  overflow-x: auto;
-`;
-
-const PaginationContainer = styled.div`
-  margin-top: 20px;
-`;
-
-const ResultSummary = styled.p`
-  margin-bottom: 20px;
-  font-style: italic;
 `;
 
 const SearchHistoryContainer = styled.div`
@@ -103,6 +65,20 @@ const ClearHistoryButton = styled.button`
   &:hover {
     background-color: ${({ theme }) => theme.colors.secondaryDark};
   }
+`;
+
+const VideoTableContainer = styled.div`
+  margin-bottom: 20px;
+  overflow-x: auto;
+`;
+
+const PaginationContainer = styled.div`
+  margin-top: 20px;
+`;
+
+const ResultSummary = styled.p`
+  margin-bottom: 20px;
+  font-style: italic;
 `;
 
 const VIDEOS_PER_PAGE = 20;
@@ -251,6 +227,7 @@ const SearchResults = () => {
           timestamp: serverTimestamp()
         })
       }, { merge: true }).catch(error => {
+        console.error("Error saving search history:", error);
         setError("検索履歴の保存エラー: " + error.message);
       });
     }
@@ -305,68 +282,73 @@ const SearchResults = () => {
 
   return (
     <SearchContainer>
-      <LeftColumn>
-        <h3>{t("genre")}</h3>
-        <GenreList
-          onGenreChange={handleGenreChange}
-          selectedGenre={selectedGenre}
-        />
-        <SearchHistoryContainer>
-          <h3>{t("searchHistory")}</h3>
-          <ul aria-label={t("searchHistoryLabel")}>
-            {searchHistory.map((item, index) => (
-              <SearchHistoryItem key={index}>
-                <SearchHistoryButton onClick={() => handleSearchHistoryItemClick(item)}>
-                  {item}
-                </SearchHistoryButton>
-                <button onClick={() => handleRemoveSearchHistoryItem(item)} aria-label={t("removeFromHistory")}>
-                  ✕
-                </button>
-              </SearchHistoryItem>
-            ))}
-          </ul>
-          {searchHistory.length > 0 && (
-            <ClearHistoryButton onClick={handleClearSearchHistory}>
-              {t("clearHistory")}
-            </ClearHistoryButton>
-          )}
-        </SearchHistoryContainer>
-        <AdSpace />
-      </LeftColumn>
-
-      <MainContent>
-        <h2>
-          {query
-            ? t("searchResults", { query })
-            : selectedGenre !== "all"
-            ? t("genreResults", { genre: selectedGenre })
-            : t("recommendedVideos")}
-        </h2>
-        <ResultSummary aria-live="polite">
-          {t("videosFound", { count: totalVideos, currentPage, totalPages })}
-        </ResultSummary>
-        <OptionsContainer>
-          <FilterOptions onFilterChange={handleFilterChange} />
-          <SortOptions 
-            sortConfig={sortConfig} 
-            onSort={handleSortChange}
-            additionalOptions={additionalSortOptions}
-            onAdditionalOptionChange={handleAdditionalSortOptionChange}
+      <ThreeColumnLayout>
+        <ThreeColumnLayout.LeftColumn>
+          <h3>{t("genre")}</h3>
+          <GenreList
+            onGenreChange={handleGenreChange}
+            selectedGenre={selectedGenre}
           />
-        </OptionsContainer>
-        <VideoTableContainer>
-          <VideoTable videos={paginatedVideos} />
-        </VideoTableContainer>
-        {totalPages > 1 && (
-          <PaginationContainer>
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
+          <SearchHistoryContainer>
+            <h3>{t("searchHistory")}</h3>
+            <ul aria-label={t("searchHistoryLabel")}>
+              {searchHistory.map((item, index) => (
+                <SearchHistoryItem key={index}>
+                  <SearchHistoryButton onClick={() => handleSearchHistoryItemClick(item)}>
+                    {item}
+                  </SearchHistoryButton>
+                  <button onClick={() => handleRemoveSearchHistoryItem(item)} aria-label={t("removeFromHistory")}>
+                    ✕
+                  </button>
+                </SearchHistoryItem>
+              ))}
+            </ul>
+            {searchHistory.length > 0 && (
+              <ClearHistoryButton onClick={handleClearSearchHistory}>
+                {t("clearHistory")}
+              </ClearHistoryButton>
+            )}
+          </SearchHistoryContainer>
+        </ThreeColumnLayout.LeftColumn>
+
+        <ThreeColumnLayout.MainColumn>
+          <h2>
+            {query
+              ? t("searchResults", { query })
+              : selectedGenre !== "all"
+              ? t("genreResults", { genre: selectedGenre })
+              : t("recommendedVideos")}
+          </h2>
+          <ResultSummary aria-live="polite">
+            {t("videosFound", { count: totalVideos, currentPage, totalPages })}
+          </ResultSummary>
+          <OptionsContainer>
+            <FilterOptions onFilterChange={handleFilterChange} />
+            <SortOptions 
+              sortConfig={sortConfig} 
+              onSort={handleSortChange}
+              additionalOptions={additionalSortOptions}
+              onAdditionalOptionChange={handleAdditionalSortOptionChange}
             />
-          </PaginationContainer>
-        )}
-      </MainContent>
+          </OptionsContainer>
+          <VideoTableContainer>
+            <VideoTable videos={paginatedVideos} />
+          </VideoTableContainer>
+          {totalPages > 1 && (
+            <PaginationContainer>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+              />
+            </PaginationContainer>
+          )}
+        </ThreeColumnLayout.MainColumn>
+
+        <ThreeColumnLayout.RightColumn>
+          <AdSpace />
+        </ThreeColumnLayout.RightColumn>
+      </ThreeColumnLayout>
     </SearchContainer>
   );
 };

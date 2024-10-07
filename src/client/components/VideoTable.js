@@ -23,6 +23,8 @@ const TableContainer = styled.div.attrs({
   'aria-label': '動画一覧テーブル' 
 })`
   width: 100%;
+  max-width: ${({ theme }) => theme.layout.mainColumnMinWidth};
+  margin: 0 auto;
 `;
 
 const TableHeader = styled.div.attrs({ role: 'row' })`
@@ -34,7 +36,8 @@ const TableHeader = styled.div.attrs({ role: 'row' })`
 
 const HeaderCell = styled.div.attrs({ role: 'columnheader' })`
   flex: ${props => props.$flex || 1};
-  padding: 10px;
+  padding: ${({ theme }) => theme.spacing?.small || '10px'};
+  font-size: ${({ theme }) => theme.fontSizes?.small || '14px'};
 `;
 
 const Row = styled.div.attrs({ role: 'row' })`
@@ -50,21 +53,22 @@ const Row = styled.div.attrs({ role: 'row' })`
 
 const Cell = styled.div.attrs({ role: 'cell' })`
   flex: ${props => props.$flex || 1};
-  padding: 10px;
+  padding: ${({ theme }) => theme.spacing?.small || '10px'};
   display: flex;
   align-items: center;
+  font-size: ${({ theme }) => theme.fontSizes?.small || '14px'};
 `;
 
 const ThumbnailImage = styled.img`
   width: 120px;
   height: 67px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: ${({ theme }) => theme.borderRadius?.small || '4px'};
 `;
 
 const NoVideosMessage = styled.p`
   text-align: center;
-  padding: 20px;
+  padding: ${({ theme }) => theme.spacing?.large || '20px'};
   font-style: italic;
   color: ${({ theme }) => theme.colors?.textLight || '#6c757d'};
 `;
@@ -130,7 +134,7 @@ const VideoTable = React.memo(({ videos }) => {
       <Row key={uniqueKey} style={style}>
         <Cell $flex={2}>
           <StyledLink to={`/video/${video.id || video.videoId}`} aria-label={`${title}のサムネイル`}>
-            <ThumbnailImage src={proxyThumbnailUrl} alt="" /> {/* 装飾的な画像のため、alt属性は空に */}
+            <ThumbnailImage src={proxyThumbnailUrl} alt="" />
           </StyledLink>
         </Cell>
         <Cell $flex={4}>

@@ -3,8 +3,8 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from './LoadingSpinner';
 
-const ProtectedRoute = ({ requireAuth = true, children }) => {
-  const { currentUser, loading } = useAuth();
+const ProtectedRoute = ({ requireAuth = true, requireEmailVerification = true, children }) => {
+  const { currentUser, loading, isEmailVerified } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -14,6 +14,11 @@ const ProtectedRoute = ({ requireAuth = true, children }) => {
   if (!currentUser && requireAuth) {
     // ユーザーが認証されていない場合、ログインページにリダイレクト
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (currentUser && requireAuth && requireEmailVerification && !isEmailVerified()) {
+    // ユーザーが認証されているがメールが確認されていない場合、メール確認ページにリダイレクト
+    return <Navigate to="/email-verification" state={{ from: location }} replace />;
   }
 
   if (!requireAuth && currentUser) {

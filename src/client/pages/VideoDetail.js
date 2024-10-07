@@ -12,6 +12,7 @@ import { useTheme } from "../hooks";
 import SkeletonLoader from "../components/SkeletonLoader";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, setDoc, arrayUnion, getFirestore, serverTimestamp } from "firebase/firestore";
+import RatingSection from "../components/RatingSection";
 
 const VideoContainer = styled.div`
   display: flex;
@@ -116,7 +117,10 @@ const VideoDetail = () => {
     error: videoError
   } = useQuery(["video", id], () => getVideoDetails(id), {
     retry: 3,
-    onError: (error) => setError("動画詳細の取得エラー: " + error.message),
+    onError: (error) => {
+      console.error("Error fetching video details:", error);
+      setError("動画詳細の取得エラー: " + error.message);
+    },
     staleTime: 5 * 60 * 1000, // 5分
     onSuccess: (data) => {
       if (user) {
@@ -128,6 +132,7 @@ const VideoDetail = () => {
             watchedAt: serverTimestamp()
           })
         }, { merge: true }).catch(error => {
+          console.error("Error saving watch history:", error);
           setError("視聴履歴の保存エラー: " + error.message);
         });
       }
@@ -141,7 +146,10 @@ const VideoDetail = () => {
   } = useQuery(["relatedVideos", id], () => getRelatedVideos(id), {
     enabled: !!id,
     retry: 3,
-    onError: (error) => setError("関連動画の取得エラー: " + error.message),
+    onError: (error) => {
+      console.error("Error fetching related videos:", error);
+      setError("関連動画の取得エラー: " + error.message);
+    },
     staleTime: 5 * 60 * 1000, // 5分
   });
 
@@ -227,6 +235,7 @@ const VideoDetail = () => {
               alt={`${video.snippet?.channelTitle || "チャンネル"} のサムネイル`}
               loading="lazy"
               onError={(e) => {
+                console.error('Channel thumbnail loading error:', e);
                 setError('チャンネルサムネイルの読み込みエラー: ' + e.message);
                 e.target.src = 'https://via.placeholder.com/48x48.png?text=No+Image';
               }}
@@ -242,6 +251,7 @@ const VideoDetail = () => {
             <span>{`💬 ${formattedCommentCount}`}</span>
           </VideoStats>
         </VideoInfo>
+        <RatingSection videoId={id} />
         <CommentSection videoId={id} />
       </MainContent>
       <Sidebar theme={theme}>
@@ -257,9 +267,3 @@ const VideoDetail = () => {
 };
 
 export default React.memo(VideoDetail);
-
-// TODO: 再生リストへの追加機能
-// TODO: 動画のホバープレビュー機能
-// TODO: パフォーマンス測定と最適化
-// TODO: アクセシビリティテストと改善
-// TODO: SEO対策の強化

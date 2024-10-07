@@ -40,14 +40,14 @@ const Header = () => {
       await logout();
       navigate('/');
     } catch (error) {
-      setError('サインアウトに失敗しました。もう一度お試しください。');
+      setError(t('signOutError'));
     }
   };
 
   return (
     <HeaderContainer>
       <HeaderContent>
-        <Logo to="/">{t('appName')}</Logo>
+        <Logo to="/">{t('app.title')}</Logo>
         <SearchBarWrapper>
           <SearchBar onSearch={handleSearch} />
         </SearchBarWrapper>
@@ -56,7 +56,7 @@ const Header = () => {
         </MobileMenuButton>
         <Nav $isOpen={isMenuOpen}>
           <ThemeToggle onClick={toggleTheme}>
-            {theme === 'light' ? '🌙' : '☀️'}
+            {theme === 'light' ? t('darkTheme') : t('lightTheme')}
           </ThemeToggle>
           {currentUser ? (
             <UserMenu>

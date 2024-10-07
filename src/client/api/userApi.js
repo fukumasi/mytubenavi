@@ -1,10 +1,13 @@
 // src/client/api/userApi.js
 import { getAuth, updateEmail, updatePassword, deleteUser as firebaseDeleteUser } from 'firebase/auth';
 import { doc, getDoc, updateDoc, deleteDoc, getFirestore } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { v4 as uuidv4 } from 'uuid';
 import { logError } from '../utils/errorLogging';
 
 const db = getFirestore();
 const auth = getAuth();
+const storage = getStorage();
 
 const handleApiError = (error, errorMessage) => {
   logError(error, { message: errorMessage });
@@ -84,17 +87,51 @@ export const getUserDashboardData = async (userId) => {
 
     if (userSnap.exists()) {
       const userData = userSnap.data();
-      // ダッシュボードに必要なデータを取得
-      // 例: 最近の活動、お気に入り動画など
       return {
         recentActivity: userData.recentActivity || [],
         favoriteVideos: userData.favoriteVideos || [],
-        // 他のダッシュボードデータ
       };
     } else {
       throw new Error('ユーザーが見つかりません');
     }
   } catch (error) {
     handleApiError(error, 'ダッシュボードデータの取得に失敗しました');
+  }
+};
+
+export const uploadAvatar = async (userId, file) => {
+  try {
+    const fileExtension = file.name.split('.').pop();
+    const fileName = `${uuidv4()}.${fileExtension}`;
+    const storageRef = ref(storage, `profileImages/${userId}/${fileName}`);
+
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, { avatar: downloadURL });
+
+    return { downloadURL };
+  } catch (error) {
+    console.error('Error uploading avatar:', error);
+    if (error.code === 'storage/unauthorized') {
+      throw new Error('アバター画像のアップロード権限がありません');
+    } else {
+      throw new Error('アバター画像のアップロードに失敗しました');
+    }
+  }
+};
+
+export const getAvatarUrl = async (userId) => {
+  try {
+    const userRef = doc(db, 'users', userId);
+    const userSnap = await getDoc(userRef);
+    if (userSnap.exists()) {
+      return userSnap.data().avatar;
+    } else {
+      throw new Error('ユーザーが見つかりません');
+    }
+  } catch (error) {
+    handleApiError(error, 'アバターURLの取得に失敗しました');
   }
 };

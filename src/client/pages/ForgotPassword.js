@@ -1,74 +1,98 @@
-import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import styled from "styled-components";
-import { useFirebase } from "../contexts/FirebaseContext";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import VideoCard from "../components/VideoCard"; // このコンポーネントは別途作成する必要があります
+import React, { useState } from 'react';
+import styled from 'styled-components';
+import { useAuth } from '../contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 
-const GenreContainer = styled.div`
+const Container = styled.div`
+  max-width: 400px;
+  margin: 0 auto;
   padding: 20px;
 `;
 
-const GenreTitle = styled.h1`
-  font-size: 24px;
+const Title = styled.h2`
+  text-align: center;
   margin-bottom: 20px;
 `;
 
-const VideoGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 20px;
+const Form = styled.form`
+  display: flex;
+  flex-direction: column;
 `;
 
-const GenrePage = () => {
-  const { genreSlug } = useParams();
-  const [videos, setVideos] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const { db } = useFirebase();
+const Input = styled.input`
+  padding: 10px;
+  margin-bottom: 10px;
+`;
 
-  useEffect(() => {
-    const fetchVideos = async () => {
-      try {
-        const videosRef = collection(db, "videos");
-        const q = query(videosRef, where("genre", "==", genreSlug));
-        const querySnapshot = await getDocs(q);
-        
-        const fetchedVideos = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        
-        setVideos(fetchedVideos);
-      } catch (err) {
-        console.error("Error fetching videos:", err);
-        setError("動画の取得中にエラーが発生しました。");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchVideos();
-  }, [db, genreSlug]);
-
-  if (loading) {
-    return <div>Loading...</div>;
+const Button = styled.button`
+  padding: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+  &:disabled {
+    background-color: #cccccc;
   }
+`;
 
-  if (error) {
-    return <div>{error}</div>;
-  }
+const Message = styled.div`
+  margin-top: 10px;
+  padding: 10px;
+  text-align: center;
+`;
+
+const SuccessMessage = styled(Message)`
+  background-color: #d4edda;
+  color: #155724;
+`;
+
+const ErrorMessage = styled(Message)`
+  background-color: #f8d7da;
+  color: #721c24;
+`;
+
+const ForgotPassword = () => {
+  const [email, setEmail] = useState('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { resetPassword } = useAuth();
+  const { t } = useTranslation();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setMessage('');
+      setError('');
+      setIsLoading(true);
+      const result = await resetPassword(email);
+      setMessage(result.message);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <GenreContainer>
-      <GenreTitle>{genreSlug} Videos</GenreTitle>
-      <VideoGrid>
-        {videos.map(video => (
-          <VideoCard key={video.id} video={video} />
-        ))}
-      </VideoGrid>
-    </GenreContainer>
+    <Container>
+      <Title>{t('forgotPassword')}</Title>
+      {message && <SuccessMessage>{message}</SuccessMessage>}
+      {error && <ErrorMessage>{error}</ErrorMessage>}
+      <Form onSubmit={handleSubmit}>
+        <Input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder={t('email')}
+          required
+        />
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? t('sending') : t('resetPassword')}
+        </Button>
+      </Form>
+    </Container>
   );
 };
 
-export default GenrePage;
+export default ForgotPassword;
