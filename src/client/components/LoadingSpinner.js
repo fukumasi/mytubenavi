@@ -60,4 +60,3 @@ const LoadingSpinner = ({
 };
 
 export default React.memo(LoadingSpinner);
-

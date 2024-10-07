@@ -1,7 +1,8 @@
 import React from "react";
 import PropTypes from 'prop-types';
-import styled from "styled-components";
+import styled, { keyframes } from "styled-components";
 import VideoCard from "./VideoCard";
+import { useTranslation } from 'react-i18next';
 
 const VideoListContainer = styled.div`
   display: grid;
@@ -16,45 +17,97 @@ const Message = styled.p`
 `;
 
 const LoadingSpinner = styled.div`
-  // スタイルは省略
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border-left-color: #09f;
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
 `;
 
-const VideoList = ({ videos = [], isLoading, error }) => {
+const fadeIn = keyframes`
+  from { opacity: 0; }
+  to { opacity: 1; }
+`;
+
+const AnimatedVideoListContainer = styled(VideoListContainer)`
+  animation: ${fadeIn} 0.5s ease-in;
+`;
+
+const VideoList = React.memo(({ videos = [], isLoading, error }) => {
+  const { t } = useTranslation();
+
   if (isLoading) {
-    return <LoadingSpinner aria-label="動画を読み込み中" />;
+    return <LoadingSpinner aria-label={t('loading.ariaLabel')} />;
   }
 
   if (error) {
-    return <Message role="alert">エラーが発生しました: {error}</Message>;
+    return <Message role="alert">{t('error.occurred')}: {error}</Message>;
   }
 
   if (videos.length === 0) {
-    return <Message>動画がありません。</Message>;
+    return <Message>{t('noVideos')}</Message>;
   }
 
   return (
-    <VideoListContainer role="list" aria-label="動画一覧">
+    <AnimatedVideoListContainer role="list" aria-label={t('videoList.ariaLabel')}>
       {videos.map((video) => (
-        <VideoCard key={video.id} video={video} />
+        <VideoCard 
+          key={video.id.videoId || video.id} 
+          video={{
+            id: video.id.videoId || video.id,
+            title: video.snippet.title,
+            thumbnailUrl: video.snippet.thumbnails.medium.url,
+            channelTitle: video.snippet.channelTitle,
+            publishedAt: video.snippet.publishedAt,
+            viewCount: video.statistics?.viewCount,
+            duration: video.contentDetails?.duration,
+          }} 
+        />
       ))}
-    </VideoListContainer>
+    </AnimatedVideoListContainer>
   );
-};
+});
 
 VideoList.propTypes = {
   videos: PropTypes.arrayOf(
     PropTypes.shape({
-      id: PropTypes.string.isRequired,
-      title: PropTypes.string.isRequired,
-      thumbnailUrl: PropTypes.string, // thumbnailUrlをオプショナルに変更
-      channelTitle: PropTypes.string.isRequired,
-      publishedAt: PropTypes.string, // publishedAtはオプショナルのまま
-      viewCount: PropTypes.oneOfType([PropTypes.number, PropTypes.string]), // viewCountの型を数値または文字列に変更
-      duration: PropTypes.string,
+      id: PropTypes.oneOfType([
+        PropTypes.string,
+        PropTypes.shape({ videoId: PropTypes.string })
+      ]).isRequired,
+      snippet: PropTypes.shape({
+        title: PropTypes.string.isRequired,
+        thumbnails: PropTypes.shape({
+          medium: PropTypes.shape({
+            url: PropTypes.string.isRequired,
+          }).isRequired,
+        }).isRequired,
+        channelTitle: PropTypes.string.isRequired,
+        publishedAt: PropTypes.string,
+      }).isRequired,
+      statistics: PropTypes.shape({
+        viewCount: PropTypes.string,
+      }),
+      contentDetails: PropTypes.shape({
+        duration: PropTypes.string,
+      }),
     })
   ),
   isLoading: PropTypes.bool,
   error: PropTypes.string,
 };
 
-export default React.memo(VideoList);
+VideoList.displayName = 'VideoList';
+
+export default VideoList;

@@ -8,13 +8,14 @@ import { AuthProvider } from './client/contexts/AuthContext';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { fab } from '@fortawesome/free-brands-svg-icons';
 import { fas } from '@fortawesome/free-solid-svg-icons';
+import { app, auth, db, analytics } from './firebase'; // Firebase設定をインポート
 
 library.add(fab, fas);
 
 const root = createRoot(document.getElementById("root"));
 root.render(
   <React.StrictMode>
-    <FirebaseProvider>
+    <FirebaseProvider value={{ app, auth, db, analytics }}>
       <AuthProvider>
         <App />
       </AuthProvider>

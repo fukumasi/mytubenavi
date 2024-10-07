@@ -2,8 +2,57 @@
 import React, { useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
 import { getFirestore, doc, getDoc, updateDoc, increment } from "firebase/firestore";
+import LoadingSpinner from "./LoadingSpinner";
+import ErrorMessage from "./ErrorMessage";
 
-// Styled components remain unchanged...
+const AdContainer = styled.div`
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 20px;
+  margin-bottom: 20px;
+  cursor: pointer;
+`;
+
+const AdLabel = styled.div`
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 5px;
+`;
+
+const AdTitle = styled.h3`
+  font-size: 18px;
+  margin-bottom: 10px;
+`;
+
+const AdDescription = styled.p`
+  font-size: 14px;
+  margin-bottom: 15px;
+`;
+
+const VideoContainer = styled.div`
+  position: relative;
+  padding-bottom: 56.25%; /* 16:9 アスペクト比 */
+  height: 0;
+  overflow: hidden;
+`;
+
+const VideoFrame = styled.iframe`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+`;
+
+const AdStats = styled.div`
+  font-size: 12px;
+  color: #666;
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+`;
 
 const AdVideoDisplay = ({ adId }) => {
   const [adVideo, setAdVideo] = useState(null);

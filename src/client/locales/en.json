@@ -3,6 +3,7 @@
     "title": "MyTubeNavi"
   },
   "loading": {
+    
     "ariaLabel": "Loading",
     "message": "Loading content..."
   },
@@ -29,7 +30,6 @@
     "movies": "Movies",
     "anime": "Anime"
   },
-  "appName": "MyTubeNavi",
   "login": "Login",
   "register": "Register",
   "logout": "Logout",
@@ -42,7 +42,7 @@
   "firstName": "First Name",
   "lastName": "Last Name",
   "bio": "Bio",
-  "bioPlaceholder": "Tell us about yourself (up to 500 characters)",
+  "bioPlaceholder": "Tell us about yourself (max 500 characters)",
   "theme": "Theme",
   "lightTheme": "Light",
   "darkTheme": "Dark",
@@ -58,9 +58,55 @@
   "avatarUpdateError": "An error occurred while uploading the profile picture",
   "firstNameRequired": "First name is required",
   "lastNameRequired": "Last name is required",
-  "bioMaxLength": "Bio must be 500 characters or less",
+  "bioMaxLength": "Bio must be less than 500 characters",
   "invalidTwitterUrl": "Please enter a valid Twitter URL",
   "invalidInstagramUrl": "Please enter a valid Instagram URL",
   "invalidYoutubeUrl": "Please enter a valid YouTube URL",
-  "userAvatar": "User Avatar"
+  "userAvatar": "User Avatar",
+  "searchPlaceholder": "Search videos...",
+  "search": "Search",
+  "welcome": "Welcome",
+  "popularVideos": "Popular Videos",
+  "featuredVideos": "Featured Videos",
+  "editProfile": "Edit Profile",
+  "displayName": "Display Name",
+  "email": "Email",
+  "password": "Password",
+  "newPassword": "New Password",
+  "confirmNewPassword": "Confirm New Password",
+  "updateEmail": "Update Email",
+  "updatePassword": "Update Password",
+  "userDataFetchError": "Failed to fetch user data.",
+  "emailUpdateSuccess": "Email updated successfully.",
+  "emailUpdateError": "Failed to update email.",
+  "passwordMismatch": "New passwords do not match.",
+  "passwordUpdateSuccess": "Password updated successfully.",
+  "passwordUpdateError": "Failed to update password.",
+  "currentPassword": "Current Password",
+  "currentPasswordRequired": "Current password is required",
+  "wrongPassword": "Incorrect password",
+  "userNotFound": "User not found.",
+  "recentLoginRequired": "For security reasons, please log in again before performing this operation",
+  "emailVerificationSent": "A verification email has been sent to your new address. Please check your email to confirm the change.",
+  "emailAlreadyInUse": "This email is already in use by another account.",
+  "invalidEmail": "The email address is not valid.",
+  "emailUpdateAndVerificationSent": "Email updated and verification email sent. Please check your new email address.",
+  "emailUpdateNotAllowed": "Email address change is not allowed. Please contact the administrator.",
+  "forgotPassword": "Forgot Password?",
+  "resetPassword": "Reset Password",
+  "sending": "Sending...",
+  "loginFailed": "Login failed. Please check your email and password.",
+  "loggingIn": "Logging in...",
+  "imageResizeError": "An error occurred while resizing the image.",
+  "imageUrlError": "An error occurred while retrieving the URL of the uploaded image.",
+  "unexpectedError": "An unexpected error occurred.",
+  "imageUploadError": "An error occurred while uploading the image.",
+  "error": {
+    "occurred": "An error occurred"
+  },
+  "noVideos": "No videos available.",
+  "searchResultsFor": "「{{genre}}」の検索結果",
+  "videoList": {
+    "ariaLabel": "Video list"
+  }
 }

@@ -8,12 +8,18 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   updateProfile,
-  updateEmail,
-  updatePassword,
   sendEmailVerification,
   reauthenticateWithCredential,
   EmailAuthProvider
 } from 'firebase/auth';
+import { 
+  updateUser, 
+  changeEmail, 
+  changePassword, 
+  getUserProfile, 
+  deleteUser as apiDeleteUser,
+  getUserDashboardData
+} from '../api/userApi';
 
 const AuthContext = createContext();
 
@@ -25,8 +31,15 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  function signup(email, password) {
-    return createUserWithEmailAndPassword(auth, email, password);
+  async function signup(email, password) {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      await sendEmailVerification(userCredential.user);
+      return userCredential;
+    } catch (error) {
+      console.error("Error during signup:", error);
+      throw error;
+    }
   }
 
   function login(email, password) {
@@ -45,6 +58,7 @@ export function AuthProvider({ children }) {
   async function updateUserProfile(profile) {
     try {
       await updateProfile(auth.currentUser, profile);
+      await updateUser(profile);
       setCurrentUser(prevUser => ({ ...prevUser, ...profile }));
     } catch (error) {
       console.error("Error updating user profile:", error);
@@ -60,26 +74,13 @@ export function AuthProvider({ children }) {
       );
       await reauthenticateWithCredential(auth.currentUser, credential);
       
-      await updateEmail(auth.currentUser, newEmail);
+      await changeEmail(newEmail);
       await sendEmailVerification(auth.currentUser);
       
       return { success: true, message: "Verification email sent to new address. Please check your email to confirm the change." };
     } catch (error) {
       console.error("Error updating user email:", error);
-      switch (error.code) {
-        case 'auth/email-already-in-use':
-          throw new Error('This email is already in use by another account.');
-        case 'auth/invalid-email':
-          throw new Error('The email address is not valid.');
-        case 'auth/requires-recent-login':
-          throw new Error('Please log out and log in again before changing your email.');
-        case 'auth/operation-not-allowed':
-          throw new Error('Email address change is not allowed. Please contact the administrator.');
-        case 'auth/invalid-credential':
-          throw new Error('The provided password is incorrect. Please try again.');
-        default:
-          throw new Error('An unexpected error occurred. Please try again later.');
-      }
+      throw error;
     }
   }
 
@@ -90,19 +91,10 @@ export function AuthProvider({ children }) {
         currentPassword
       );
       await reauthenticateWithCredential(auth.currentUser, credential);
-      await updatePassword(auth.currentUser, newPassword);
+      await changePassword(newPassword);
     } catch (error) {
       console.error("Error updating user password:", error);
-      switch (error.code) {
-        case 'auth/weak-password':
-          throw new Error('The new password is too weak. Please choose a stronger password.');
-        case 'auth/requires-recent-login':
-          throw new Error('Please log out and log in again before changing your password.');
-        case 'auth/invalid-credential':
-          throw new Error('The current password is incorrect. Please try again.');
-        default:
-          throw new Error('An unexpected error occurred. Please try again later.');
-      }
+      throw error;
     }
   }
 
@@ -110,10 +102,63 @@ export function AuthProvider({ children }) {
     return sendEmailVerification(auth.currentUser);
   }
 
+  async function resetPassword(email) {
+    try {
+      await auth.sendPasswordResetEmail(email);
+      return { success: true, message: "パスワードリセットメールを送信しました。メールをご確認ください。" };
+    } catch (error) {
+      console.error("Error sending password reset email:", error);
+      throw new Error('パスワードリセットメールの送信に失敗しました。');
+    }
+  }
+
+  function isEmailVerified() {
+    return currentUser && currentUser.emailVerified;
+  }
+
+  async function deleteAccount(password) {
+    try {
+      const credential = EmailAuthProvider.credential(
+        auth.currentUser.email,
+        password
+      );
+      await reauthenticateWithCredential(auth.currentUser, credential);
+      await apiDeleteUser();
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      throw error;
+    }
+  }
+
+  async function fetchUserProfile() {
+    if (currentUser) {
+      try {
+        const profile = await getUserProfile(currentUser.uid);
+        setCurrentUser(prevUser => ({ ...prevUser, ...profile }));
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+      }
+    }
+  }
+
+  async function fetchDashboardData() {
+    if (currentUser) {
+      try {
+        return await getUserDashboardData(currentUser.uid);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+        throw error;
+      }
+    }
+  }
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setLoading(false);
+      if (user) {
+        fetchUserProfile();
+      }
     });
 
     return unsubscribe;
@@ -128,7 +173,12 @@ export function AuthProvider({ children }) {
     updateUserProfile,
     updateUserEmail,
     updateUserPassword,
-    sendVerificationEmail
+    sendVerificationEmail,
+    resetPassword,
+    isEmailVerified,
+    deleteAccount,
+    fetchUserProfile,
+    fetchDashboardData
   };
 
   return (

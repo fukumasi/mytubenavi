@@ -21,17 +21,22 @@ const baseTheme = {
     large: '8px',
     round: '50%',
   },
-  maxWidth: '1200px',
+  maxWidth: '1440px', // 修正: 最大幅を1440pxに変更
   breakpoints: {
     mobile: '480px',
     tablet: '768px',
     desktop: '1024px',
-    largeDesktop: '1200px',
+    largeDesktop: '1440px', // 修正: 大画面のブレークポイントを1440pxに変更
   },
   transitions: {
     fast: '0.2s',
     medium: '0.3s',
     slow: '0.5s',
+  },
+  layout: { // 追加: レイアウト関連の設定
+    columnGap: '24px',
+    sideColumnWidth: '250px',
+    mainColumnMinWidth: '500px',
   },
 };
 

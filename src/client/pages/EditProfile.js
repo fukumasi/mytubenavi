@@ -4,6 +4,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import styled from "styled-components";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 const FormContainer = styled.div`
   max-width: 500px;
@@ -51,9 +52,16 @@ const SuccessMessage = styled.p`
   color: green;
 `;
 
+const BackToProfileLink = styled(Link)`
+  display: block;
+  margin-top: 20px;
+  color: #007bff;
+  text-decoration: none;
+`;
+
 const EditProfile = () => {
   const { t } = useTranslation();
-  const { currentUser, updateUserEmail, updateUserPassword, updateUserProfile, sendVerificationEmail } = useAuth();
+  const { currentUser, updateUserEmail, updateUserPassword, updateUserProfile } = useAuth();
   const [userData, setUserData] = useState({
     displayName: "",
     email: "",
@@ -282,6 +290,8 @@ const EditProfile = () => {
 
       {error && <ErrorMessage>{error}</ErrorMessage>}
       {success && <SuccessMessage>{success}</SuccessMessage>}
+
+      <BackToProfileLink to="/profile">{t("backToProfile")}</BackToProfileLink>
     </FormContainer>
   );
 };
