@@ -1,7 +1,8 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import styled from 'styled-components';
 
-const ThreeColumnLayout = styled.div`
+const ThreeColumnLayoutWrapper = styled.div`
   display: flex;
   flex-wrap: wrap;
   max-width: 1440px;
@@ -18,9 +19,9 @@ const Column = styled.div`
   width: 100%;
 `;
 
-ThreeColumnLayout.LeftColumn = styled(Column)`
-  flex: 1;
-  min-width: 200px;
+const LeftColumn = styled(Column)`
+  flex: 0 0 180px;
+  min-width: 180px;
 
   @media (min-width: 1025px) {
     order: 1;
@@ -31,9 +32,9 @@ ThreeColumnLayout.LeftColumn = styled(Column)`
   }
 `;
 
-ThreeColumnLayout.MainColumn = styled(Column)`
-  flex: 2;
-  min-width: 300px;
+const MainColumn = styled(Column)`
+  flex: 1;
+  min-width: 500px;
 
   @media (min-width: 1025px) {
     order: 2;
@@ -44,9 +45,9 @@ ThreeColumnLayout.MainColumn = styled(Column)`
   }
 `;
 
-ThreeColumnLayout.RightColumn = styled(Column)`
-  flex: 1;
-  min-width: 200px;
+const RightColumn = styled(Column)`
+  flex: 0 0 180px;
+  min-width: 180px;
 
   @media (min-width: 1025px) {
     order: 3;
@@ -56,5 +57,21 @@ ThreeColumnLayout.RightColumn = styled(Column)`
     order: 3;
   }
 `;
+
+const ThreeColumnLayout = ({ children, leftColumn, mainColumn, rightColumn }) => (
+  <ThreeColumnLayoutWrapper>
+    <LeftColumn>{leftColumn}</LeftColumn>
+    <MainColumn>{mainColumn}</MainColumn>
+    <RightColumn>{rightColumn}</RightColumn>
+    {children}
+  </ThreeColumnLayoutWrapper>
+);
+
+ThreeColumnLayout.propTypes = {
+  children: PropTypes.node,
+  leftColumn: PropTypes.node,
+  mainColumn: PropTypes.node,
+  rightColumn: PropTypes.node,
+};
 
 export default ThreeColumnLayout;

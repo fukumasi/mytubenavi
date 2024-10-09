@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import styled from "styled-components";
 import { useFirebase } from "../contexts/FirebaseContext";
-import { getGenreById, getSubGenres } from "../api/genreApi";
+import { getGenreById } from "../api/genreApi";
 import { getVideosByGenre } from "../api/youtube";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
 import { useTranslation } from "react-i18next";
 import ThreeColumnLayout from '../components/ThreeColumnLayout';
 import GenreList from '../components/GenreList';
+import { FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
 
 const GenreContainer = styled.div`
   padding: 20px;
@@ -33,6 +34,12 @@ const TableHeader = styled.th`
   color: white;
   padding: 10px;
   text-align: left;
+  cursor: ${props => props.$sortable ? 'pointer' : 'default'};
+  user-select: none;
+
+  &:hover {
+    background-color: ${props => props.$sortable ? props.theme.colors.primaryDark : props.theme.colors.primary};
+  }
 `;
 
 const TableRow = styled.tr`
@@ -66,6 +73,12 @@ const BreadcrumbLink = styled(Link)`
   }
 `;
 
+const SortIcon = styled.span`
+  margin-left: 5px;
+  display: inline-flex;
+  align-items: center;
+`;
+
 const GenrePage = () => {
   const { level, genreId } = useParams();
   const [genre, setGenre] = useState(null);
@@ -74,7 +87,8 @@ const GenrePage = () => {
   const [error, setError] = useState(null);
   const { db } = useFirebase();
   const { t } = useTranslation();
-  const navigate = useNavigate();
+
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
 
   const VIDEOS_PER_PAGE = 20;
 
@@ -117,6 +131,42 @@ const GenrePage = () => {
     window.open(`https://www.youtube.com/watch?v=${videoId}`, '_blank');
   }, []);
 
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+    
+    const sortedVideos = [...videos].sort((a, b) => {
+      let aValue, bValue;
+      
+      if (key === 'viewCount') {
+        aValue = parseInt(a.statistics?.viewCount || '0', 10);
+        bValue = parseInt(b.statistics?.viewCount || '0', 10);
+      } else if (key === 'publishedAt') {
+        aValue = new Date(a.snippet?.publishedAt || 0).getTime();
+        bValue = new Date(b.snippet?.publishedAt || 0).getTime();
+      } else {
+        aValue = a.snippet?.[key] || '';
+        bValue = b.snippet?.[key] || '';
+      }
+
+      if (aValue < bValue) return direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+    
+    setVideos(sortedVideos);
+  };
+
+  const getSortIcon = (key) => {
+    if (sortConfig.key === key) {
+      return sortConfig.direction === 'asc' ? <FaSortUp /> : <FaSortDown />;
+    }
+    return <FaSort />;
+  };
+
   if (loading) {
     return <LoadingSpinner />;
   }
@@ -130,8 +180,8 @@ const GenrePage = () => {
       {genre && (
         <>
           <BreadcrumbContainer>
-            <BreadcrumbLink to="/genres">{t("allGenres")}</BreadcrumbLink> &gt; 
-            {genre.parentId && <><BreadcrumbLink to={`/genre/${parseInt(level) - 1}/${genre.parentId}`}>{t("parentGenre")}</BreadcrumbLink> &gt; </>}
+            <BreadcrumbLink to="/genres">{t("genres")}</BreadcrumbLink> &gt; 
+            {genre.parentId && <><BreadcrumbLink to={`/genre/${parseInt(level, 10) - 1}/${genre.parentId}`}>{t("parentGenre")}</BreadcrumbLink> &gt; </>}
             {genre.name}
           </BreadcrumbContainer>
           <GenreTitle>{genre.name}</GenreTitle>
@@ -142,29 +192,33 @@ const GenrePage = () => {
                 <thead>
                   <tr>
                     <TableHeader>{t("thumbnail")}</TableHeader>
-                    <TableHeader>{t("title")}</TableHeader>
-                    <TableHeader>{t("channel")}</TableHeader>
+                    <TableHeader $sortable onClick={() => handleSort('title')}>{t("title")}<SortIcon>{getSortIcon('title')}</SortIcon></TableHeader>
+                    <TableHeader $sortable onClick={() => handleSort('channelTitle')}>{t("channel")}<SortIcon>{getSortIcon('channelTitle')}</SortIcon></TableHeader>
+                    <TableHeader $sortable onClick={() => handleSort('publishedAt')}>{t("publishDate")}<SortIcon>{getSortIcon('publishedAt')}</SortIcon></TableHeader>
+                    <TableHeader $sortable onClick={() => handleSort('viewCount')}>{t("views")}<SortIcon>{getSortIcon('viewCount')}</SortIcon></TableHeader>
                   </tr>
                 </thead>
                 <tbody>
                   {videos.map(video => (
-                    <TableRow key={video.id.videoId}>
+                    <TableRow key={video.id}>
                       <TableCell>
                         <VideoThumbnail
-                          src={video.snippet.thumbnails.default.url}
-                          alt={video.snippet.title}
-                          onClick={() => handleVideoClick(video.id.videoId)}
+                          src={video.snippet?.thumbnails?.default?.url || ''}
+                          alt={video.snippet?.title || ''}
+                          onClick={() => handleVideoClick(video.id)}
                         />
                       </TableCell>
-                      <TableCell>{video.snippet.title}</TableCell>
-                      <TableCell>{video.snippet.channelTitle}</TableCell>
+                      <TableCell>{video.snippet?.title || ''}</TableCell>
+                      <TableCell>{video.snippet?.channelTitle || ''}</TableCell>
+                      <TableCell>{video.snippet?.publishedAt ? new Date(video.snippet.publishedAt).toLocaleDateString() : ''}</TableCell>
+                      <TableCell>{video.statistics?.viewCount || 'N/A'}</TableCell>
                     </TableRow>
                   ))}
                 </tbody>
               </VideoTable>
             </>
           ) : (
-            <p>{t("noVideosFound")}</p>
+            <p>{t("noVideos")}</p>
           )}
         </>
       )}
@@ -172,17 +226,11 @@ const GenrePage = () => {
   );
 
   return (
-    <ThreeColumnLayout>
-      <ThreeColumnLayout.LeftColumn>
-        <GenreList />
-      </ThreeColumnLayout.LeftColumn>
-      <ThreeColumnLayout.MainColumn>
-        {content}
-      </ThreeColumnLayout.MainColumn>
-      <ThreeColumnLayout.RightColumn>
-        {/* ここに右カラムのコンテンツを追加 */}
-      </ThreeColumnLayout.RightColumn>
-    </ThreeColumnLayout>
+    <ThreeColumnLayout
+      leftColumn={<GenreList />}
+      mainColumn={content}
+      rightColumn={<div>{/* ここに右カラムのコンテンツを追加 */}</div>}
+    />
   );
 };
 

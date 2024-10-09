@@ -72,7 +72,7 @@
   "updatePassword": "パスワードを更新",
   "userDataFetchError": "ユーザーデータの取得に失敗しました。",
   "emailUpdateSuccess": "メールアドレスが更新されました。",
- "emailUpdateError": "メールアドレスの更新に失敗しました。",
+  "emailUpdateError": "メールアドレスの更新に失敗しました。",
   "passwordMismatch": "新しいパスワードが一致しません。",
   "passwordUpdateSuccess": "パスワードが更新されました。",
   "passwordUpdateError": "パスワードの更新に失敗しました。",
@@ -117,5 +117,8 @@
   "errorFetchingVideos": "動画の取得中にエラーが発生しました",
   "genreNotFound": "指定されたジャンルが見つかりません",
   "errorFetchingGenre": "ジャンル情報の取得中にエラーが発生しました",
-  "parentGenre": "親ジャンル"
+  "parentGenre": "親ジャンル",
+  "genres": "ジャンル",
+  "publishDate": "公開日",
+  "errorFetchingGenreData": "ジャンルデータの取得中にエラーが発生しました"
 }

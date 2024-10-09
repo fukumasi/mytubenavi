@@ -23,7 +23,15 @@ i18n
     interpolation: {
       escapeValue: false,
     },
-    returnObjects: true, // オブジェクトの返却を有効化
+    returnObjects: false, // オブジェクトの返却を無効化
+    returnEmptyString: false, // 空の文字列を返さないように設定
+    react: {
+      useSuspense: false, // Suspenseの使用を無効化
+    },
+    parseMissingKeyHandler: (key) => {
+      console.warn(`Missing translation key: ${key}`);
+      return key; // キーが見つからない場合はキー自体を返す
+    },
   });
 
 export default i18n;

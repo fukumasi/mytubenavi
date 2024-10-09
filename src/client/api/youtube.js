@@ -6,6 +6,18 @@ import { db } from '../../firebase';  // パスは実際のファイル構造に
 const API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY;
 const BASE_URL = 'https://www.googleapis.com/youtube/v3';
 
+const handleApiError = (err, operation) => {
+  console.error(`Error ${operation}:`, err);
+  if (err.response) {
+    console.error('Error response:', err.response.data);
+    if (err.response.status === 403) {
+      console.error('API Key may be invalid or quota exceeded. Please check your YouTube Data API key.');
+    }
+  }
+  error(`Error ${operation}:`, err);
+  throw err;
+};
+
 export const searchVideos = async (query, maxResults = 10, genreId = null) => {
   try {
     console.log('Searching videos with query:', query, 'genreId:', genreId);
@@ -25,9 +37,7 @@ export const searchVideos = async (query, maxResults = 10, genreId = null) => {
     console.log('Search API Response:', response.data);
     return response.data.items;
   } catch (err) {
-    console.error('Error searching videos:', err);
-    error('Error searching videos:', err);
-    throw err;
+    handleApiError(err, 'searching videos');
   }
 };
 
@@ -44,9 +54,7 @@ export const getVideoDetails = async (videoId) => {
     console.log('Video details API Response:', response.data);
     return response.data.items[0];
   } catch (err) {
-    console.error('Error getting video details:', err);
-    error('Error getting video details:', err);
-    throw err;
+    handleApiError(err, 'getting video details');
   }
 };
 
@@ -69,9 +77,7 @@ export const getPopularVideos = async (maxResults = 10, genreId = null) => {
     console.log('Popular videos API Response:', response.data);
     return response.data.items;
   } catch (err) {
-    console.error('Error getting popular videos:', err);
-    error('Error getting popular videos:', err);
-    throw err;
+    handleApiError(err, 'getting popular videos');
   }
 };
 
@@ -89,9 +95,7 @@ export const getVideoComments = async (videoId, maxResults = 20) => {
     console.log('Video comments API Response:', response.data);
     return response.data.items;
   } catch (err) {
-    console.error('Error getting video comments:', err);
-    error('Error getting video comments:', err);
-    throw err;
+    handleApiError(err, 'getting video comments');
   }
 };
 
@@ -108,9 +112,7 @@ export const getVideoCategories = async () => {
     console.log('Video categories:', response.data.items);
     return response.data.items;
   } catch (err) {
-    console.error('Error getting video categories:', err);
-    error('Error getting video categories:', err);
-    throw err;
+    handleApiError(err, 'getting video categories');
   }
 };
 
@@ -147,12 +149,7 @@ export const getVideosByCategory = async (categoryId, maxResults = 10) => {
     }
     return response.data.items;
   } catch (err) {
-    console.error('Error getting videos by category:', err);
-    if (err.response) {
-      console.error('Error response:', err.response.data);
-    }
-    error('Error getting videos by category:', err);
-    throw err;
+    handleApiError(err, 'getting videos by category');
   }
 };
 
@@ -170,13 +167,11 @@ export const getCategoryName = async (categoryId) => {
     }
     return '';
   } catch (err) {
-    console.error('Error getting category name:', err);
-    error('Error getting category name:', err);
-    return '';
+    handleApiError(err, 'getting category name');
   }
 };
 
-export const getVideosByGenre = async (genreId, maxResults = 10) => {
+export const getVideosByGenre = async (genreId, maxResults = 20, sortConfig = { key: 'publishedAt', direction: 'desc' }) => {
   try {
     console.log('Getting videos by genre:', genreId);
     const genreDoc = await getDoc(doc(db, "genres", genreId));
@@ -190,18 +185,67 @@ export const getVideosByGenre = async (genreId, maxResults = 10) => {
         type: 'video',
         q: genreName,
         maxResults,
-        order: 'viewCount',
+        order: getSortOrder(sortConfig),
         regionCode: 'JP',
         key: API_KEY,
       },
     });
     console.log('Videos by genre API Response:', response.data);
-    return response.data.items;
+    const videoIds = response.data.items.map(item => item.id.videoId).join(',');
+    const detailedResponse = await axios.get(`${BASE_URL}/videos`, {
+      params: {
+        part: 'snippet,statistics',
+        id: videoIds,
+        key: API_KEY,
+      },
+    });
+    const detailedVideos = detailedResponse.data.items;
+    return sortVideos(detailedVideos, sortConfig);
   } catch (err) {
-    console.error('Error getting videos by genre:', err);
-    error('Error getting videos by genre:', err);
-    throw err;
+    handleApiError(err, 'getting videos by genre');
   }
+};
+
+const getSortOrder = (sortConfig) => {
+  switch (sortConfig.key) {
+    case 'publishedAt':
+      return 'date';
+    case 'viewCount':
+      return 'viewCount';
+    case 'rating':
+      return 'rating';
+    default:
+      return 'relevance';
+  }
+};
+
+const sortVideos = (videos, sortConfig) => {
+  return videos.sort((a, b) => {
+    let aValue, bValue;
+    switch (sortConfig.key) {
+      case 'title':
+        aValue = a.snippet.title.toLowerCase();
+        bValue = b.snippet.title.toLowerCase();
+        break;
+      case 'channelTitle':
+        aValue = a.snippet.channelTitle.toLowerCase();
+        bValue = b.snippet.channelTitle.toLowerCase();
+        break;
+      case 'publishedAt':
+        aValue = new Date(a.snippet.publishedAt).getTime();
+        bValue = new Date(b.snippet.publishedAt).getTime();
+        break;
+      case 'viewCount':
+        aValue = parseInt(a.statistics.viewCount || '0');
+        bValue = parseInt(b.statistics.viewCount || '0');
+        break;
+      default:
+        return 0;
+    }
+    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
 };
 
 // その他のYouTube API関連の関数をここに追加

@@ -13,7 +13,7 @@ const GenreListContainer = styled.div`
   max-width: ${({ theme }) => theme.layout.sideColumnWidth};
 `;
 
-const GenreItem = styled.div`
+const GenreItem = styled.button`
   background-color: ${({ theme, $isActive }) => 
     $isActive ? theme.colors.primaryDark : theme.colors.primary
   };
@@ -27,9 +27,16 @@ const GenreItem = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border: none;
+  width: 100%;
 
   &:hover {
     background-color: ${({ theme }) => theme.colors.primaryDark};
+  }
+
+  &:focus {
+    outline: 2px solid ${({ theme }) => theme.colors.focus};
+    outline-offset: 2px;
   }
 `;
 
@@ -68,10 +75,10 @@ const GenreList = () => {
           fetchedGenres = await getTopLevelGenres(db);
         }
         setGenres(fetchedGenres);
-        setLoading(false);
       } catch (err) {
         console.error("Error fetching genres:", err);
         setError('ジャンルの読み込みに失敗しました');
+      } finally {
         setLoading(false);
       }
     };
@@ -91,7 +98,7 @@ const GenreList = () => {
 
   return (
     <GenreListContainer>
-      {genres && genres.length > 0 ? (
+      {genres.length > 0 ? (
         genres.map(genre => (
           <GenreItem 
             key={genre.id}

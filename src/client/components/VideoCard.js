@@ -92,6 +92,27 @@ const VisuallyHidden = styled.span`
   border: 0;
 `;
 
+const formatDate = (publishedAt) => {
+  if (!publishedAt) return '日付不明';
+  const date = new Date(publishedAt);
+  if (isValid(date)) {
+    return formatDistance(date, new Date(), { addSuffix: true, locale: ja });
+  }
+  return '日付不明';
+};
+
+const formatViewCount = (viewCount) => 
+  viewCount ? `${parseInt(viewCount).toLocaleString()} 回視聴` : '視聴回数不明';
+
+const formatDuration = (duration) => {
+  if (!duration) return '';
+  const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+  const hours = (match[1] || '').replace('H', '');
+  const minutes = (match[2] || '').replace('M', '');
+  const seconds = (match[3] || '').replace('S', '');
+  return `${hours ? hours + ':' : ''}${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`;
+};
+
 const VideoCard = ({ video }) => {
   const {
     id,
@@ -103,29 +124,9 @@ const VideoCard = ({ video }) => {
     duration
   } = video;
 
-  const formattedDate = React.useMemo(() => {
-    if (!publishedAt) return '日付不明';
-    const date = new Date(publishedAt);
-    if (isValid(date)) {
-      return formatDistance(date, new Date(), { addSuffix: true, locale: ja });
-    }
-    return '日付不明';
-  }, [publishedAt]);
-
-  const formattedViewCount = React.useMemo(() => 
-    viewCount ? `${parseInt(viewCount).toLocaleString()} 回視聴` : '視聴回数不明'
-  , [viewCount]);
-
-  const formatDuration = React.useCallback((duration) => {
-    if (!duration) return '';
-    const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
-    const hours = (match[1] || '').replace('H', '');
-    const minutes = (match[2] || '').replace('M', '');
-    const seconds = (match[3] || '').replace('S', '');
-    return `${hours ? hours + ':' : ''}${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`;
-  }, []);
-
-  const formattedDuration = React.useMemo(() => formatDuration(duration), [duration, formatDuration]);
+  const formattedDate = React.useMemo(() => formatDate(publishedAt), [publishedAt]);
+  const formattedViewCount = React.useMemo(() => formatViewCount(viewCount), [viewCount]);
+  const formattedDuration = React.useMemo(() => formatDuration(duration), [duration]);
 
   return (
     <Card to={`/video/${id}`}>
@@ -146,7 +147,7 @@ const VideoCard = ({ video }) => {
         </MetaInfo>
       </Content>
       <VisuallyHidden>
-        {`${title}, ${channelTitle}による動画。${formattedViewCount}、${formattedDate}に公開。`}
+        {title} {channelTitle}による動画。{formattedViewCount}、{formattedDate}に公開。
       </VisuallyHidden>
     </Card>
   );
