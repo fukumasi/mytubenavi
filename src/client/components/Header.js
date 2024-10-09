@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import SearchBar from './SearchBar';
 import { useAuth } from '../contexts/AuthContext';
-import useTheme from '../hooks/useTheme';
+import { useTheme } from '../contexts/ThemeContext';
 import {
   HeaderContainer,
   HeaderContent,
@@ -40,14 +40,39 @@ const Header = () => {
       await logout();
       navigate('/');
     } catch (error) {
-      setError(t('signOutError'));
+      setError(t('signOutError') || 'Sign out error');
     }
+  };
+
+  const renderUserMenu = () => {
+    if (currentUser) {
+      return (
+        <UserMenu>
+          <UserMenuButton>
+            {currentUser.displayName || currentUser.email}
+          </UserMenuButton>
+          <UserMenuDropdown>
+            <UserMenuLink to="/profile">{t('profile') || 'Profile'}</UserMenuLink>
+            <UserMenuLink to="/edit-profile">{t('settings') || 'Settings'}</UserMenuLink>
+            <UserMenuLink as="button" onClick={handleSignOut}>
+              {t('signOut') || 'Sign Out'}
+            </UserMenuLink>
+          </UserMenuDropdown>
+        </UserMenu>
+      );
+    }
+    return (
+      <>
+        <NavLink to="/login">{t('login') || 'Login'}</NavLink>
+        <NavLink to="/register">{t('register') || 'Register'}</NavLink>
+      </>
+    );
   };
 
   return (
     <HeaderContainer>
       <HeaderContent>
-        <Logo to="/">{t('app.title')}</Logo>
+        <Logo to="/">{t('app.title') || 'MyTubeNavi'}</Logo>
         <SearchBarWrapper>
           <SearchBar onSearch={handleSearch} />
         </SearchBarWrapper>
@@ -56,30 +81,12 @@ const Header = () => {
         </MobileMenuButton>
         <Nav $isOpen={isMenuOpen}>
           <ThemeToggle onClick={toggleTheme}>
-            {theme === 'light' ? t('darkTheme') : t('lightTheme')}
+            {theme.name === 'light' ? (t('darkTheme') || 'Dark Theme') : (t('lightTheme') || 'Light Theme')}
           </ThemeToggle>
-          {currentUser ? (
-            <UserMenu>
-              <UserMenuButton>
-                {currentUser.displayName || currentUser.email}
-              </UserMenuButton>
-              <UserMenuDropdown>
-                <UserMenuLink to="/profile">{t('profile')}</UserMenuLink>
-                <UserMenuLink to="/edit-profile">{t('settings')}</UserMenuLink>
-                <UserMenuLink as="button" onClick={handleSignOut}>
-                  {t('signOut')}
-                </UserMenuLink>
-              </UserMenuDropdown>
-            </UserMenu>
-          ) : (
-            <>
-              <NavLink to="/login">{t('login')}</NavLink>
-              <NavLink to="/register">{t('register')}</NavLink>
-            </>
-          )}
+          {renderUserMenu()}
         </Nav>
       </HeaderContent>
-      {error && <div className="error-message">{error}</div>}
+      {error && <div role="alert">{error}</div>}
     </HeaderContainer>
   );
 };

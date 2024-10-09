@@ -16,7 +16,7 @@ const ProtectedRoute = ({ requireAuth = true, requireEmailVerification = true, c
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (currentUser && requireAuth && requireEmailVerification && !isEmailVerified()) {
+  if (currentUser && requireAuth && requireEmailVerification && !isEmailVerified) {
     // ユーザーが認証されているがメールが確認されていない場合、メール確認ページにリダイレクト
     return <Navigate to="/email-verification" state={{ from: location }} replace />;
   }

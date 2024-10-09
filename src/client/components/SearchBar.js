@@ -9,6 +9,11 @@ const SearchContainer = styled.div`
   align-items: center;
 `;
 
+const SearchForm = styled.form`
+  display: flex;
+  align-items: center;
+`;
+
 const SearchInput = styled.input`
   padding: 8px;
   font-size: 16px;
@@ -31,36 +36,62 @@ const SearchButton = styled.button`
   }
 `;
 
+const ErrorMessage = styled.p`
+  color: red;
+  margin-top: 8px;
+`;
+
+const VisuallyHidden = styled.span`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+`;
+
 const SearchBar = ({ onSearch }) => {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (query.trim()) {
       try {
+        setError('');
         const results = await searchVideos(query);
         onSearch(results);
         navigate(`/search?q=${encodeURIComponent(query)}`);
       } catch (error) {
         console.error('Search error:', error);
-        // エラーハンドリングを追加する（例：エラーメッセージの表示）
+        setError(t('searchError'));
       }
     }
   };
 
   return (
     <SearchContainer>
-      <form onSubmit={handleSubmit}>
+      <SearchForm onSubmit={handleSubmit} role="search">
+        <VisuallyHidden as="label" htmlFor="search-input">
+          {t('searchLabel')}
+        </VisuallyHidden>
         <SearchInput
-          type="text"
+          id="search-input"
+          type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t('searchPlaceholder')}
         />
-        <SearchButton type="submit">{t('search')}</SearchButton>
-      </form>
+        <SearchButton type="submit">
+          {t('search')}
+        </SearchButton>
+      </SearchForm>
+      {error && <ErrorMessage role="alert">{error}</ErrorMessage>}
     </SearchContainer>
   );
 };

@@ -10,7 +10,8 @@ import {
   updateProfile,
   sendEmailVerification,
   reauthenticateWithCredential,
-  EmailAuthProvider
+  EmailAuthProvider,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { 
   updateUser, 
@@ -104,16 +105,12 @@ export function AuthProvider({ children }) {
 
   async function resetPassword(email) {
     try {
-      await auth.sendPasswordResetEmail(email);
+      await sendPasswordResetEmail(auth, email);
       return { success: true, message: "パスワードリセットメールを送信しました。メールをご確認ください。" };
     } catch (error) {
       console.error("Error sending password reset email:", error);
       throw new Error('パスワードリセットメールの送信に失敗しました。');
     }
-  }
-
-  function isEmailVerified() {
-    return currentUser && currentUser.emailVerified;
   }
 
   async function deleteAccount(password) {
@@ -166,6 +163,7 @@ export function AuthProvider({ children }) {
 
   const value = {
     currentUser,
+    isEmailVerified: currentUser?.emailVerified || false,
     signup,
     login,
     logout,
@@ -175,15 +173,15 @@ export function AuthProvider({ children }) {
     updateUserPassword,
     sendVerificationEmail,
     resetPassword,
-    isEmailVerified,
     deleteAccount,
     fetchUserProfile,
-    fetchDashboardData
+    fetchDashboardData,
+    loading
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 }

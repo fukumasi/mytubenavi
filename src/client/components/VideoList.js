@@ -48,7 +48,7 @@ const VideoList = React.memo(({ videos = [], isLoading, error }) => {
   const { t } = useTranslation();
 
   if (isLoading) {
-    return <LoadingSpinner aria-label={t('loading.ariaLabel')} />;
+    return <LoadingSpinner aria-label={t('loading')} />;
   }
 
   if (error) {
@@ -60,21 +60,24 @@ const VideoList = React.memo(({ videos = [], isLoading, error }) => {
   }
 
   return (
-    <AnimatedVideoListContainer role="list" aria-label={t('videoList.ariaLabel')}>
-      {videos.map((video) => (
-        <VideoCard 
-          key={video.id.videoId || video.id} 
-          video={{
-            id: video.id.videoId || video.id,
-            title: video.snippet.title,
-            thumbnailUrl: video.snippet.thumbnails.medium.url,
-            channelTitle: video.snippet.channelTitle,
-            publishedAt: video.snippet.publishedAt,
-            viewCount: video.statistics?.viewCount,
-            duration: video.contentDetails?.duration,
-          }} 
-        />
-      ))}
+    <AnimatedVideoListContainer role="list" aria-label={t('videoList')}>
+      {videos.map((video) => {
+        const videoId = video.id?.videoId || video.id;
+        return (
+          <VideoCard 
+            key={videoId} 
+            video={{
+              id: videoId,
+              title: video.snippet?.title || '',
+              thumbnailUrl: video.snippet?.thumbnails?.medium?.url || '',
+              channelTitle: video.snippet?.channelTitle || '',
+              publishedAt: video.snippet?.publishedAt || '',
+              viewCount: video.statistics?.viewCount || '',
+              duration: video.contentDetails?.duration || '',
+            }} 
+          />
+        );
+      })}
     </AnimatedVideoListContainer>
   );
 });
@@ -85,17 +88,17 @@ VideoList.propTypes = {
       id: PropTypes.oneOfType([
         PropTypes.string,
         PropTypes.shape({ videoId: PropTypes.string })
-      ]).isRequired,
+      ]),
       snippet: PropTypes.shape({
-        title: PropTypes.string.isRequired,
+        title: PropTypes.string,
         thumbnails: PropTypes.shape({
           medium: PropTypes.shape({
-            url: PropTypes.string.isRequired,
-          }).isRequired,
-        }).isRequired,
-        channelTitle: PropTypes.string.isRequired,
+            url: PropTypes.string,
+          }),
+        }),
+        channelTitle: PropTypes.string,
         publishedAt: PropTypes.string,
-      }).isRequired,
+      }),
       statistics: PropTypes.shape({
         viewCount: PropTypes.string,
       }),

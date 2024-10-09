@@ -260,15 +260,15 @@ const SearchResults = () => {
     };
   }, [query, selectedGenre, searchData, dummyVideos, currentPage]);
 
-  if (isSearchLoading || isDummyLoading) return <LoadingSpinner data-testid="loading-spinner" aria-label={t("loading")} />;
+  if (isSearchLoading || isDummyLoading) return <LoadingSpinner data-testid="loading-spinner" aria-label={t("loading") || ""} />;
 
   if (searchError || dummyError || error) {
-    let errorMessage = t("error.fetch");
+    let errorMessage = t("error.fetch") || "";
     if (searchError) {
-      errorMessage += ` ${t("error.search")} ${searchError.message || ''}`;
+      errorMessage += ` ${t("error.search") || ""} ${searchError.message || ''}`;
     }
     if (dummyError) {
-      errorMessage += ` ${t("error.dummy")} ${dummyError.message || ''}`;
+      errorMessage += ` ${t("error.dummy") || ""} ${dummyError.message || ''}`;
     }
     if (error) {
       errorMessage += ` ${error}`;
@@ -277,27 +277,27 @@ const SearchResults = () => {
   }
 
   if (!videos || videos.length === 0) {
-    return <ErrorMessage message={t("error.noVideos")} />;
+    return <ErrorMessage message={t("error.noVideos") || ""} />;
   }
 
   return (
     <SearchContainer>
       <ThreeColumnLayout>
         <ThreeColumnLayout.LeftColumn>
-          <h3>{t("genre")}</h3>
+          <h3>{t("genre") || ""}</h3>
           <GenreList
             onGenreChange={handleGenreChange}
             selectedGenre={selectedGenre}
           />
           <SearchHistoryContainer>
-            <h3>{t("searchHistory")}</h3>
-            <ul aria-label={t("searchHistoryLabel")}>
+            <h3>{t("searchHistory") || ""}</h3>
+            <ul aria-label={t("searchHistoryLabel") || ""}>
               {searchHistory.map((item, index) => (
                 <SearchHistoryItem key={index}>
                   <SearchHistoryButton onClick={() => handleSearchHistoryItemClick(item)}>
                     {item}
                   </SearchHistoryButton>
-                  <button onClick={() => handleRemoveSearchHistoryItem(item)} aria-label={t("removeFromHistory")}>
+                  <button onClick={() => handleRemoveSearchHistoryItem(item)} aria-label={t("removeFromHistory") || ""}>
                     ✕
                   </button>
                 </SearchHistoryItem>
@@ -305,7 +305,7 @@ const SearchResults = () => {
             </ul>
             {searchHistory.length > 0 && (
               <ClearHistoryButton onClick={handleClearSearchHistory}>
-                {t("clearHistory")}
+                {t("clearHistory") || ""}
               </ClearHistoryButton>
             )}
           </SearchHistoryContainer>
@@ -314,13 +314,13 @@ const SearchResults = () => {
         <ThreeColumnLayout.MainColumn>
           <h2>
             {query
-              ? t("searchResults", { query })
+              ? t("searchResults", { query }) || ""
               : selectedGenre !== "all"
-              ? t("genreResults", { genre: selectedGenre })
-              : t("recommendedVideos")}
+              ? t("genreResults", { genre: selectedGenre }) || ""
+              : t("recommendedVideos") || ""}
           </h2>
           <ResultSummary aria-live="polite">
-            {t("videosFound", { count: totalVideos, currentPage, totalPages })}
+            {t("videosFound", { count: totalVideos, currentPage, totalPages }) || ""}
           </ResultSummary>
           <OptionsContainer>
             <FilterOptions onFilterChange={handleFilterChange} />

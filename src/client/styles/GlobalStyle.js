@@ -10,15 +10,6 @@ const GlobalStyle = createGlobalStyle`
     --spacing-medium: 1rem;
     --spacing-large: 1.5rem;
     --border-radius: 4px;
-    --color-primary: #4285F4;
-    --color-secondary: #34A853;
-    --color-accent1: #FBBC05;
-    --color-accent2: #EA4335;
-    --color-background: #F8F9FA;
-    --color-text: #202124;
-    --color-text-light: #5F6368;
-    --color-border: #DADCE0;
-    --color-hover: #E8F0FE;
   }
 
   * {
@@ -35,10 +26,11 @@ const GlobalStyle = createGlobalStyle`
   body {
     font-family: 'Roboto', Arial, sans-serif;
     line-height: 1.6;
-    background-color: var(--color-background);
-    color: var(--color-text);
+    background-color: ${({ theme }) => theme.colors.background};
+    color: ${({ theme }) => theme.colors.text};
     margin: 0;
     padding: 0;
+    transition: all 0.3s ease-in-out;
   }
 
   .container {
@@ -62,7 +54,7 @@ const GlobalStyle = createGlobalStyle`
   }
 
   a {
-    color: var(--color-primary);
+    color: ${({ theme }) => theme.colors.primary};
     text-decoration: none;
   }
 
@@ -78,8 +70,8 @@ const GlobalStyle = createGlobalStyle`
   }
 
   .genre-item {
-    background-color: var(--color-primary);
-    color: white;
+    background-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.text};
     padding: 15px;
     text-align: center;
     text-decoration: none;
@@ -94,7 +86,7 @@ const GlobalStyle = createGlobalStyle`
 
   .genre-item:hover {
     transform: translateY(-5px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 8px ${({ theme }) => theme.colors.shadow};
   }
 
   .genre-icon {
@@ -118,16 +110,16 @@ const GlobalStyle = createGlobalStyle`
   }
 
   .video-card {
-    background-color: #ffffff;
+    background-color: ${({ theme }) => theme.colors.backgroundLight};
     border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px ${({ theme }) => theme.colors.shadow};
     transition: all 0.3s ease;
   }
 
   .video-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 8px ${({ theme }) => theme.colors.shadow};
   }
 
   .video-thumbnail {
@@ -155,11 +147,12 @@ const GlobalStyle = createGlobalStyle`
     font-size: 16px;
     font-weight: 500;
     margin-bottom: 5px;
+    color: ${({ theme }) => theme.colors.text};
   }
 
   .video-channel {
     font-size: 14px;
-    color: var(--color-text-light);
+    color: ${({ theme }) => theme.colors.textSecondary};
   }
 
   .pagination {
@@ -171,31 +164,32 @@ const GlobalStyle = createGlobalStyle`
   .pagination button {
     margin: 0 5px;
     padding: 8px 12px;
-    background-color: #ffffff;
-    border: 1px solid var(--color-border);
+    background-color: ${({ theme }) => theme.colors.backgroundLight};
+    border: 1px solid ${({ theme }) => theme.colors.border};
     border-radius: 4px;
     cursor: pointer;
     transition: background-color 0.3s;
+    color: ${({ theme }) => theme.colors.text};
   }
 
   .pagination button:hover {
-    background-color: var(--color-hover);
+    background-color: ${({ theme }) => theme.colors.hover};
   }
 
   .pagination button.active {
-    background-color: var(--color-primary);
-    color: white;
-    border-color: var(--color-primary);
+    background-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.text};
+    border-color: ${({ theme }) => theme.colors.primary};
   }
 
   .ad-space {
-    background-color: var(--color-accent1);
+    background-color: ${({ theme }) => theme.colors.backgroundLight};
     padding: 15px;
     margin-bottom: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px ${({ theme }) => theme.colors.shadow};
     text-align: center;
-    color: var(--color-text);
+    color: ${({ theme }) => theme.colors.text};
   }
 
   .search-container {
@@ -213,15 +207,17 @@ const GlobalStyle = createGlobalStyle`
     flex-grow: 1;
     padding: 12px;
     font-size: 16px;
-    border: 1px solid var(--color-border);
+    border: 1px solid ${({ theme }) => theme.colors.border};
     border-radius: 4px 0 0 4px;
+    background-color: ${({ theme }) => theme.colors.backgroundLight};
+    color: ${({ theme }) => theme.colors.text};
   }
 
   .search-form button {
     padding: 12px 24px;
     font-size: 16px;
-    background-color: var(--color-primary);
-    color: white;
+    background-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.text};
     border: none;
     border-radius: 0 4px 4px 0;
     cursor: pointer;
@@ -229,14 +225,14 @@ const GlobalStyle = createGlobalStyle`
   }
 
   .search-form button:hover {
-    background-color: #3367d6;
+    background-color: ${({ theme }) => theme.colors.primaryDark};
   }
 
   .error-message {
-    color: var(--color-accent2);
+    color: ${({ theme }) => theme.colors.error};
     margin-bottom: 20px;
     padding: 10px;
-    background-color: #ffebee;
+    background-color: ${({ theme }) => theme.colors.backgroundLight};
     border-radius: 4px;
   }
 
@@ -253,7 +249,7 @@ const GlobalStyle = createGlobalStyle`
     overflow: hidden;
     margin-bottom: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px ${({ theme }) => theme.colors.shadow};
   }
 
   .video-container iframe {
@@ -269,10 +265,11 @@ const GlobalStyle = createGlobalStyle`
   }
 
   .video-description {
-    background-color: #ffffff;
+    background-color: ${({ theme }) => theme.colors.backgroundLight};
     padding: 15px;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px ${({ theme }) => theme.colors.shadow};
+    color: ${({ theme }) => theme.colors.text};
   }
 
   @media (max-width: 1200px) {

@@ -2,7 +2,7 @@ import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 
 export const Container = styled.div`
-  max-width: 1200px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 0 20px;
 `;
@@ -16,36 +16,38 @@ export const AuthContainer = styled.div`
   max-width: 400px;
   margin: 0 auto;
   padding: 20px;
-  background-color: #ffffff;
+  background-color: ${({ theme }) => theme.colors.backgroundLight};
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px ${({ theme }) => theme.colors.shadow};
 `;
 
 export const FormInput = styled.input`
   width: 100%;
   padding: 10px;
   margin-bottom: 10px;
-  border: 1px solid #d0d0d0;
+  border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: 4px;
+  background-color: ${({ theme }) => theme.colors.backgroundLight};
+  color: ${({ theme }) => theme.colors.text};
 `;
 
 export const SubmitButton = styled.button`
   width: 100%;
   padding: 10px;
-  background-color: #1a73e8;
-  color: white;
+  background-color: ${({ theme }) => theme.colors.primary};
+  color: ${({ theme }) => theme.colors.text};
   border: none;
   border-radius: 4px;
   cursor: pointer;
   transition: background-color 0.3s;
 
   &:hover {
-    background-color: #155db1;
+    background-color: ${({ theme }) => theme.colors.primaryDark};
   }
 `;
 
 export const ErrorMessage = styled.p`
-  color: #d32f2f;
+  color: ${({ theme }) => theme.colors.error};
   margin-bottom: 10px;
 `;
 
@@ -53,8 +55,8 @@ export const LoadingSpinner = styled.div`
   display: inline-block;
   width: 30px;
   height: 30px;
-  border: 3px solid #f3f3f3;
-  border-top: 3px solid #1a73e8;
+  border: 3px solid ${({ theme }) => theme.colors.backgroundLight};
+  border-top: 3px solid ${({ theme }) => theme.colors.primary};
   border-radius: 50%;
   animation: spin 1s linear infinite;
 
@@ -65,10 +67,10 @@ export const LoadingSpinner = styled.div`
 `;
 
 export const UserProfileContainer = styled.div`
-  background-color: #ffffff;
+  background-color: ${({ theme }) => theme.colors.backgroundLight};
   padding: 20px;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px ${({ theme }) => theme.colors.shadow};
 `;
 
 export const UserAvatar = styled.img`
@@ -79,16 +81,16 @@ export const UserAvatar = styled.img`
 `;
 
 export const HeaderContainer = styled.header`
-  background-color: #f8f9fa;
+  background-color: ${({ theme }) => theme.colors.background};
   padding: 10px 0;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px ${({ theme }) => theme.colors.shadow};
 `;
 
 export const HeaderContent = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 1200px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 0 20px;
 `;
@@ -96,7 +98,7 @@ export const HeaderContent = styled.div`
 export const Logo = styled(Link)`
   font-size: 24px;
   font-weight: bold;
-  color: #333;
+  color: ${({ theme }) => theme.colors.text};
   text-decoration: none;
 `;
 
@@ -111,6 +113,7 @@ export const MobileMenuButton = styled.button`
   border: none;
   font-size: 24px;
   cursor: pointer;
+  color: ${({ theme }) => theme.colors.text};
 
   @media (max-width: 768px) {
     display: block;
@@ -128,9 +131,9 @@ export const Nav = styled.nav`
     top: 100%;
     left: 0;
     right: 0;
-    background-color: #f8f9fa;
+    background-color: ${({ theme }) => theme.colors.background};
     padding: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px ${({ theme }) => theme.colors.shadow};
   }
 `;
 
@@ -140,6 +143,7 @@ export const ThemeToggle = styled.button`
   font-size: 20px;
   cursor: pointer;
   margin-right: 10px;
+  color: ${({ theme }) => theme.colors.text};
 `;
 
 export const UserMenu = styled.div`
@@ -152,16 +156,17 @@ export const UserMenuButton = styled.button`
   cursor: pointer;
   display: flex;
   align-items: center;
+  color: ${({ theme }) => theme.colors.text};
 `;
 
 export const UserMenuDropdown = styled.div`
   position: absolute;
   top: 100%;
   right: 0;
-  background-color: #ffffff;
-  border: 1px solid #d0d0d0;
+  background-color: ${({ theme }) => theme.colors.backgroundLight};
+  border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px ${({ theme }) => theme.colors.shadow};
   display: none;
 
   ${UserMenu}:hover & {
@@ -172,16 +177,16 @@ export const UserMenuDropdown = styled.div`
 export const UserMenuLink = styled(Link)`
   display: block;
   padding: 10px;
-  color: #333;
+  color: ${({ theme }) => theme.colors.text};
   text-decoration: none;
 
   &:hover {
-    background-color: #f0f0f0;
+    background-color: ${({ theme }) => theme.colors.hover};
   }
 `;
 
 export const NavLink = styled(Link)`
-  color: #333;
+  color: ${({ theme }) => theme.colors.text};
   text-decoration: none;
   margin-left: 20px;
 
@@ -192,4 +197,18 @@ export const NavLink = styled(Link)`
   @media (max-width: 768px) {
     margin: 10px 0;
   }
+`;
+
+export const AdSpaceContainer = styled.div`
+  background-color: ${({ theme }) => theme.colors.backgroundLight};
+  border-radius: ${({ theme }) => theme.borderRadius.medium};
+  padding: 1rem;
+  margin-bottom: 1rem;
+  text-align: center;
+  font-size: 0.9rem;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  height: 250px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 `;

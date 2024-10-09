@@ -3,7 +3,7 @@ import styled from "styled-components";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase";
-import { useTranslation } from "react-i18next";
+import { useTranslation } from 'react-i18next';
 import { Link } from "react-router-dom";
 
 const Container = styled.div`
@@ -47,56 +47,107 @@ const EditButton = styled(Link)`
   border-radius: 5px;
 `;
 
+const VisuallyHidden = styled.span`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+`;
+
 const Profile = () => {
   const { t } = useTranslation();
   const { currentUser } = useAuth();
   const [profileData, setProfileData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
       if (currentUser) {
-        const userDocRef = doc(db, "users", currentUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-          setProfileData(userDocSnap.data());
+        try {
+          const userDocRef = doc(db, "users", currentUser.uid);
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            setProfileData(userDocSnap.data());
+          } else {
+            setError("User not found");
+          }
+        } catch (err) {
+          console.error("Error fetching user data:", err);
+          setError("Error fetching user data");
+        } finally {
+          setLoading(false);
         }
+      } else {
+        setLoading(false);
+        setError("User not authenticated");
       }
     };
+
     fetchUserData();
   }, [currentUser]);
 
-  if (!profileData) {
-    return <div>{t("loading")}</div>;
+  if (loading) {
+    return <Container>{t('loading')}</Container>;
   }
+
+  if (error) {
+    return <Container>{error}</Container>;
+  }
+
+  if (!profileData) {
+    return <Container>{t('noProfileData')}</Container>;
+  }
+
+  const getThemeText = (theme) => {
+    return theme === 'light' ? t('lightTheme') : t('darkTheme');
+  };
+
+  const getLanguageText = (lang) => {
+    return lang === 'en' ? t('english') : t('japanese');
+  };
 
   return (
     <Container>
-      <Title>{t("userProfile")}</Title>
+      <Title>{t('profile')}</Title>
+
       <ProfileSection>
-        <SectionTitle>{t("basicInfo")}</SectionTitle>
+        <SectionTitle>{t('basicInfo')}</SectionTitle>
         {profileData.avatar && (
-          <AvatarPreview src={profileData.avatar} alt={t("userAvatar")} />
+          <AvatarPreview src={profileData.avatar} alt={t('profilePicture')} />
         )}
-        <ProfileInfo>{t("name")}: {profileData.firstName} {profileData.lastName}</ProfileInfo>
-        <ProfileInfo>{t("email")}: {currentUser.email}</ProfileInfo>
-        <ProfileInfo>{t("bio")}: {profileData.bio}</ProfileInfo>
+        <ProfileInfo>{t('name')}: {profileData.firstName} {profileData.lastName}</ProfileInfo>
+        <ProfileInfo>{t('email')}: {currentUser.email}</ProfileInfo>
+        <ProfileInfo>{t('bio')}: {profileData.bio || t('noBioProvided')}</ProfileInfo>
       </ProfileSection>
 
       <ProfileSection>
-        <SectionTitle>{t("preferences")}</SectionTitle>
-        <ProfileInfo>{t("theme")}: {t(profileData.preferences?.theme || "lightTheme")}</ProfileInfo>
-        <ProfileInfo>{t("language")}: {t(profileData.preferences?.language || "en")}</ProfileInfo>
-        <ProfileInfo>{t("notifications")}: {profileData.preferences?.notifications ? t("enabled") : t("disabled")}</ProfileInfo>
+        <SectionTitle>{t('preferences')}</SectionTitle>
+        <ProfileInfo>{t('theme')}: {getThemeText(profileData.preferences?.theme)}</ProfileInfo>
+        <ProfileInfo>{t('language')}: {getLanguageText(profileData.preferences?.language)}</ProfileInfo>
+        <ProfileInfo>{t('notifications')}: {profileData.preferences?.notifications ? t('enabled') : t('disabled')}</ProfileInfo>
       </ProfileSection>
 
       <ProfileSection>
-        <SectionTitle>{t("socialLinks")}</SectionTitle>
-        <ProfileInfo>Twitter: {profileData.socialLinks?.twitter || t("notProvided")}</ProfileInfo>
-        <ProfileInfo>Instagram: {profileData.socialLinks?.instagram || t("notProvided")}</ProfileInfo>
-        <ProfileInfo>YouTube: {profileData.socialLinks?.youtube || t("notProvided")}</ProfileInfo>
+        <SectionTitle>{t('socialLinks')}</SectionTitle>
+        <ProfileInfo>Twitter: {profileData.socialLinks?.twitter || t('notProvided')}</ProfileInfo>
+        <ProfileInfo>Instagram: {profileData.socialLinks?.instagram || t('notProvided')}</ProfileInfo>
+        <ProfileInfo>YouTube: {profileData.socialLinks?.youtube || t('notProvided')}</ProfileInfo>
       </ProfileSection>
 
-      <EditButton to="/edit-profile">{t("editProfile")}</EditButton>
+      <EditButton to="/edit-profile">{t('editProfile')}</EditButton>
+
+      <VisuallyHidden>
+        {t('profileSummary', { 
+          name: `${profileData.firstName} ${profileData.lastName}`, 
+          email: currentUser.email 
+        })}
+      </VisuallyHidden>
     </Container>
   );
 };
