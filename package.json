@@ -1,0 +1,54 @@
+{
+  "name": "mytubenavi",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "supabase": "supabase",
+    "db:init": "supabase init",
+    "db:start": "supabase start",
+    "db:migrate": "npx supabase migration up",
+    "db:reset": "supabase db reset",
+    "db:stop": "supabase stop"
+  },
+  "dependencies": {
+    "@headlessui/react": "^2.0.0",
+    "@supabase/supabase-js": "^2.48.1",
+    "@types/recharts": "^1.8.29",
+    "axios": "^1.7.9",
+    "date-fns": "^3.3.1",
+    "lodash": "^4.17.21",
+    "lucide-react": "^0.323.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.21.3",
+    "recharts": "^2.15.0",
+    "tailwind-scrollbar-hide": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.17.14",
+    "@types/node": "^20.11.16",
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@typescript-eslint/eslint-plugin": "^6.14.0",
+    "@typescript-eslint/parser": "^6.14.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.55.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "postcss": "^8.5.1",
+    "supabase-cli": "^0.0.21",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.2.2",
+    "vite": "^5.0.8"
+  },
+  "future": {
+    "v7_startTransition": true,
+    "v7_relativeSplatPath": true
+  }
+}

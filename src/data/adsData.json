@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "title": "広告動画1",
+    "thumbnail": "https://via.placeholder.com/150",
+    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+  },
+  {
+    "id": 2,
+    "title": "広告動画2",
+    "thumbnail": "https://via.placeholder.com/150",
+    "url": "https://www.youtube.com/watch?v=3JZ_D3ELwOQ"
+  }
+]
