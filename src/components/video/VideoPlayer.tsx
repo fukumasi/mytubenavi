@@ -6,6 +6,7 @@ interface VideoPlayerProps {
  videoId: string;
  width?: string | number;
  height?: string | number;
+ onError?: (event: YouTubeEvent) => void;
 }
 
 declare global {
@@ -17,7 +18,8 @@ declare global {
 const VideoPlayer: React.FC<VideoPlayerProps> = ({
  videoId,
  width = '100%',
- height = '100%'
+ height = '100%',
+ onError
 }) => {
  const playerRef = useRef<HTMLDivElement>(null);
 
@@ -66,6 +68,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
          },
          onError: (event: YouTubeEvent) => {
            console.error('YouTube Player error:', event.data);
+           onError?.(event);
          }
        }
      });
@@ -83,7 +86,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
      }
      window.onYouTubeIframeAPIReady = () => {};
    };
- }, [videoId, width, height]);
+ }, [videoId, width, height, onError]);
 
  return (
    <div className="video-player-container w-full h-full">

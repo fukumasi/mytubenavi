@@ -270,9 +270,10 @@ export default function VideoDetail() {
 
           setVideo({
             ...videoData,
-             youtubeId: videoData.youtube_id,
+            youtubeId: videoData.youtube_id,
             viewCount: videoData.view_count,
             publishedAt: videoData.published_at,
+              youtube_id: videoData.youtube_id, // この行を追加
           });
 
 
@@ -321,16 +322,13 @@ export default function VideoDetail() {
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         {/* 動画プレーヤーセクション */}
         <div className="w-full relative pt-[56.25%]">
-          {/* 修正箇所: video が存在し、かつ video.youtubeId が存在する場合のみレンダリング */}
-          {video && video.youtube_id && (
-            <div className="absolute top-0 left-0 w-full h-full">
+              <div className="absolute top-0 left-0 w-full h-full">
               <VideoPlayer
                 videoId={video.youtube_id}
                 width="100%"
                 height="100%"
               />
             </div>
-          )}
         </div>
 
         {/* 動画情報セクション */}
