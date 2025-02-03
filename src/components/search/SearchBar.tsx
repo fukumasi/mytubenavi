@@ -1,22 +1,13 @@
-import React, { useState, useCallback } from 'react';
+// src/components/search/SearchBar.tsx
+
+import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search } from 'lucide-react';
-import debounce from 'lodash/debounce';
 
 export default function SearchBar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [query, setQuery] = useState(searchParams.get('q') || '');
-
-  // 検索クエリのデバウンス処理
-  const debouncedSearch = useCallback(
-    debounce((searchQuery: string) => {
-      if (searchQuery.trim()) {
-        navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-      }
-    }, 500),
-    [navigate]
-  );
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +19,6 @@ export default function SearchBar() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setQuery(value);
-    debouncedSearch(value); // 入力変更時にデバウンス検索をトリガー
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

@@ -1,61 +1,94 @@
-import { useNavigate } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
-
-interface SubGenre {
-  id: string;
-  name: string;
-  slug: string;
-}
+// src/components/genre/GenreSidebar.tsx
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { Genre } from '@/types';
+import { Link } from 'react-router-dom';
 
 interface GenreSidebarProps {
-  parentGenre: string;
-  subGenres: SubGenre[];
-  activeGenre?: string;
+   parentGenre?: string;
+   activeGenre?: string;
+   onSubGenreClick?: (subGenreSlug: string) => void;
 }
 
-export default function GenreSidebar({ parentGenre, subGenres, activeGenre }: GenreSidebarProps) {
-  const navigate = useNavigate();
+export default function GenreSidebar({ parentGenre, activeGenre, onSubGenreClick }: GenreSidebarProps) {
+   const [subGenres, setSubGenres] = useState<Genre[]>([]);
+   const [loading, setLoading] = useState(true);
+   const [error, setError] = useState<string | null>(null);
 
-  return (
-    <div className="bg-white rounded-lg p-4 border border-gray-100">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
-        {parentGenre === 'music' && '音楽'}
-        {parentGenre === 'gaming' && 'ゲーム'}
-        {parentGenre === 'entertainment' && 'エンタメ'}
-        {parentGenre === 'education' && '教育'}
-        {parentGenre === 'technology' && 'テクノロジー'}
-        {parentGenre === 'lifestyle' && 'ライフスタイル'}
-        {parentGenre === 'sports' && 'スポーツ'}
-        {parentGenre === 'news' && 'ニュース'}
-      </h3>
-      
-      <div className="space-y-1">
-        <button
-          onClick={() => navigate(`/genre/${parentGenre}`)}
-          className={`w-full flex items-center px-4 py-2.5 text-sm rounded-lg transition-colors ${
-            !activeGenre
-              ? 'bg-gray-50 text-gray-900 font-medium'
-              : 'text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          すべて表示
-        </button>
+   useEffect(() => {
+       const fetchSubGenres = async () => {
+           if (!parentGenre) return;
+           try {
+               setLoading(true);
+               const { data: genreData, error: genreError } = await supabase
+                   .from('genres')
+                   .select('id')
+                   .eq('slug', parentGenre)
+                   .single();
 
-        {subGenres.map((genre) => (
-          <button
-            key={genre.id}
-            onClick={() => navigate(`/genre/${parentGenre}/${genre.slug}`)}
-            className={`w-full flex items-center justify-between px-4 py-2.5 text-sm rounded-lg transition-colors ${
-              activeGenre === genre.slug
-                ? 'bg-gray-50 text-gray-900 font-medium'
-                : 'text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            <span>{genre.name}</span>
-            <ChevronRight className="h-4 w-4 text-gray-400" />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+               if (genreError || !genreData) {
+                   setError('ジャンルの取得に失敗しました');
+                   return;
+               }
+
+               const { data, error } = await supabase
+                   .from('genres')
+                   .select('*')
+                   .eq('parent_genre_id', genreData.id)
+                   .order('order');
+
+               if (error) throw error;
+               setSubGenres(data || []);
+           } catch (err) {
+               console.error('Error fetching sub-genres:', err);
+               setError('サブジャンルの読み込みに失敗しました');
+           } finally {
+               setLoading(false);
+           }
+       };
+       fetchSubGenres();
+   }, [parentGenre]);
+   
+   const handleSubGenreClick = (slug: string) => {
+       if(onSubGenreClick){
+           onSubGenreClick(slug)
+       }
+   }
+
+   if (loading) {
+       return <div className="animate-pulse h-full w-full bg-gray-200"></div>;
+   }
+
+   if (error) {
+       return <div className="text-red-500 p-4">{error}</div>;
+   }
+
+   return (
+       <div className="bg-gray-50 rounded-lg p-4">
+           <h2 className="text-lg font-semibold mb-4">サブジャンル</h2>
+           <div className="space-y-2">
+               {subGenres.map((subGenre) => (
+                   <Link
+                       key={subGenre.id}
+                       to={`/genre/${parentGenre}/${subGenre.slug}`}
+                       onClick={() => handleSubGenreClick(subGenre.slug)}
+                       className={`block px-4 py-2 rounded-md transition-colors cursor-pointer ${
+                           activeGenre === subGenre.slug
+                               ? 'bg-primary-600 text-white'
+                               : 'hover:bg-gray-100'
+                       }`}
+                   >
+                       <span className="flex items-center">
+                           {subGenre.icon && (
+                               <span className="mr-2">
+                                   {subGenre.icon}
+                               </span>
+                           )}
+                           {subGenre.name}
+                       </span>
+                   </Link>
+               ))}
+           </div>
+       </div>
+   );
 }

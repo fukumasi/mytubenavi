@@ -5,8 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getVideoReviews, supabase, postReview } from '@/lib/supabase';
 import ReviewList from '@/components/review/ReviewList';
 import type { Video, Review } from '@/types';
+import VideoPlayer from './VideoPlayer';
 
-// StarRating コンポーネント
 interface StarRatingProps {
   rating: number;
   size?: 'sm' | 'md' | 'lg';
@@ -36,7 +36,7 @@ function StarRating({
         <Star
           key={index}
           size={starSize}
-          className={`${index < rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} 
+          className={`${index < rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}
             ${interactive ? 'cursor-pointer hover:scale-110 transition-transform' : ''}`}
           onClick={() => interactive && onRatingChange && onRatingChange(index + 1)}
         />
@@ -45,7 +45,6 @@ function StarRating({
   );
 }
 
-// ReviewForm コンポーネント
 interface ReviewFormProps {
   videoId: string;
   onReviewSubmitted: (rating: number, comment: string) => Promise<void>;
@@ -67,7 +66,7 @@ function ReviewForm({ videoId, onReviewSubmitted, existingReview }: ReviewFormPr
     const checkExistingReview = async () => {
       if (currentUser) {
         const reviews = await getVideoReviews(videoId);
-        const userReview = reviews.find(review => review.userId === currentUser.id);
+        const userReview = reviews.find(review => review.user_id === currentUser.id);
         setHasUserReviewed(!!userReview);
       }
     };
@@ -195,7 +194,7 @@ function ReviewForm({ videoId, onReviewSubmitted, existingReview }: ReviewFormPr
           rows={4}
           value={comment}
           onChange={handleCommentChange}
-          className={`w-full rounded-md shadow-sm ${
+           className={`w-full rounded-md shadow-sm ${
             charCount > MAX_CHARS * 0.9
               ? 'border-yellow-300 focus:border-yellow-500 focus:ring-yellow-500'
               : 'border-gray-300 focus:border-primary-500 focus:ring-primary-500'
@@ -246,7 +245,6 @@ function ReviewForm({ videoId, onReviewSubmitted, existingReview }: ReviewFormPr
   );
 }
 
-// メインのVideoDetailコンポーネント
 export default function VideoDetail() {
   const { videoId } = useParams();
   const { currentUser } = useAuth();
@@ -260,18 +258,24 @@ export default function VideoDetail() {
       if (videoId) {
         try {
           setLoading(true);
-          
-          // 動画データの取得
-          const videoData = await supabase
+
+          const { data: videoData, error: videoError } = await supabase
             .from('videos')
             .select('*')
-            .eq('id', videoId)
+            .eq('youtube_id', videoId)
             .single();
 
-          if (videoData.error) throw videoData.error;
-          setVideo(videoData.data);
+          if (videoError) throw videoError;
+          if (!videoData) throw new Error('Video not found');
 
-          // レビューデータの取得
+          setVideo({
+            ...videoData,
+             youtubeId: videoData.youtube_id,
+            viewCount: videoData.view_count,
+            publishedAt: videoData.published_at,
+          });
+
+
           const reviewsData = await getVideoReviews(videoId);
           setReviews(reviewsData);
 
@@ -293,6 +297,7 @@ export default function VideoDetail() {
       setReviews(updatedReviews);
     }
   };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -315,15 +320,16 @@ export default function VideoDetail() {
     <div className="container mx-auto p-4">
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         {/* 動画プレーヤーセクション */}
-        <div className="aspect-w-16 aspect-h-9">
-          {video.youtubeId && (
-            <iframe
-              src={`https://www.youtube.com/embed/${video.youtubeId}`}
-              title={video.title}
-              className="w-full h-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
+        <div className="w-full relative pt-[56.25%]">
+          {/* 修正箇所: video が存在し、かつ video.youtubeId が存在する場合のみレンダリング */}
+          {video && video.youtube_id && (
+            <div className="absolute top-0 left-0 w-full h-full">
+              <VideoPlayer
+                videoId={video.youtube_id}
+                width="100%"
+                height="100%"
+              />
+            </div>
           )}
         </div>
 
@@ -342,13 +348,12 @@ export default function VideoDetail() {
         {/* レビューセクション */}
         <div className="p-6 border-t border-gray-200">
           <h2 className="text-xl font-semibold mb-6">レビュー</h2>
-          
-          {/* レビューフォーム */}
+
           {currentUser && (
             <ReviewForm
               videoId={videoId!}
               onReviewSubmitted={handleReviewSubmit}
-              existingReview={reviews.find(review => review.userId === currentUser.id)}
+              existingReview={reviews.find(review => review.user_id === currentUser.id)}
             />
           )}
 

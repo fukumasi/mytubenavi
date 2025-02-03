@@ -1,19 +1,16 @@
 import { ReactNode } from 'react';
 
-// Baseとなる共通の型
 type BaseEntity = {
   id: string;
   created_at?: string;
   updated_at?: string;
 };
 
-// Component Props Types
 export type BaseProps = {
   children?: ReactNode;
   className?: string;
 };
 
-// Video関連の型
 export type Youtuber = {
   channelName: string;
   channelUrl: string;
@@ -27,12 +24,12 @@ export type Video = BaseEntity & {
   duration: string;
   viewCount: number;
   rating: number;
-  genre?: string;
+  genre_id?: string;
   publishedAt: string;
   channelTitle: string;
   youtuber?: Youtuber;
   commentCount: number;
-  youtubeId: string;
+  youtube_id: string;
 };
 
 export type SupabaseVideo = BaseEntity & {
@@ -42,15 +39,14 @@ export type SupabaseVideo = BaseEntity & {
   duration: string;
   view_count: number;
   rating: number;
-  genre?: string;
+  genre_id?: string;
   published_at: string;
-  channelTitle: string;
+  channel_title: string;
   youtuber?: Youtuber;
   comment_count?: number;
   youtube_id: string;
 };
 
-// Event関連の型
 export type Event = BaseEntity & {
   title: string;
   description: string;
@@ -67,7 +63,6 @@ export type Event = BaseEntity & {
   isFeatured: boolean;
 };
 
-// Profile関連の型
 export type Profile = BaseEntity & {
   username: string;
   avatar_url: string;
@@ -75,39 +70,20 @@ export type Profile = BaseEntity & {
   description?: string;
 };
 
-// Genre関連の型
 export type Genre = BaseEntity & {
   slug: string;
   name: string;
-  parent_id: number | null;
+  parent_id: string | null;
   order: number;
+  icon?: string;
+  description?: string;
 };
 
-// Review関連の型
-export interface Review {
-  id: string;
-  videoId: string;
-  userId: string;
-  rating: number;
-  comment: string;
-  createdAt: string;
-  updatedAt: string;
-  profiles?: {
-    id: string;
-    username: string;
-    avatarUrl: string;
-  };
-}
-
-// Supabaseから返ってくるレビューデータの型
-export interface SupabaseReview {
-  id: string;
+export interface Review extends BaseEntity {
   video_id: string;
   user_id: string;
   rating: number;
   comment: string;
-  created_at: string;
-  updated_at: string;
   profiles?: {
     id: string;
     username: string;
@@ -115,13 +91,23 @@ export interface SupabaseReview {
   };
 }
 
-// 検索関連の型
+export interface SupabaseReview extends BaseEntity {
+  video_id: string;
+  user_id: string;
+  rating: number;
+  comment: string;
+  profiles?: {
+    id: string;
+    username: string;
+    avatar_url: string;
+  };
+}
+
 export interface SearchResult {
   videos: Video[];
   totalPages: number;
 }
 
-// イベント参加者関連の型
 export interface EventParticipant {
   user_id: string;
   event_id: string;
@@ -131,7 +117,6 @@ export interface EventParticipant {
   };
 }
 
-// チャンネル統計関連の型
 export interface ChannelStats {
   totalViews: number;
   totalSubscribers: number;
@@ -155,7 +140,6 @@ export interface SubscriberData {
   subscribers: number;
 }
 
-// Auth関連の型
 export type AuthUser = {
   id: string;
   email: string;
@@ -165,7 +149,6 @@ export type AuthUser = {
   };
 };
 
-// Component Props Types
 export type VideoCardProps = BaseProps & {
   video: Video;
   onVideoClick?: (video: Video) => void;
@@ -185,15 +168,109 @@ export type VideoListProps = BaseProps & {
   loading?: boolean;
 };
 
-// Video フィルター用の型
 export type VideoFilter = {
-  genre?: string;
+  genre_id?: string;
 };
 
-// ソートオプション用の型
 export type SortOption = {
-  field: 'publishedAt' | 'viewCount' | 'rating';
+  field: 'published_at' | 'view_count' | 'rating';
   direction: 'asc' | 'desc';
 };
+
+declare global {
+  interface Window {
+    YT?: {
+      Player: new (
+        elementId: string | HTMLElement,
+        config: {
+          videoId: string;
+          width?: string | number;
+          height?: string | number;
+          playerVars?: {
+            autoplay?: 0 | 1;
+            controls?: 0 | 1;
+            disablekb?: 0 | 1;
+            enablejsapi?: 0 | 1;
+            fs?: 0 | 1;
+            modestbranding?: 0 | 1;
+            playsinline?: 0 | 1;
+            rel?: 0 | 1;
+          };
+          events?: {
+            onReady?: () => void;
+            onStateChange?: (event: { data: number }) => void;
+            onError?: (event: { data: number }) => void;
+          };
+        }
+      ) => Player;
+      PlayerState: {
+        UNSTARTED: -1;
+        ENDED: 0;
+        PLAYING: 1;
+        PAUSED: 2;
+        BUFFERING: 3;
+        CUED: 5;
+      };
+    };
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+export class Player {
+  constructor(
+    public elementId: string | HTMLElement,
+    public config: {
+      videoId: string;
+      width?: string | number;
+      height?: string | number;
+      playerVars?: {
+        autoplay?: 0 | 1;
+        controls?: 0 | 1;
+        disablekb?: 0 | 1;
+        enablejsapi?: 0 | 1;
+        fs?: 0 | 1;
+        modestbranding?: 0 | 1;
+        playsinline?: 0 | 1;
+        rel?: 0 | 1;
+      };
+      events?: {
+        onReady?: () => void;
+        onStateChange?: (event: { data: number }) => void;
+        onError?: (event: { data: number }) => void;
+      };
+    }
+  ) {}
+
+  playVideo() {}
+  pauseVideo() {}
+  stopVideo() {}
+  destroy() {}
+  getPlayerState(): number {
+    return -1;
+  }
+  getCurrentTime(): number {
+    return 0;
+  }
+  getDuration(): number {
+    return 0;
+  }
+}
+
+export interface SupabaseVideoResponse {
+  id: string;
+  videos: {
+    id: string;
+    title: string;
+    description: string;
+    thumbnail: string;
+    duration: string;
+    view_count: number;
+    rating: number;
+    published_at: string;
+    channel_title: string;
+    youtube_id: string;
+    genre_id: string;
+  }[];
+}
 
 export default BaseEntity;

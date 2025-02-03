@@ -35,7 +35,8 @@ export function ReviewForm({
       if (currentUser) {
         try {
           const reviews = await getVideoReviews(videoId);
-          const userReview = reviews.find(review => review.userId === currentUser.id);
+          // 修正箇所: review.userId を review.user_id に変更
+          const userReview = reviews.find(review => review.user_id === currentUser.id);
           setHasUserReviewed(!!userReview);
         } catch (err) {
           console.error('Error checking existing review:', err);

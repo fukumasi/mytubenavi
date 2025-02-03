@@ -1,3 +1,4 @@
+// src/lib/supabase.ts
 import { createClient } from '@supabase/supabase-js';
 import { YouTubeAPI, extractVideoId } from './youtube';
 import type {
@@ -33,13 +34,29 @@ const mapSupabaseVideoToVideo = (video: SupabaseVideo): Video => ({
     duration: video.duration || '',
     viewCount: video.view_count || 0,
     rating: video.rating || 0,
-    genre: video.genre,
+    genre_id: video.genre_id,
     publishedAt: video.published_at,
-    channelTitle: video.channelTitle || '',
+    channelTitle: video.channel_title || '',
     youtuber: video.youtuber,
     commentCount: video.comment_count || 0,
-    youtubeId: video.youtube_id
+    youtube_id: video.youtube_id
 });
+
+const mapSupabaseReviewToReview = (review: any): Review => ({
+    id: review.id,
+    video_id: review.video_id,
+    user_id: review.user_id,
+    rating: review.rating,
+    comment: review.comment,
+    created_at: new Date(review.created_at).toISOString(),
+    updated_at: new Date(review.updated_at).toISOString(),
+    profiles: review.profiles ? {
+        id: review.profiles.id,
+        username: review.profiles.username,
+        avatar_url: review.profiles.avatar_url
+    } : undefined
+ });
+
 
 // 最近の動画取得
 export const getRecentVideos = async (limit: number = 30): Promise<Video[]> => {
@@ -229,13 +246,14 @@ export const addVideoToDatabase = async (videoUrl: string): Promise<void> => {
                 ? (parseInt(details.statistics.likeCount) / parseInt(details.statistics.viewCount || '1')) * 5
                 : 0,
             published_at: details.snippet?.publishedAt || new Date().toISOString(),
-            channelTitle: details.snippet?.channelTitle || '',
+            channel_title: details.snippet?.channelTitle || '',
             youtuber: {
                 channelName: details.snippet?.channelTitle || '',
                 channelUrl: `https://www.youtube.com/channel/${details.snippet?.channelId || ''}`,
                 verificationStatus: 'unknown'
             },
-            youtube_id: details.id
+            youtube_id: details.id,
+            genre_id: null
         });
 
         if (error) {
@@ -305,21 +323,6 @@ export const toggleFavorite = async (videoId: string): Promise<boolean> => {
         return true;
     }
 };
-// mapSupabaseReviewToReview関数を追加
-const mapSupabaseReviewToReview = (review: any): Review => ({
-    id: review.id,
-    videoId: review.video_id,
-    userId: review.user_id,
-    rating: review.rating,
-    comment: review.comment,
-    createdAt: new Date(review.created_at).toISOString(),
-    updatedAt: new Date(review.updated_at).toISOString(),
-    profiles: review.profiles ? {
-      id: review.profiles.id,
-      username: review.profiles.username,
-      avatarUrl: review.profiles.avatar_url
-    } : undefined
-  });
 
 // レビュー関連の関数を修正
 export const getVideoReviews = async (videoId: string): Promise<Review[]> => {
@@ -355,9 +358,8 @@ async function checkExistingReview(userId: string, videoId: string): Promise<boo
     const { data, error } = await supabase
         .from('reviews')
         .select('id')
-        .eq('user_id', userId)
-        .eq('video_id', videoId)
-        .single();
+        .match({ user_id: userId, video_id: videoId })
+        .maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
         throw error;
@@ -718,5 +720,6 @@ const calculateSubscribersGrowth = async (userId: string): Promise<number> => {
 
     return oldCount ? ((newCount - oldCount) / oldCount) * 100 : 0;
 };
+
 
 export default supabase;
