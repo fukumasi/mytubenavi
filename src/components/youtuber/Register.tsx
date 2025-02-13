@@ -1,8 +1,10 @@
+// src/components/youtuber/Register.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AlertCircle, Youtube, Upload, Link as LinkIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { useYoutuberSync } from '../../hooks/useYoutuberSync';
 
 const categories = [
   { id: 'music', name: '音楽' },
@@ -18,6 +20,7 @@ const categories = [
 export default function Register() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  const { syncChannel, syncStatus } = useYoutuberSync(); // useYoutuberSync フック
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -29,6 +32,10 @@ export default function Register() {
   });
   const [avatar, setAvatar] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
+
+    // ローディング状態とエラーメッセージを syncStatus から取得
+    const isLoading = ['syncing', 'loading'].includes(syncStatus.status);
+  const syncError = syncStatus.status === 'error' ? syncStatus.message : null;
 
   useEffect(() => {
     if (currentUser?.user_metadata?.avatar_url) {
@@ -50,7 +57,7 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.agreement) {
       setError('利用規約に同意してください');
       return;
@@ -63,6 +70,15 @@ export default function Register() {
       if (!currentUser) {
         setError('ログインが必要です');
         return;
+      }
+
+       // チャンネル情報の同期。await で完了を待つ。
+      await syncChannel(formData.channelUrl);
+
+        // useYoutuberSync のエラーをチェック。
+      if (syncStatus.status === 'error') {
+          setError(syncStatus.message || 'チャンネル情報の同期に失敗しました。URLを確認してください。'); // より具体的なエラーメッセージ、message がない場合のフォールバック
+          return; // エラーが発生したら、以降の処理を中断
       }
 
       let avatarUrl = currentUser.user_metadata?.avatar_url;
@@ -124,7 +140,7 @@ export default function Register() {
       if (metadataError) throw metadataError;
 
       navigate('/youtuber/dashboard');
-    } catch (err) {
+    } catch (err:any) {
       console.error('Registration error:', err);
       setError('登録に失敗しました。もう一度お試しください。');
     } finally {
@@ -171,13 +187,15 @@ export default function Register() {
           </p>
         </div>
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
-            <div className="flex items-center text-red-600">
-              <AlertCircle className="h-5 w-5 mr-2" />
-              <span className="text-sm">{error}</span>
+        {/* エラーメッセージの表示 */}
+        {(error || syncError) && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+                <div className="flex items-center text-red-600">
+                <AlertCircle className="h-5 w-5 mr-2" />
+                {/* 通常のエラーと同期エラーの両方を表示 */}
+                <span className="text-sm">{error || syncError}</span>
+                </div>
             </div>
-          </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -322,10 +340,11 @@ export default function Register() {
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || isLoading} // loading または isLoading が true のときに disabled
               className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
             >
-              {loading ? '処理中...' : 'YouTuberとして登録'}
+              {/* loading だけでなく isLoading もチェック */}
+              {(loading || isLoading) ? '処理中...' : 'YouTuberとして登録'}
             </button>
           </div>
         </form>

@@ -1,68 +1,41 @@
-import { useState, useEffect } from 'react';
-import { Heart } from 'lucide-react';
+import React from 'react';
+import { Star } from 'lucide-react';
+import { useFavorites } from '../../hooks/useFavorites';
 import { useAuth } from '../../contexts/AuthContext';
-import { toggleFavorite, getFavoriteStatus } from '../../lib/supabase';
 
 interface FavoriteButtonProps {
   videoId: string;
-  onLoginRequired?: () => void;
 }
 
-export default function FavoriteButton({ videoId, onLoginRequired }: FavoriteButtonProps) {
+export const FavoriteButton: React.FC<FavoriteButtonProps> = ({ videoId }) => {
   const { currentUser } = useAuth();
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const { isFavorite, isLoading, toggleFavorite } = useFavorites(videoId);
 
-  useEffect(() => {
-    const checkFavoriteStatus = async () => {
-      if (!currentUser) return;
-      try {
-        const status = await getFavoriteStatus(videoId);
-        setIsFavorite(status);
-      } catch (err) {
-        console.error('Error checking favorite status:', err);
-      }
-    };
-
-    checkFavoriteStatus();
-  }, [videoId, currentUser]);
-
-  const handleClick = async () => {
+  const handleClick = () => {
     if (!currentUser) {
-      onLoginRequired?.();
+      alert('お気に入り機能を使用するにはログインしてください。');
       return;
     }
-
-    try {
-      setLoading(true);
-      const newStatus = await toggleFavorite(videoId);
-      setIsFavorite(newStatus);
-    } catch (err) {
-      console.error('Error toggling favorite:', err);
-    } finally {
-      setLoading(false);
-    }
+    toggleFavorite();
   };
+
+  if (isLoading) {
+    return <div className="animate-pulse w-8 h-8 bg-gray-200 rounded-full" />;
+  }
 
   return (
     <button
       onClick={handleClick}
-      disabled={loading}
-      className={`
-        inline-flex items-center space-x-1 px-3 py-2 rounded-md
-        ${isFavorite
-          ? 'text-red-600 hover:text-red-700'
-          : 'text-gray-600 hover:text-gray-700'
-        }
-        disabled:opacity-50 transition-colors duration-200
-      `}
+      className={`flex items-center gap-2 px-4 py-2 rounded-full transition-colors ${
+        isFavorite
+          ? 'bg-yellow-400 text-white hover:bg-yellow-500'
+          : 'bg-gray-100 hover:bg-gray-200'
+      }`}
     >
-      <Heart
-        className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`}
-      />
-      <span className="text-sm font-medium">
-        {isFavorite ? 'お気に入り済み' : 'お気に入り'}
-      </span>
+      <Star className={isFavorite ? 'fill-current' : ''} size={20} />
+      <span>{isFavorite ? 'お気に入り済み' : 'お気に入り'}</span>
     </button>
   );
-}
+};
+
+export default FavoriteButton;

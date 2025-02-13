@@ -3,8 +3,8 @@ import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supab
 import { useAuth } from '../contexts/AuthContext';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
+const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -28,7 +28,28 @@ interface ChartData {
   ctr: number;
 }
 
-export function usePromotionStats(timeRange: 'week' | 'month' | 'year' = 'week') {
+type TimeRange = 'week' | 'month' | 'year';
+
+const calculateDateRange = (timeRange: TimeRange): { startDate: Date; endDate: Date } => {
+  const endDate = new Date();
+  const startDate = new Date();
+
+  switch (timeRange) {
+    case 'week':
+      startDate.setDate(endDate.getDate() - 7);
+      break;
+    case 'month':
+      startDate.setMonth(endDate.getMonth() - 1);
+      break;
+    case 'year':
+      startDate.setFullYear(endDate.getFullYear() - 1);
+      break;
+  }
+
+  return { startDate, endDate };
+};
+
+export function usePromotionStats(timeRange: TimeRange = 'week') {
   const { currentUser } = useAuth();
   const [stats, setStats] = useState<PromotionStats | null>(null);
   const [chartData, setChartData] = useState<ChartData[]>([]);
@@ -39,93 +60,59 @@ export function usePromotionStats(timeRange: 'week' | 'month' | 'year' = 'week')
     let subscription: RealtimeChannel | null = null;
 
     const fetchStats = async () => {
-      if (!currentUser) return;
+      if (!currentUser) {
+        setLoading(false);
+        return;
+      }
 
       try {
         setLoading(true);
         setError(null);
 
-        const endDate = new Date();
-        const startDate = new Date();
-        switch (timeRange) {
-          case 'week':
-            startDate.setDate(endDate.getDate() - 7);
-            break;
-          case 'month':
-            startDate.setMonth(endDate.getMonth() - 1);
-            break;
-          case 'year':
-            startDate.setFullYear(endDate.getFullYear() - 1);
-            break;
-        }
-
+        const { startDate, endDate } = calculateDateRange(timeRange);
         const data = await getPromotionStats(currentUser.id, startDate, endDate);
 
-        const totalImpressions = data.reduce((sum, item) => sum + (item.impressions || 0), 0);
-        const totalClicks = data.reduce((sum, item) => sum + (item.clicks || 0), 0);
-        const totalRevenue = data.reduce((sum, item) => sum + (item.revenue || 0), 0);
+        const aggregatedStats = data.reduce(
+          (acc, item) => ({
+            impressions: acc.impressions + (item.impressions || 0),
+            clicks: acc.clicks + (item.clicks || 0),
+            revenue: acc.revenue + (item.revenue || 0),
+          }),
+          { impressions: 0, clicks: 0, revenue: 0 }
+        );
 
         setStats({
-          impressions: totalImpressions,
-          clicks: totalClicks,
-          ctr: totalClicks && totalImpressions ? (totalClicks / totalImpressions) * 100 : 0,
-          revenue: totalRevenue,
+          ...aggregatedStats,
+          ctr: aggregatedStats.impressions > 0
+            ? (aggregatedStats.clicks / aggregatedStats.impressions) * 100
+            : 0,
         });
 
         setChartData(
-          data.map((item: any) => ({
+          data.map(item => ({
             date: item.date,
-            impressions: item.impressions,
-            clicks: item.clicks,
-            ctr: item.impressions ? (item.clicks / item.impressions) * 100 : 0,
+            impressions: item.impressions || 0,
+            clicks: item.clicks || 0,
+            ctr: item.impressions > 0
+              ? (item.clicks / item.impressions) * 100
+              : 0,
           }))
         );
 
-        // リアルタイム購読の正しい実装
         subscription = supabase
-          .channel(`promotion_stats:user_id=eq.${currentUser.id}`)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'promotion_stats' }, (payload: RealtimePostgresChangesPayload<any>) => {
-            const update = payload.new as PromotionUpdate;
-
-            setStats((prevStats) => {
-              if (!prevStats) return prevStats;
-              return {
-                ...prevStats,
-                impressions: prevStats.impressions + (update.impressions || 0),
-                clicks: prevStats.clicks + (update.clicks || 0),
-                ctr:
-                  prevStats.impressions + (update.impressions || 0) > 0
-                    ? ((prevStats.clicks + (update.clicks || 0)) /
-                        (prevStats.impressions + (update.impressions || 0))) *
-                      100
-                    : 0,
-                revenue: prevStats.revenue + (update.revenue || 0),
-              };
-            });
-
-            setChartData((prevData) => {
-              const today = new Date().toISOString().split('T')[0];
-              const existingIndex = prevData.findIndex((item) => item.date === today);
-
-              if (existingIndex >= 0) {
-                const updatedData = [...prevData];
-                updatedData[existingIndex] = {
-                  ...updatedData[existingIndex],
-                  impressions:
-                    updatedData[existingIndex].impressions + (update.impressions || 0),
-                  clicks: updatedData[existingIndex].clicks + (update.clicks || 0),
-                  ctr:
-                    (updatedData[existingIndex].clicks + (update.clicks || 0)) /
-                    (updatedData[existingIndex].impressions + (update.impressions || 0)) *
-                    100,
-                };
-                return updatedData;
-              }
-
-              return prevData;
-            });
-          })
+          .channel(`promotion_stats:${currentUser.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'promotion_stats',
+              filter: `user_id=eq.${currentUser.id}`
+            },
+            handleRealtimeUpdate
+          )
           .subscribe();
+
       } catch (err) {
         console.error('Error fetching promotion stats:', err);
         setError('データの取得に失敗しました');
@@ -134,29 +121,69 @@ export function usePromotionStats(timeRange: 'week' | 'month' | 'year' = 'week')
       }
     };
 
+    const handleRealtimeUpdate = (payload: RealtimePostgresChangesPayload<any>) => {
+      const update = payload.new as PromotionUpdate;
+
+      setStats(prevStats => {
+        if (!prevStats) return prevStats;
+
+        const newImpressions = prevStats.impressions + (update.impressions || 0);
+        const newClicks = prevStats.clicks + (update.clicks || 0);
+
+        return {
+          impressions: newImpressions,
+          clicks: newClicks,
+          ctr: newImpressions > 0 ? (newClicks / newImpressions) * 100 : 0,
+          revenue: prevStats.revenue + (update.revenue || 0),
+        };
+      });
+
+      setChartData(prevData => {
+        const today = new Date().toISOString().split('T')[0];
+        const existingIndex = prevData.findIndex(item => item.date === today);
+
+        if (existingIndex === -1) return prevData;
+
+        const updatedData = [...prevData];
+        const targetItem = updatedData[existingIndex];
+        const newImpressions = targetItem.impressions + (update.impressions || 0);
+        const newClicks = targetItem.clicks + (update.clicks || 0);
+
+        updatedData[existingIndex] = {
+          ...targetItem,
+          impressions: newImpressions,
+          clicks: newClicks,
+          ctr: newImpressions > 0 ? (newClicks / newImpressions) * 100 : 0,
+        };
+
+        return updatedData;
+      });
+    };
+
     fetchStats();
 
     return () => {
-      if (subscription) {
-        subscription.unsubscribe();
-      }
+      subscription?.unsubscribe();
     };
   }, [currentUser, timeRange]);
 
   return { stats, chartData, loading, error };
 }
 
-export async function getPromotionStats(userId: string, startDate: Date, endDate: Date) {
+export async function getPromotionStats(
+  userId: string,
+  startDate: Date,
+  endDate: Date
+) {
   const { data, error } = await supabase
     .from('promotion_stats')
     .select('*')
     .eq('user_id', userId)
     .gte('created_at', startDate.toISOString())
-    .lte('created_at', endDate.toISOString());
+    .lte('created_at', endDate.toISOString())
+    .order('created_at', { ascending: true });
 
-  if (error) {
-    throw error;
-  }
+  if (error) throw error;
 
   return data || [];
 }
