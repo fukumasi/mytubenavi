@@ -2,7 +2,5 @@
 import PopularVideos from './PopularVideos';
 
 export default function FeaturedVideos() {
-  return (
-      <PopularVideos />
-  );
+  return <PopularVideos />;
 }

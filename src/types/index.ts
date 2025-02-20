@@ -1,5 +1,34 @@
 import { ReactNode } from 'react';
 
+export type RatingCategory =
+  | 'overall'
+  | 'clarity'
+  | 'entertainment'
+  | 'originality'
+  | 'quality'
+  | 'reliability'
+  | 'usefulness';
+
+export type RatingValue = 1 | 2 | 3 | 4 | 5;
+
+export interface VideoRating {
+  id: string;                 // 追加
+  video_id: string;          // 追加
+  user_id: string;           // 追加
+  profiles?: {               // 追加
+    username: string;
+    avatar_url: string;
+  };
+  overall: number;
+  clarity: number;
+  entertainment: number;
+  originality: number;
+  quality: number;
+  reliability: number;
+  usefulness: number;
+  comment: string;
+}
+
 type BaseEntity = {
     id: string;
     created_at?: string;
@@ -28,7 +57,26 @@ export interface Profile {
     total_views?: number;   // 総視聴回数
 }
 
+export interface AggregatedVideoRating {
+  reliability: AggregatedRating;
+  entertainment: AggregatedRating;
+  usefulness: AggregatedRating;
+  quality: AggregatedRating;
+  originality: AggregatedRating;
+  clarity: AggregatedRating;
+  overall: AggregatedRating;
+}
+
+export interface AggregatedRating {
+  averageRating: number;
+  totalRatings: number;
+  distribution: {
+    [K in RatingValue]: number;
+  };
+}
+
 export interface Video {
+    channelId?: string;  // 追加
     avg_rating?: number;
     review_count?: number;
     mytubenavi_comment_count?: number;
@@ -39,6 +87,7 @@ export interface Video {
     duration: string;
     viewCount: number;
     rating: number;
+    likeCount?: number;  // 追加
     publishedAt: string;
     channelTitle: string;
     commentCount?: number;
@@ -46,15 +95,33 @@ export interface Video {
     genre_id?: string;
     created_at?: string;
     updated_at?: string;
+    tags?: string[];
     youtuber?: {
         channelName: string;
         channelUrl: string;
         verificationStatus: 'unknown' | 'pending' | 'verified' | 'rejected';
-        // YouTuber 関連 (ダッシュボード用)
-        channel_id?: string;      // チャンネルID
-        avatar_url?: string;        // アバターURL
-        subscribers?: number; // 登録者数
+        channel_id?: string;
+        avatar_url?: string;
+        subscribers?: number;
     };
+    ratings?: AggregatedVideoRating; // 追加
+}
+
+export interface Review {
+    id: string;
+    video_id: string;
+    user_id: string;
+    rating: number;
+    comment: string;
+    created_at: string;
+    updated_at: string;
+    helpful_count?: number;  // 追加
+    profiles?: {
+        id: string;
+        username: string;
+        avatar_url: string;
+    };
+    videos?: Video;
 }
 
 export interface PromotionSlot {
@@ -178,7 +245,7 @@ export interface YouTubePlayerVars {
     modestbranding?: 0 | 1;
     rel?: 0 | 1;
     controls?: 0 | 1;
-    enablejsapi?: 0 | 1;
+    enablejsapi?: 0 | 1;  // 追加
     origin?: string;
 }
 
@@ -198,12 +265,10 @@ export interface YouTubePlayerConfig {
 export type Youtuber = {
     channelName: string;
     channelUrl: string;
-    verificationStatus: 'verified' | 'unverified' | 'unknown';
-    // YouTuber 関連 (ダッシュボード用)  <- こちらは不要
-    // channel_id?: string;
-    // avatar_url?: string;
-    // subscribers?: number;
-
+    verificationStatus: 'pending' | 'unknown' | 'verified' | 'rejected';  // Video型と合わせる
+    channel_id?: string;
+    avatar_url?: string;
+    subscribers?: number;
 };
 
 // Supabaseのビデオテーブルのインターフェース
@@ -244,18 +309,18 @@ export type Event = BaseEntity & {
     isFeatured: boolean;
 };
 
-export type Review = BaseEntity & {
-    video_id: string;
-    user_id: string;
-    rating: number;
-    comment: string;
-    profiles?: {
-        id: string;
-        username: string;
-        avatar_url: string;
-    };
-    helpful_count?: number;
-}
+// export type Review = BaseEntity & { //削除
+//     video_id: string;
+//     user_id: string;
+//     rating: number;
+//     comment: string;
+//     profiles?: {
+//         id: string;
+//         username: string;
+//         avatar_url: string;
+//     };
+//     helpful_count?: number;
+// }
 
 export interface SupabaseReview extends BaseEntity {
     video_id: string;
@@ -343,6 +408,20 @@ export type SortOption = {
     direction: 'asc' | 'desc';
 };
 
+export interface VideoRatingFormProps {
+    videoId: string;
+    onSubmit: () => Promise<void>; // asyncに対応する非同期関数に変更
+    initialRatings?: Partial<VideoRating>;
+  }
+
+export interface VideoRatingDisplayProps {
+  ratings: AggregatedVideoRating;
+  showDetails?: boolean;
+  allRatings?: VideoRating[];   // 追加
+  userRatings?: VideoRating[];  // 追加
+}
+
+
 declare global {
     interface Window {
         YT?: {
@@ -356,7 +435,6 @@ declare global {
                         autoplay?: 0 | 1;
                         controls?: 0 | 1;
                         disablekb?: 0 | 1;
-                        enablejsapi?: 0 | 1;
                         fs?: 0 | 1;
                         modestbranding?: 0 | 1;
                         playsinline?: 0 | 1;

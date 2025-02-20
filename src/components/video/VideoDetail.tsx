@@ -1,98 +1,122 @@
-import { useEffect, useState } from 'react';
-import { Star } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { getVideoReviews, supabase } from '@/lib/supabase';
-import ReviewList from '@/components/review/ReviewList';
-import type { Video, Review } from '@/types';
+import { supabase, getUserVideoRating, getAllVideoRatings } from '@/lib/supabase';
+import type { Video, AggregatedVideoRating, VideoRating } from '@/types';
 import VideoPlayer from './VideoPlayer';
 import FavoriteButton from '../video/FavoriteButton';
-import ReviewForm from '@/components/video/ReviewForm';
+import VideoRatingDisplay from './VideoRatingDisplay';
+import VideoRatingForm from './VideoRatingForm';
+
+const defaultRatings: AggregatedVideoRating = {
+    reliability: { averageRating: 0, totalRatings: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } },
+    entertainment: { averageRating: 0, totalRatings: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } },
+    usefulness: { averageRating: 0, totalRatings: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } },
+    quality: { averageRating: 0, totalRatings: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } },
+    originality: { averageRating: 0, totalRatings: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } },
+    clarity: { averageRating: 0, totalRatings: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } },
+    overall: { averageRating: 0, totalRatings: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } }
+};
 
 export default function VideoDetail() {
     const { videoId } = useParams();
-    const { currentUser } = useAuth();
     const [video, setVideo] = useState<Video | null>(null);
-    const [reviews, setReviews] = useState<Review[]>([]);
+    const [userRating, setUserRating] = useState<VideoRating | null>(null);
+    const [allRatings, setAllRatings] = useState<VideoRating[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
-    useEffect(() => {
-        const fetchVideoAndReviews = async () => {
-            if (videoId) {
-                try {
-                    setLoading(true);
+    const fetchVideoData = useCallback(async () => {
+        if (!videoId) return null;
 
-                    const { data: videoData, error: videoError } = await supabase
-                        .from('videos')
-                        .select('*')
-                        .eq('youtube_id', videoId)
-                        .single();
+        const { data: videoData, error: videoError } = await supabase
+            .from('videos')
+            .select('*')
+            .eq('youtube_id', videoId)
+            .single();
 
-                    if (videoError) throw videoError;
-                    if (!videoData) throw new Error('Video not found');
+        if (videoError) throw videoError;
+        if (!videoData) throw new Error('Video not found');
 
-                    const parsedVideo: Video = {
-                        ...videoData,
-                        id: videoData.id,
-                        title: videoData.title,
-                        description: videoData.description || '',
-                        thumbnail: videoData.thumbnail,
-                        duration: videoData.duration || '',
-                        viewCount: videoData.view_count,
-                        publishedAt: videoData.published_at,
-                        channelTitle: videoData.channel_title,
-                        youtube_id: videoData.youtube_id,
-                        genre_id: videoData.genre_id,
-                        avg_rating: videoData.avg_rating || 0,
-                        review_count: videoData.review_count || 0,
-                        mytubenavi_comment_count: videoData.mytubenavi_comment_count || 0,
-                        rating: videoData.rating || 0
-                    };
-
-                    setVideo(parsedVideo);
-
-                    const reviewsData = await getVideoReviews(videoId);
-                    setReviews(reviewsData);
-
-                } catch (err) {
-                    console.error('Error fetching video details:', err);
-                    setError('動画の読み込みに失敗しました。');
-                } finally {
-                    setLoading(false);
-                }
-            }
-        };
-
-        fetchVideoAndReviews();
+        return {
+            ...videoData,
+            title: videoData.title,
+            description: videoData.description || '',
+            thumbnail: videoData.thumbnail,
+            duration: videoData.duration || '',
+            viewCount: videoData.view_count,
+            publishedAt: videoData.published_at,
+            channelTitle: videoData.channel_title,
+            youtube_id: videoData.youtube_id,
+            genre_id: videoData.genre_id,
+            avg_rating: videoData.avg_rating || 0,
+            review_count: videoData.review_count || 0,
+            mytubenavi_comment_count: videoData.mytubenavi_comment_count || 0,
+            rating: videoData.rating || 0,
+            ratings: videoData.ratings || defaultRatings,
+            channelId: videoData.youtuber?.channel_id || '',
+        } as Video;
     }, [videoId]);
 
-    const handleReviewSubmit = async () => {
-        if (videoId) {
-            const updatedReviews = await getVideoReviews(videoId);
-            setReviews(updatedReviews);
+    const refreshData = useCallback(async () => {
+        if (!videoId) return;
 
-            const { data: videoData } = await supabase
-                .from('videos')
-                .select('*')
-                .eq('youtube_id', videoId)
-                .single();
+        try {
+            setLoading(true);
+            const [videoData, userRatingData, allRatingsData] = await Promise.all([
+                fetchVideoData(),
+                getUserVideoRating(videoId),
+                getAllVideoRatings(videoId)
+            ]);
 
             if (videoData) {
-                setVideo(prev => prev ? {
-                    ...prev,
-                    avg_rating: videoData.avg_rating || 0,
-                    review_count: videoData.review_count || 0,
-                    mytubenavi_comment_count: videoData.mytubenavi_comment_count || 0
-                } : null);
+                videoData.ratings = videoData.ratings || defaultRatings;
+                setVideo(videoData);
             }
+            setUserRating(userRatingData);
+            setAllRatings(allRatingsData || []);
+
+        } catch (err) {
+            console.error('Error fetching video details:', err);
+            setError('動画の読み込みに失敗しました。');
+        } finally {
+            setLoading(false);
         }
-    };
+    }, [videoId, fetchVideoData]);
+
+    useEffect(() => {
+        refreshData();
+    }, [refreshData]);
+
+    useEffect(() => {
+        if (!videoId) return;
+
+        const subscription = supabase
+            .channel('video_rating_changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'videos',
+                    filter: `youtube_id=eq.${videoId}`
+                },
+                async (payload) => {
+                    console.log('Video data updated:', payload);
+                    await refreshData();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, [videoId, refreshData]);
 
     if (loading) {
         return (
             <div className="flex justify-center items-center min-h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
             </div>
         );
     }
@@ -108,63 +132,94 @@ export default function VideoDetail() {
     }
 
     return (
-        <div className="container mx-auto p-4">
+        <div className="container mx-auto p-4 space-y-6">
+            {/* 動画プレイヤーセクション */}
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="w-full relative pt-[56.25%]">
+                <div className="max-w-4xl mx-auto relative pt-[56.25%]">
                     <div className="absolute top-0 left-0 w-full h-full">
-                        {video?.youtube_id && (
-                            <VideoPlayer
-                                videoId={video.youtube_id}
-                                width="100%"
-                                height="100%"
-                            />
-                        )}
+                        <VideoPlayer
+                            videoId={video.youtube_id}
+                            width="100%"
+                            height="100%"
+                        />
                     </div>
                 </div>
 
+                {/* 動画情報ヘッダー */}
                 <div className="p-6">
-                    <div className="flex justify-between items-start mb-4">
-                        <h1 className="text-2xl font-bold mb-2">{video.title}</h1>
-                        {video?.youtube_id && (
+                    <h1 className="text-2xl font-bold mb-2">{video.title}</h1>
+                    
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-4 text-gray-600">
+                            <span>{video.viewCount?.toLocaleString() || 0} 回視聴</span>
+                            <span>投稿日: {new Date(video.publishedAt).toLocaleDateString()}</span>
                             <FavoriteButton videoId={video.youtube_id} />
-                        )}
-                    </div>
-                    <div className="text-gray-600 mb-4">
-                        <p>{video.viewCount?.toLocaleString() || 0} 回視聴</p>
-                        <p>投稿日: {new Date(video.publishedAt).toLocaleDateString()}</p>
-                        <div className="flex items-center space-x-4 mt-2">
-                            <p className="flex items-center">
-                                <Star className="w-5 h-5 text-yellow-400 fill-yellow-400 mr-1" />
-                                {video.avg_rating?.toFixed(1) || '未評価'}
-                            </p>
-                            <p>{video.review_count || 0} 件のレビュー</p>
-                            <p>{video.mytubenavi_comment_count || 0} 件のコメント</p>
                         </div>
                     </div>
-                    {video.description && (
-                        <p className="text-gray-700 whitespace-pre-wrap">{video.description}</p>
-                    )}
-                </div>
 
-                <div className="p-6 border-t border-gray-200">
-                    <h2 className="text-xl font-semibold mb-6">レビュー</h2>
+                    {/* チャンネル情報とジャンル */}
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-4">
+                            <img
+                                src={`https://www.youtube.com/channel/${video.channelId}/picture`}
+                                alt={video.channelTitle}
+                                className="w-12 h-12 rounded-full"
+                            />
+                            <div>
+                                <h2 className="font-medium">{video.channelTitle}</h2>
+                                <span className="text-sm text-gray-600">{video.genre_id}</span>
+                            </div>
+                        </div>
+                    </div>
 
-                    {currentUser && (
-                        <ReviewForm
-                            videoId={videoId!}
-                            onReviewSubmitted={handleReviewSubmit}
-                            existingReview={reviews.find(review => review.user_id === currentUser.id)}
-                        />
-                    )}
-
-                    <div className="mt-8">
-                        <ReviewList
-                            reviews={reviews}
-                            currentUserId={currentUser?.id}
-                            videoId={videoId}
-                        />
+                    {/* 動画説明 */}
+                    <div className="mt-4">
+                        <div>
+                            <p className={`text-gray-700 whitespace-pre-wrap ${
+                                !isDescriptionExpanded ? 'line-clamp-2' : ''
+                            }`}>
+                                {isDescriptionExpanded ? video.description : video.description.slice(0, 150) + '...'}
+                            </p>
+                            {video.description.length > 150 && (
+                                <button
+                                    onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                                    className="text-indigo-600 hover:text-indigo-800 mt-2 text-sm font-medium"
+                                >
+                                    {isDescriptionExpanded ? '閉じる' : '続きを見る'}
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
+            </div>
+
+            {/* 評価セクション */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 左カラム: 評価サマリー */}
+                <div className="bg-white rounded-lg shadow-md p-6">
+                    <h2 className="text-xl font-bold mb-6">総合評価</h2>
+                    {video.ratings && (
+                        <VideoRatingDisplay
+                            ratings={video.ratings}
+                            showDetails
+                            userRatings={userRating ? [userRating] : []}
+                            allRatings={allRatings}
+                        />
+                    )}
+                </div>
+
+                {/* 右カラム: 評価フォーム */}
+<div className="bg-white rounded-lg shadow-md p-6">
+    <h2 className="text-xl font-bold mb-6">評価を投稿</h2>
+    <VideoRatingForm
+        videoId={videoId!}
+        onSubmit={async () => {
+            await refreshData();
+            setUserRating(null);
+        }}
+        initialRatings={undefined}
+    />
+</div>
             </div>
         </div>
     );

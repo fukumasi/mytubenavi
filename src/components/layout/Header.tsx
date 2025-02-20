@@ -3,6 +3,7 @@ import { LogIn, UserPlus, Youtube, User } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { supabase } from '../../lib/supabase';
 import SearchBar from '../search/SearchBar';
 import NotificationBell from './NotificationBell';
 import NotificationSound from './NotificationSound';
@@ -13,9 +14,32 @@ export default function Header() {
  const navigate = useNavigate();
  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
  const [loading, setLoading] = useState(true);
+ const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+ const [username, setUsername] = useState<string | null>(null);
 
  useEffect(() => {
-   setLoading(false);
+   const fetchUserProfile = async () => {
+     if (currentUser) {
+       try {
+         const { data: profile, error } = await supabase
+           .from('profiles')
+           .select('avatar_url, username')
+           .eq('id', currentUser.id)
+           .single();
+
+         if (error) throw error;
+         if (profile) {
+           setAvatarUrl(profile.avatar_url);
+           setUsername(profile.username);
+         }
+       } catch (error) {
+         console.error('Error fetching profile:', error);
+       }
+     }
+     setLoading(false);
+   };
+
+   fetchUserProfile();
  }, [currentUser]);
 
  const handleLogout = async () => {
@@ -55,19 +79,19 @@ export default function Header() {
                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                    className="flex items-center space-x-2 text-gray-700 hover:text-gray-900"
                  >
-                   <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                     {currentUser.user_metadata?.avatar_url ? (
+                   <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden">
+                     {avatarUrl ? (
                        <img
-                         src={currentUser.user_metadata.avatar_url}
+                         src={avatarUrl}
                          alt="Profile"
-                         className="w-full h-full rounded-full"
+                         className="w-full h-full object-cover"
                        />
                      ) : (
                        <User className="w-5 h-5 text-gray-600" />
                      )}
                    </div>
                    <span className="hidden sm:block">
-                     {currentUser.user_metadata?.username || currentUser.email?.split('@')[0]}
+                     {username || currentUser.email?.split('@')[0]}
                    </span>
                    {unreadCount > 0 && (
                      <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full flex items-center justify-center text-xs text-white">

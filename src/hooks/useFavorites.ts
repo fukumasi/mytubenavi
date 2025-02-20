@@ -1,3 +1,5 @@
+// src/hooks/useFavorites.ts
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,19 +11,26 @@ export const useFavorites = (videoId: string | undefined) => {
 
   useEffect(() => {
     const checkFavoriteStatus = async () => {
-      if (!currentUser) {
+      if (!currentUser || !videoId) {
         setIsFavorite(false);
         setIsLoading(false);
         return;
       }
 
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('favorites')
-          .select()
-          .eq('user_id', currentUser.id)
-          .eq('video_id', videoId)
-          .single();
+          .select('id')
+          .match({
+            user_id: currentUser.id,
+            video_id: videoId
+          })
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error checking favorite status:', error);
+          return;
+        }
 
         setIsFavorite(!!data);
       } catch (error) {
@@ -35,23 +44,29 @@ export const useFavorites = (videoId: string | undefined) => {
   }, [currentUser, videoId]);
 
   const toggleFavorite = async () => {
-    if (!currentUser) return;
+    if (!currentUser || !videoId) return;
 
     try {
       if (isFavorite) {
-        await supabase
+        const { error } = await supabase
           .from('favorites')
           .delete()
-          .eq('user_id', currentUser.id)
-          .eq('video_id', videoId);
+          .match({
+            user_id: currentUser.id,
+            video_id: videoId
+          });
+
+        if (error) throw error;
       } else {
-        await supabase
+        const { error } = await supabase
           .from('favorites')
           .insert([{
             user_id: currentUser.id,
             video_id: videoId,
             created_at: new Date().toISOString()
           }]);
+
+        if (error) throw error;
       }
       
       setIsFavorite(!isFavorite);

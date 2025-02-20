@@ -28,13 +28,17 @@ const ReviewCard = ({ review, onVideoClick }: ReviewCardProps) => {
             {new Date(review.created_at).toLocaleDateString('ja-JP')}
           </span>
         </div>
+
+        <h3 className="text-lg font-medium text-gray-900 mb-3">
+          {review.videos?.title || '削除された動画'}
+        </h3>
         
         <p className="text-gray-700 whitespace-pre-wrap mb-3">{review.comment}</p>
         
         {review.profiles && (
           <div className="flex items-center space-x-2 text-sm text-gray-500">
             <img
-              src={review.profiles.avatar_url}
+              src={review.profiles.avatar_url || '/default-avatar.jpg'}
               alt={review.profiles.username}
               className="w-6 h-6 rounded-full"
             />
@@ -46,7 +50,7 @@ const ReviewCard = ({ review, onVideoClick }: ReviewCardProps) => {
   );
 };
 
-export default function ReviewHistory() {
+const ReviewHistory = () => {
   const navigate = useNavigate();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,11 +63,12 @@ export default function ReviewHistory() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('認証されていません');
 
-        const { data, error } = await supabase
+        // まず reviews を取得
+        const { data: reviewsData, error: reviewsError } = await supabase
           .from('reviews')
           .select(`
             *,
-            profiles (
+            profiles!reviews_user_id_fkey (
               id,
               username,
               avatar_url
@@ -72,8 +77,26 @@ export default function ReviewHistory() {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
-        setReviews(data || []);
+        if (reviewsError) throw reviewsError;
+
+        // 次に videos の情報を取得
+        if (reviewsData) {
+          const videoIds = reviewsData.map(review => review.video_id);
+          const { data: videosData, error: videosError } = await supabase
+            .from('videos')
+            .select('id, title')
+            .in('id', videoIds);
+
+          if (videosError) throw videosError;
+
+          // reviews と videos のデータを結合
+          const combinedData = reviewsData.map(review => ({
+            ...review,
+            videos: videosData?.find(video => video.id === review.video_id)
+          }));
+
+          setReviews(combinedData);
+        }
       } catch (err) {
         console.error('Error fetching reviews:', err);
         setError('レビューの読み込みに失敗しました。');
@@ -152,4 +175,6 @@ export default function ReviewHistory() {
       </div>
     </ProfileLayout>
   );
-}
+};
+
+export default ReviewHistory;

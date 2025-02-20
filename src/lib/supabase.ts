@@ -1,4 +1,3 @@
-// src/lib/supabase.ts
 import { createClient } from '@supabase/supabase-js';
 import { YouTubeAPI, extractVideoId } from './youtube';
 import type {
@@ -51,7 +50,7 @@ const mapSupabaseVideoToVideo = (video: SupabaseVideo): Video => ({
     thumbnail: video.thumbnail || '',
     duration: video.duration || '',
     viewCount: video.view_count || 0,
-    rating: video.rating || 0,
+    rating: typeof video.rating === 'string' ? parseFloat(video.rating) : video.rating || 0,
     genre_id: video.genre_id,
     publishedAt: video.published_at,
     channelTitle: video.channel_title || '',
@@ -288,13 +287,16 @@ export const addVideoToDatabase = async (videoUrl: string): Promise<void> => {
             view_count: parseInt(details.statistics?.viewCount || '0'),
             rating: details.statistics?.likeCount
                 ? (parseInt(details.statistics.likeCount) / parseInt(details.statistics.viewCount || '1')) * 5
-                : 0,
+                : null,
             published_at: details.snippet?.publishedAt || new Date().toISOString(),
             channel_title: details.snippet?.channelTitle || '',
             youtuber: {
                 channelName: details.snippet?.channelTitle || '',
                 channelUrl: `https://www.youtube.com/channel/${details.snippet?.channelId || ''}`,
-                verificationStatus: 'unknown'
+                verificationStatus: 'pending' as const, // 'unknown'から'pending'に変更
+                channel_id: details.snippet?.channelId,
+                avatar_url: undefined,
+                subscribers: undefined
             },
             youtube_id: details.id,
             genre_id: null
@@ -333,27 +335,40 @@ export const getFavoriteVideos = async (): Promise<Video[]> => {
 };
 
 export const getFavoriteStatus = async (videoId: string): Promise<boolean> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+
     const { data, error } = await supabase
         .from('favorites')
         .select('id')
+        .eq('user_id', user.id)
         .eq('video_id', videoId)
-        .single();
+        .maybeSingle();  // single()の代わりにmaybeSingle()を使用
 
-    if (error) return false;
+    if (error) {
+        console.error('Error checking favorite status:', error);
+        return false;
+    }
+
     return !!data;
 };
 
 export const toggleFavorite = async (videoId: string): Promise<boolean> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
     const { data: existing } = await supabase
         .from('favorites')
         .select('id')
+        .eq('user_id', user.id)
         .eq('video_id', videoId)
-        .single();
+        .maybeSingle();
 
     if (existing) {
         const { error } = await supabase
             .from('favorites')
             .delete()
+            .eq('user_id', user.id)
             .eq('video_id', videoId);
 
         if (error) throw error;
@@ -361,7 +376,10 @@ export const toggleFavorite = async (videoId: string): Promise<boolean> => {
     } else {
         const { error } = await supabase
             .from('favorites')
-            .insert([{ video_id: videoId }]);
+            .insert([{
+                user_id: user.id,
+                video_id: videoId
+            }]);
 
         if (error) throw error;
         return true;
@@ -397,16 +415,36 @@ export const getVideoReviews = async (videoId: string): Promise<Review[]> => {
     return (data || []).map(review => mapSupabaseReviewToReview(review));
 };
 
+// ビデオ評価を取得する関数
+export const getVideoRating = async (videoId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase
+        .rpc('get_video_rating', { p_video_id: videoId });
+
+    if (error) {
+        console.error('Error fetching video rating:', error);
+        throw error;
+    }
+
+    return data;
+};
+
 // レビュー投稿
 export const postReview = async (
     videoId: string,
     rating: number,
     comment: string
 ) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
     const { data, error } = await supabase
         .from('reviews')
         .insert([{
             video_id: videoId,
+            user_id: user.id,  // 追加：認証済みユーザーのIDを設定
             rating,
             comment,
             created_at: new Date().toISOString()
@@ -449,93 +487,6 @@ export const deleteReview = async (reviewId: string) => {
     if (error) throw error;
 };
 
-
-// レビュー投稿/更新（既存の関数と統合）
-// export const postOrUpdateReview = async (videoId: string, rating: number, comment: string): Promise<Review> => { //コメントアウト：重複のため
-//     const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-//     if (authError || !user) {
-//         throw new Error('ログインが必要です');
-//     }
-
-//     try {
-//         // 既存のレビューを確認
-//         const { data: existingReview } = await supabase
-//             .from('reviews')
-//             .select('id')
-//             .match({ user_id: user.id, video_id: videoId })
-//             .single();
-
-//         let result;
-
-//         if (existingReview) {
-//             // 既存のレビューを更新
-//             const { data, error } = await supabase
-//                 .from('reviews')
-//                 .update({
-//                     rating,
-//                     comment,
-//                     updated_at: new Date().toISOString()
-//                 })
-//                 .eq('id', existingReview.id)
-//                 .select(`
-//                     id,
-//                     video_id,
-//                     user_id,
-//                     rating,
-//                     comment,
-//                     created_at,
-//                     updated_at,
-//                     profiles!reviews_user_id_fkey (
-//                         id,
-//                         username,
-//                         avatar_url
-//                     )
-//                 `)
-//                 .single();
-
-//             if (error) throw error;
-//             result = data;
-//         } else {
-//             // 新規レビューを投稿
-//             const { data, error } = await supabase
-//                 .from('reviews')
-//                 .insert([{
-//                     video_id: videoId,
-//                     user_id: user.id,
-//                     rating,
-//                     comment,
-//                     created_at: new Date().toISOString(),
-//                     updated_at: new Date().toISOString()
-//                 }])
-//                 .select(`
-//                     id,
-//                     video_id,
-//                     user_id,
-//                     rating,
-//                     comment,
-//                     created_at,
-//                     updated_at,
-//                     profiles!reviews_user_id_fkey (
-//                         id,
-//                         username,
-//                         avatar_url
-//                     )
-//                 `)
-//                 .single();
-
-//             if (error) throw error;
-//             result = data;
-//         }
-
-//         return mapSupabaseReviewToReview(result);
-//     } catch (error: any) {
-//         console.error('Error posting/updating review:', error);
-//         throw error;
-//     }
-// };
-
-
 export const getUserReviews = async (): Promise<Review[]> => {
     const { data, error } = await supabase
         .from('reviews')
@@ -559,39 +510,6 @@ export const getUserReviews = async (): Promise<Review[]> => {
 
     return (data || []).map(review => mapSupabaseReviewToReview(review));
 };
-
-// 視聴履歴関連の関数
-// export const addViewHistory = async (videoId: string): Promise<void> => { // コメントアウト：重複のため
-//     const { error } = await supabase
-//         .from('view_history')
-//         .insert([{
-//             video_id: videoId,
-//             viewed_at: new Date().toISOString()
-//         }]);
-
-//     if (error) throw error;
-// };
-
-// export const getViewHistory = async (): Promise<Video[]> => {  // コメントアウト：重複のため
-//     const { data, error } = await supabase
-//         .from('view_history')
-//         .select(`
-//       video_id,
-//       videos:video_id (*)
-//     `)
-//         .order('viewed_at', { ascending: false });
-
-//     if (error) throw error;
-
-//     return (data || [])
-//         .map(item => {
-//             if (item.videos && typeof item.videos === 'object' && !Array.isArray(item.videos)) {
-//                 return mapSupabaseVideoToVideo(item.videos as unknown as SupabaseVideo);
-//             }
-//             return null;
-//         })
-//         .filter((video): video is Video => video !== null);
-// };
 
 // 検索関連の関数
 export const searchVideos = async (
@@ -829,4 +747,120 @@ export const getViewHistory = async (userId: string) => {
         console.error('視聴履歴の取得に失敗:', error);
         return [];
     }
+};
+
+// ratingsの型定義
+export type Ratings = {
+    reliability: { averageRating: number; totalRatings: number; distribution: { [key: string]: number } };
+    entertainment: { averageRating: number; totalRatings: number; distribution: { [key: string]: number } };
+    usefulness: { averageRating: number; totalRatings: number; distribution: { [key: string]: number } };
+    quality: { averageRating: number; totalRatings: number; distribution: { [key: string]: number } };
+    originality: { averageRating: number; totalRatings: number; distribution: { [key: string]: number } };
+    clarity: { averageRating: number; totalRatings: number; distribution: { [key: string]: number } };
+    overall: { averageRating: number; totalRatings: number; distribution: { [key: string]: number } };
+};
+
+// 7項目評価データの保存送信
+export const submitVideoRating = async (
+    videoId: string,
+    overall: number,
+    clarity: number,
+    entertainment: number,
+    originality: number,
+    quality: number,
+    reliability: number,
+    usefulness: number,
+    comment: string
+) => {
+    console.log('送信データ:', {
+        videoId,
+        overall,
+        clarity,
+        entertainment,
+        originality,
+        quality,
+        reliability,
+        usefulness,
+        comment
+    });
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase
+        .from('video_ratings')
+        .upsert([{
+            video_id: videoId,
+            user_id: user.id,
+            overall,
+            clarity,
+            entertainment,
+            originality,
+            quality,
+            reliability,
+            usefulness,
+            comment
+        }], {
+            onConflict: 'user_id,video_id'
+        })
+        .select()
+        .single();
+
+    console.log('Supabase応答:', { data, error });
+
+    if (error) {
+        console.error('評価送信エラー:', error);
+        throw error;
+    }
+
+    return data;
+};
+// すべてのユーザーの評価を取得する関数
+export const getAllVideoRatings = async (videoId: string) => {
+    const { data, error } = await supabase
+        .from('video_ratings')
+        .select(`
+            *,
+            profiles:user_id (
+                username,
+                avatar_url
+            )
+        `)
+        .eq('video_id', videoId)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching all video ratings:', error);
+        return null;
+    }
+
+    return data;
+};
+
+// 現在のユーザーの評価を取得する関数
+// src/lib/supabase.ts
+export const getUserVideoRating = async (videoId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data, error } = await supabase
+        .from('video_ratings')
+        .select(`
+            *,
+            profiles:user_id (
+                id,
+                username,
+                avatar_url
+            )
+        `)  // プロフィール情報を含めるように修正
+        .eq('video_id', videoId)
+        .eq('user_id', user.id)
+        .single();
+
+    if (error) {
+        console.error('Error fetching user video rating:', error);
+        return null;
+    }
+
+    return data;
 };

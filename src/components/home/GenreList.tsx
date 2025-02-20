@@ -1,4 +1,3 @@
-// src/components/home/GenreList.tsx
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -110,7 +109,7 @@ function GenreList({ onGenreClick }: GenreListProps) {
            >
              <IconRenderer iconName={genre.name} className="w-6 h-6"/>
            </div>
-           <span className="text-gray-300">{genre.name}</span>
+           <span className="text-indigo-600">{genre.name}</span>
          </Link>
      ))}
    </div>

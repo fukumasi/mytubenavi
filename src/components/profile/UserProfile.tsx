@@ -1,7 +1,9 @@
+// src/components/profile/UserProfile.tsx
 import { useEffect, useState } from 'react';
 import { getProfile, updateProfile } from '../../lib/supabase';
 import type { Profile } from '../../types';
 import ProfileLayout from './ProfileLayout';
+import { ProfileAvatar } from './ProfileAvatar';
 
 export default function UserProfile() {
     const [profileData, setProfileData] = useState<Profile | null>(null);
@@ -31,6 +33,21 @@ export default function UserProfile() {
 
         fetchProfile();
     }, []);
+
+    const handleAvatarUpload = async (url: string) => {
+        try {
+            if (profileData) {
+                await updateProfile({
+                    ...profileData,
+                    avatar_url: url
+                });
+                setProfileData(prev => ({ ...prev, avatar_url: url } as Profile));
+            }
+        } catch (error) {
+            console.error('Error updating avatar:', error);
+            setError('プロフィール画像の更新に失敗しました');
+        }
+    };
 
     const handleSaveProfile = async () => {
         try {
@@ -77,13 +94,11 @@ export default function UserProfile() {
                 </div>
             )}
             <div className="flex items-center space-x-6">
-                <div className="w-24 h-24 bg-gray-200 rounded-full overflow-hidden">
-                    <img
-                        src={profileData?.avatar_url || '/default-avatar.png'}
-                        alt="プロフィール画像"
-                        className="w-full h-full object-cover"
-                    />
-                </div>
+                <ProfileAvatar
+                    url={profileData?.avatar_url}
+                    onUpload={handleAvatarUpload}
+                    size={96}
+                />
                 <div className="flex-1">
                     {isEditing ? (
                         <div className="space-y-4">
