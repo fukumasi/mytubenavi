@@ -2,24 +2,24 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProfileLayout from './ProfileLayout';
 import { supabase } from '../../lib/supabase';
-import { CommentCard } from '../ui/CommentCard';
-import type { Comment } from '../../types/comment';
+import { ReviewCard } from '../ui/ReviewCard';
+import type { Review } from '../../types/review';
 
-export default function CommentHistory() {
+export default function ReviewHistory() {
   const navigate = useNavigate();
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchComments = async () => {
+    const fetchReviews = async () => {
       try {
         setLoading(true);
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('認証されていません');
 
         const { data, error } = await supabase
-          .from('comments')
+          .from('reviews')
           .select(`
             *,
             profiles (
@@ -36,16 +36,16 @@ export default function CommentHistory() {
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        setComments(data || []);
+        setReviews(data || []);
       } catch (err) {
-        console.error('Error fetching comments:', err);
-        setError('コメントの読み込みに失敗しました。');
+        console.error('Error fetching reviews:', err);
+        setError('レビューの読み込みに失敗しました。');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchComments();
+    fetchReviews();
   }, []);
 
   const handleVideoClick = (videoId: string) => {
@@ -75,10 +75,10 @@ export default function CommentHistory() {
       );
     }
 
-    if (comments.length === 0) {
+    if (reviews.length === 0) {
       return (
         <div className="text-center py-8">
-          <p className="text-gray-600">まだコメントを投稿していません。</p>
+          <p className="text-gray-600">まだレビューを投稿していません。</p>
           <button
             onClick={() => navigate('/')}
             className="mt-4 text-indigo-600 hover:text-indigo-500"
@@ -91,10 +91,10 @@ export default function CommentHistory() {
 
     return (
       <div className="space-y-4">
-        {comments.map((comment) => (
-          <CommentCard
-            key={comment.id}
-            comment={comment}
+        {reviews.map((review) => (
+          <ReviewCard
+            key={review.id}
+            review={review}
             onVideoClick={handleVideoClick}
           />
         ))}
@@ -106,9 +106,9 @@ export default function CommentHistory() {
     <ProfileLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-gray-900">コメント履歴</h2>
+          <h2 className="text-xl font-semibold text-gray-900">レビュー履歴</h2>
           <span className="text-sm text-gray-500">
-            {!loading && !error && `${comments.length}件のコメント`}
+            {!loading && !error && `${reviews.length}件のレビュー`}
           </span>
         </div>
         {renderContent()}

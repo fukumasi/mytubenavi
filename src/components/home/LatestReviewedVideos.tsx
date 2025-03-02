@@ -18,26 +18,27 @@ export default function LatestReviewedVideos() {
      navigate(`/video/${video.youtube_id}`);
      return;
    }
-  
+   
    setPlayingVideoId(prevId => prevId === video.youtube_id ? null : video.youtube_id);
  };
 
  useEffect(() => {
-   const fetchLatestReviewedVideos = async () => {
+   const fetchVideos = async () => {
      try {
        setLoading(true);
+       // 新しく作成したgetVideosByReviewCount関数を使用
        const videosData = await getVideosByReviewCount(6);
        console.log('Found reviewed videos:', videosData.length);
        setVideos(videosData);
      } catch (err) {
-       console.error('Detailed error in fetchLatestReviewedVideos:', err);
+       console.error('Error fetching videos:', err);
        setError('動画の読み込みに失敗しました');
      } finally {
        setLoading(false);
      }
    };
 
-   fetchLatestReviewedVideos();
+   fetchVideos();
  }, []);
 
  if (loading) {

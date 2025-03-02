@@ -3,13 +3,13 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import {
- Notification as NotificationType,
- NotificationType as NotificationTypeValue, // 型名を修正
- NotificationPreferences
+  Notification,
+  NotificationType, // 型名を修正
+  NotificationPreferences
 } from '../types/notification';
 
 interface NotificationContextType {
- notifications: NotificationType[];
+ notifications: Notification[]; // 型名を修正
  unreadCount: number;
  loading: boolean;
  error: string | null;
@@ -18,14 +18,14 @@ interface NotificationContextType {
  fetchNotifications: () => Promise<void>;
  deleteNotification: (id: string) => Promise<void>;
  clearNotifications: () => Promise<void>;
- filterNotifications: (type?: NotificationTypeValue) => NotificationType[]; // 型名を修正
+ filterNotifications: (type?: NotificationType) => Notification[]; // 型名を修正
  updateNotificationPreferences: (preferences: NotificationPreferences) => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
- const [notifications, setNotifications] = useState<NotificationType[]>([]); // 型名を修正
+ const [notifications, setNotifications] = useState<Notification[]>([]); // 型名を修正
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState<string | null>(null);
  const [channel, setChannel] = useState<RealtimeChannel | null>(null);
@@ -47,7 +47,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
        .order('createdAt', { ascending: false });
 
      if (fetchError) throw fetchError;
-     setNotifications(data as NotificationType[] || []); // 型をアサート
+     setNotifications(data as Notification[] || []); // 型をアサート
    } catch (err) {
      console.error('通知の取得に失敗:', err);
      setError('通知の読み込みに失敗しました');
@@ -154,7 +154,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
    }
  };
 
- const filterNotifications = (type?: NotificationTypeValue) => { // 型名を修正
+ const filterNotifications = (type?: NotificationType) => { // 型名を修正
    if (!type) return notifications;
    return notifications.filter(notification => notification.type === type);
  };

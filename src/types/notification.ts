@@ -1,9 +1,9 @@
 // src/types/notification.ts
 
 export enum NotificationType {
-  Comment = 'comment',
+  Review = 'review',
   Rating = 'rating',
-  Favorite = 'favorite',
+  Favorite = 'favorite', 
   NewVideo = 'new_video',
   System = 'system',
   Mention = 'mention',
@@ -16,7 +16,7 @@ export enum NotificationType {
  
  export interface Notification {
   id: string;
-  userId: string;
+  userId: string; 
   type: NotificationType;
   title: string;
   message: string;
@@ -35,10 +35,9 @@ export enum NotificationType {
  
  export interface NotificationMetadata {
   videoId?: string;
-  commentId?: string;
+  reviewId?: string;
   ratingId?: string;
   userId?: string;
-  reviewId?: string;
   achievementId?: string;
   milestoneId?: string;
   subscriptionId?: string;
@@ -59,7 +58,7 @@ export enum NotificationType {
   pushNotifications: boolean;
   inAppNotifications: boolean;
   notificationTypes: {
-    comments: boolean;
+    reviews: boolean;
     ratings: boolean;
     favorites: boolean;
     newVideos: boolean;

@@ -10,6 +10,8 @@ import {
 
 interface GenreListProps {
  onGenreClick?: (genre: Genre) => void;
+ genres?: Genre[];
+ parentGenre?: string;
 }
 
 interface IconRendererProps {
@@ -52,12 +54,14 @@ const getColorForGenre = (genreName: string): string => {
  return colors[genreName] || 'gray';
 };
 
-function GenreList({ onGenreClick }: GenreListProps) {
- const [genres, setGenres] = useState<Genre[]>([]);
- const [loading, setLoading] = useState(true);
+function GenreList({ onGenreClick, genres: propGenres }: GenreListProps) {
+ const [genres, setGenres] = useState<Genre[]>(propGenres || []);
+ const [loading, setLoading] = useState(!propGenres);
  const [error, setError] = useState<string | null>(null);
 
  useEffect(() => {
+   if (propGenres) return;
+
    const fetchGenres = async () => {
      try {
        setLoading(true);
@@ -78,7 +82,7 @@ function GenreList({ onGenreClick }: GenreListProps) {
    };
 
    fetchGenres();
- }, []);
+ }, [propGenres]);
 
  if (loading) {
    return (

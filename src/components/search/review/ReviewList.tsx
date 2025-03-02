@@ -1,10 +1,9 @@
 // src/components/review/ReviewList.tsx
 
 import { User, ThumbsUp, Pencil, Trash2 } from 'lucide-react';
-import type { Review } from '@/types';
+import type { Review } from '@/types/review';
 import { StarRating } from './StarRating';
 import { useState, useEffect } from 'react';
-
 import { supabase } from '@/lib/supabase';
 
 interface ReviewListProps {
@@ -129,7 +128,7 @@ const ReviewList = ({
                 {review.profiles?.avatar_url ? (
                   <img
                     src={review.profiles.avatar_url}
-                    alt={review.profiles.username}
+                    alt={review.profiles.username || ''}
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -140,11 +139,13 @@ const ReviewList = ({
                 <div className="font-medium text-gray-900 text-sm">
                   {review.profiles?.username || 'ゲスト'}
                 </div>
-                <StarRating 
-  rating={review.rating} 
-  size="sm" 
-  readOnly={true} // editableの代わりにreadOnlyを使用
-/>
+                {review.rating && (
+                  <StarRating 
+                    rating={review.rating} 
+                    size="sm" 
+                    readOnly={true}
+                  />
+                )}
               </div>
             </div>
             
@@ -182,7 +183,7 @@ const ReviewList = ({
           </div>
           
           <div className="text-sm text-gray-700 whitespace-pre-wrap break-words mb-3">
-            {review.comment}
+            {review.content}
           </div>
           
           <div className="flex items-center">

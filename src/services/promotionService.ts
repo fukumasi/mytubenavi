@@ -1,5 +1,5 @@
-import { supabase } from '../lib/supabase';
-import { PromotionSlot, SlotBooking } from '../types/promotion';
+import { supabase } from '@/lib/supabase';
+import { PromotionSlot, SlotBooking } from '@/types/promotion';
 
 export const promotionService = {
   async getPromotionSlots(): Promise<PromotionSlot[]> {

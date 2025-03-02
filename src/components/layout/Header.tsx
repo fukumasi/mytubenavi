@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { LogIn, UserPlus, Youtube, User } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { supabase } from '../../lib/supabase';
@@ -11,7 +11,6 @@ import NotificationSound from './NotificationSound';
 export default function Header() {
  const { currentUser, signOut } = useAuth();
  const { unreadCount } = useNotifications();
- const navigate = useNavigate();
  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
  const [loading, setLoading] = useState(true);
  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -43,13 +42,13 @@ export default function Header() {
  }, [currentUser]);
 
  const handleLogout = async () => {
-   try {
-     await signOut();
-     navigate('/');
-   } catch (error) {
-     console.error('Logout error:', error);
-   }
- };
+  try {
+    setIsUserMenuOpen(false); // まずメニューを閉じる
+    await signOut(); // signOut関数を呼び出し（この中でリロードされるため、以下は実行されない可能性があります）
+  } catch (error) {
+    console.error('Logout error:', error);
+  }
+};
 
  return (
    <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-50">

@@ -12,10 +12,10 @@ export type RatingCategory =
 export type RatingValue = 1 | 2 | 3 | 4 | 5;
 
 export interface VideoRating {
-  id: string;                 // 追加
-  video_id: string;          // 追加
-  user_id: string;           // 追加
-  profiles?: {               // 追加
+  id: string;                 
+  video_id: string;          
+  user_id: string;           
+  profiles?: {               
     username: string;
     avatar_url: string;
   };
@@ -50,11 +50,10 @@ export interface Profile {
     category?: string;
     created_at?: string;
     updated_at?: string;
-    // YouTuber 関連フィールド (PromotionSlot, SlotBooking で使用)
-    channel_id?: string;       // YouTube チャンネルID
-    subscribers?: number;   // チャンネル登録者数
-    video_count?: number;     // 動画数
-    total_views?: number;   // 総視聴回数
+    channel_id?: string;
+    subscribers?: number;
+    video_count?: number;
+    total_views?: number;
 }
 
 export interface AggregatedVideoRating {
@@ -76,37 +75,30 @@ export interface AggregatedRating {
 }
 
 export interface Video {
-    channelId?: string;  // 追加
-    avg_rating?: number;
-    review_count?: number;
-    mytubenavi_comment_count?: number;
     id: string;
+    youtube_id: string;
     title: string;
     description: string;
     thumbnail: string;
     duration: string;
-    viewCount: number;
+    view_count: number;
     rating: number;
-    likeCount?: number;  // 追加
-    publishedAt: string;
-    channelTitle: string;
-    commentCount?: number;
-    youtube_id: string;
+    published_at: string;
+    channel_title: string;
     genre_id?: string;
     created_at?: string;
     updated_at?: string;
-    tags?: string[];
+    review_count: number;
+    avg_rating?: number;
+    ratings?: AggregatedVideoRating;
+    channel_id?: string;
     youtuber?: {
         channelName: string;
         channelUrl: string;
         verificationStatus: 'unknown' | 'pending' | 'verified' | 'rejected';
         channel_id?: string;
-        avatar_url?: string;
-        subscribers?: number;
     };
-    ratings?: AggregatedVideoRating; // 追加
-}
-
+ }
 export interface Review {
     id: string;
     video_id: string;
@@ -285,7 +277,6 @@ export interface SupabaseVideo extends BaseEntity {
     tags: string[];
     avg_rating?: number;
     review_count?: number;
-    mytubenavi_comment_count?: number;
     genre_id?: string;
     subgenre_id?: string;
     youtube_id: string;

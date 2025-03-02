@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Star } from 'lucide-react';
-import type { RatingValue } from '@/types';
+import type { RatingValue } from '@/types/rating';
 
 interface StarRatingProps {
  rating: number;

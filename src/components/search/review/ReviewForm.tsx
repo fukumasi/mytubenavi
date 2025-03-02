@@ -1,14 +1,15 @@
+// src/components/review/ReviewForm.tsx
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, ThumbsUp, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { postReview, updateReview, deleteReview, getVideoReviews } from '@/lib/supabase';
+import { postReview, updateReview, deleteReview, getVideoReviews, updateVideoReviewCount } from '@/lib/supabase';
 import { StarRating } from './StarRating';
-import type { Review } from '@/types';
+import type { Review } from '@/types/review';
 
 interface ReviewFormProps {
   videoId: string;
-  onReviewSubmitted: (rating: number, comment: string) => Promise<void>;
+  onReviewSubmitted: (rating: number, content: string) => Promise<void>;
   existingReview?: Review;
   onCancel?: () => void;
   onDelete?: () => void;
@@ -23,10 +24,10 @@ export function ReviewForm({
 }: ReviewFormProps) {
   const { currentUser } = useAuth();
   const [rating, setRating] = useState(existingReview?.rating || 0);
-  const [comment, setComment] = useState(existingReview?.comment || '');
+  const [content, setContent] = useState(existingReview?.content || '');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [charCount, setCharCount] = useState(existingReview?.comment?.length || 0);
+  const [charCount, setCharCount] = useState(existingReview?.content?.length || 0);
   const [hasUserReviewed, setHasUserReviewed] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -53,10 +54,10 @@ export function ReviewForm({
     }
   }, [videoId, currentUser, existingReview]);
 
-  const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
     if (text.length <= MAX_CHARS) {
-      setComment(text);
+      setContent(text);
       setCharCount(text.length);
       if (error) setError(null);
     }
@@ -68,6 +69,8 @@ export function ReviewForm({
     try {
       setLoading(true);
       await deleteReview(existingReview.id);
+      // レビュー削除後にレビュー数を更新
+      await updateVideoReviewCount(videoId);
       onDelete?.();
     } catch (err) {
       console.error('Error deleting review:', err);
@@ -83,19 +86,19 @@ export function ReviewForm({
       return false;
     }
     
-    const trimmedComment = comment.trim();
-    if (!trimmedComment) {
-      setError('コメントを入力してください');
+    const trimmedContent = content.trim();
+    if (!trimmedContent) {
+      setError('レビュー内容を入力してください');
       return false;
     }
     
-    if (trimmedComment.length < MIN_CHARS) {
-      setError(`コメントは${MIN_CHARS}文字以上入力してください`);
+    if (trimmedContent.length < MIN_CHARS) {
+      setError(`レビュー内容は${MIN_CHARS}文字以上入力してください`);
       return false;
     }
     
-    if (trimmedComment.length > MAX_CHARS) {
-      setError(`コメントは${MAX_CHARS}文字以内で入力してください`);
+    if (trimmedContent.length > MAX_CHARS) {
+      setError(`レビュー内容は${MAX_CHARS}文字以内で入力してください`);
       return false;
     }
     
@@ -112,13 +115,18 @@ export function ReviewForm({
       setLoading(true);
 
       if (existingReview) {
-        await updateReview(existingReview.id, rating, comment.trim());
+        await updateReview(existingReview.id, rating, content.trim());
       } else {
-        await postReview(videoId, rating, comment.trim());
+        await postReview(videoId, rating, content.trim());
       }
 
+      // レビュー投稿・更新後にレビュー数を更新
+      console.log('Updating review count for video:', videoId);
+      const updatedCount = await updateVideoReviewCount(videoId);
+      console.log('Updated review count:', updatedCount);
+
       setSubmitSuccess(true);
-      await onReviewSubmitted(rating, comment.trim());
+      await onReviewSubmitted(rating, content.trim());
 
       if (!existingReview) {
         setTimeout(() => {
@@ -239,14 +247,14 @@ export function ReviewForm({
           </div>
 
           <div className="mb-2">
-            <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-2">
-              コメント
+            <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
+              レビュー内容
             </label>
             <textarea
-              id="comment"
+              id="content"
               rows={4}
-              value={comment}
-              onChange={handleCommentChange}
+              value={content}
+              onChange={handleContentChange}
               className={`w-full rounded-md shadow-sm ${
                 charCount > MAX_CHARS * 0.9
                   ? 'border-yellow-300 focus:border-yellow-500 focus:ring-yellow-500'
@@ -268,7 +276,7 @@ export function ReviewForm({
             <ul className="list-disc list-inside space-y-1">
               <li>投稿したレビューは公開され、他のユーザーが参照できます</li>
               <li>不適切な内容は削除される場合があります</li>
-              <li>コメントは{MIN_CHARS}文字以上、{MAX_CHARS}文字以内で入力してください</li>
+              <li>レビュー内容は{MIN_CHARS}文字以上、{MAX_CHARS}文字以内で入力してください</li>
             </ul>
           </div>
 

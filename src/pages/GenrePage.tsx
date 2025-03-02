@@ -52,7 +52,7 @@ const GenrePage: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6">サブジャンル</h1>
       {subGenres.length > 0 ? (
-        <GenreList />
+        <GenreList genres={subGenres} parentGenre={slug} />
       ) : (
         <p className="text-gray-500">サブジャンルが見つかりませんでした。</p>
       )}

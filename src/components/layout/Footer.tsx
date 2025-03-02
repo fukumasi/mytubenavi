@@ -60,12 +60,22 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#" className="text-sm text-gray-600 hover:text-gray-900">
+                <a 
+                  href="/privacy-policy.html" 
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-gray-600 hover:text-gray-900"
+                >
                   プライバシーポリシー
                 </a>
               </li>
               <li>
-                <a href="#" className="text-sm text-gray-600 hover:text-gray-900">
+                <a 
+                  href="/terms-of-service.html"
+                  target="_blank"
+                  rel="noopener noreferrer" 
+                  className="text-sm text-gray-600 hover:text-gray-900"
+                >
                   利用規約
                 </a>
               </li>

@@ -9,12 +9,14 @@ interface VideoListProps {
  videos: Video[];
  viewType?: 'table' | 'grid';
  loading?: boolean;
+ onImageError?: (video: Video) => void;
 }
 
 export default function VideoList({ 
  videos, 
  viewType = 'grid',
- loading
+ loading,
+ onImageError
 }: VideoListProps) {
  const { t } = useTranslation();
  const [sortConfig, setSortConfig] = useState<{
@@ -78,10 +80,11 @@ export default function VideoList({
            videoId={video.youtube_id || video.id}
            title={video.title}
            thumbnail={video.thumbnail}
-           channelTitle={video.channelTitle}
-           viewCount={video.viewCount}
+           channelTitle={video.channel_title}
+           viewCount={video.view_count}
            rating={video.rating}
            video={video}
+           onImageError={() => onImageError?.(video)}
          />
        ))}
      </div>
@@ -99,21 +102,21 @@ export default function VideoList({
                <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
              )}
            </th>
-           <th className="cursor-pointer p-2" onClick={() => requestSort('channelTitle')}>
+           <th className="cursor-pointer p-2" onClick={() => requestSort('channel_title')}>
              {t('channel')}
-             {sortConfig?.key === 'channelTitle' && (
+             {sortConfig?.key === 'channel_title' && (
                <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
              )}
            </th>
-           <th className="cursor-pointer p-2" onClick={() => requestSort('publishedAt')}>
+           <th className="cursor-pointer p-2" onClick={() => requestSort('published_at')}>
              {t('publishDate')}
-             {sortConfig?.key === 'publishedAt' && (
+             {sortConfig?.key === 'published_at' && (
                <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
              )}
            </th>
-           <th className="cursor-pointer p-2" onClick={() => requestSort('viewCount')}>
+           <th className="cursor-pointer p-2" onClick={() => requestSort('view_count')}>
              {t('views')}
-             {sortConfig?.key === 'viewCount' && (
+             {sortConfig?.key === 'view_count' && (
                <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
              )}
            </th>
@@ -131,17 +134,23 @@ export default function VideoList({
              <td className="p-2">
                <div className="flex items-center space-x-2">
                  <img
-                   src={video.thumbnail}
+                   src={video.thumbnail || '/placeholder.jpg'}
                    alt={video.title}
                    className="w-24 h-auto"
+                   onError={(e) => {
+                     const target = e.target as HTMLImageElement;
+                     target.onerror = null;
+                     target.src = '/placeholder.jpg';
+                     onImageError?.(video);
+                   }}
                  />
                  <span>{video.title}</span>
                </div>
              </td>
-             <td className="p-2">{video.channelTitle}</td>
-             <td className="p-2">{new Date(video.publishedAt).toLocaleDateString()}</td>
-             <td className="p-2">{video.viewCount.toLocaleString()}</td>
-             <td className="p-2">{video.duration}</td>
+             <td className="p-2">{video.channel_title || 'チャンネル名なし'}</td>
+             <td className="p-2">{video.published_at ? new Date(video.published_at).toLocaleDateString() : '-'}</td>
+             <td className="p-2">{video.view_count ? video.view_count.toLocaleString() : '0'}</td>
+             <td className="p-2">{video.duration || '-'}</td>
            </tr>
          ))}
        </tbody>

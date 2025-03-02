@@ -1,5 +1,4 @@
 // src/pages/SearchPage.tsx
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Search, Filter, Loader } from 'lucide-react';
@@ -63,10 +62,8 @@ export default function SearchPage() {
             setError(null);
 
             try {
-                // Supabaseでの検索
                 const dbResult = await searchVideos(searchQuery);
 
-                // データベースに結果がない場合、YouTube APIで検索
                 if (dbResult.videos.length === 0) {
                     const youtubeResult = await YouTubeAPI.searchVideos(searchQuery, 10);
                     setVideos(youtubeResult.videos);
@@ -74,18 +71,16 @@ export default function SearchPage() {
                     const related = await fetchRelatedVideos(searchQuery);
                     setRelatedVideos(related);
                 } else {
-                    // フィルタリングとソートを適用
                     let filteredVideos = dbResult.videos;
                     
                     if (filter.genre_id) {
                          filteredVideos = filteredVideos.filter(v => v.genre_id === filter.genre_id);
                     }
                     
-                    // ソート
                     filteredVideos.sort((a, b) => {
                         const factor = sort.direction === 'asc' ? 1 : -1;
                         if (sort.field === 'published_at') {
-                           return factor * (new Date(a.publishedAt || "").getTime() - new Date(b.publishedAt || "").getTime());
+                           return factor * (new Date(a.published_at || "").getTime() - new Date(b.published_at || "").getTime());
                        }
                       return factor * ((Number(a[sort.field as keyof Video]) || 0) - (Number(b[sort.field as keyof Video]) || 0));
                     });
@@ -107,7 +102,6 @@ export default function SearchPage() {
     useEffect(() => {
         if (query) {
             debouncedSearch(query);
-            // URLパラメータを更新
             setSearchParams({ q: query });
         }
         return () => {
@@ -152,7 +146,7 @@ export default function SearchPage() {
                             className="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500"
                         >
                             <option value="published_at">投稿日時</option>
-                            <option value="viewCount">視聴回数</option>
+                            <option value="view_count">視聴回数</option>
                             <option value="rating">評価</option>
                         </select>
                         <button
@@ -202,11 +196,11 @@ export default function SearchPage() {
                                             {video.description}
                                         </p>
                                         <div className="flex items-center gap-3 mt-2 text-sm text-gray-500">
-                                            <span>{video.channelTitle}</span>
+                                            <span>{video.channel_title}</span>
                                             <span>•</span>
-                                            <span>{new Date(video.publishedAt).toLocaleDateString('ja-JP')}</span>
+                                            <span>{new Date(video.published_at).toLocaleDateString('ja-JP')}</span>
                                             <span>•</span>
-                                            <span>{video.viewCount?.toLocaleString()} 回視聴</span>
+                                            <span>{video.view_count?.toLocaleString()} 回視聴</span>
                                             {video.rating > 0 && (
                                                 <>
                                                     <span>•</span>
@@ -240,7 +234,7 @@ export default function SearchPage() {
                                                                         {video.title}
                                                                     </h3>
                                                                     <p className="text-xs text-gray-500 mt-1">
-                                                                        {video.channelTitle}
+                                                                        {video.channel_title}
                                                                     </p>
                                                                  </div>
                                                             </div>
