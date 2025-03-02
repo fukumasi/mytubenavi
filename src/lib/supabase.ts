@@ -159,8 +159,8 @@ export const getPopularVideosByRating = async (limit: number = 10): Promise<Vide
 
         // 2. レビューデータを取得
         const { data: reviewData, error: reviewError } = await supabase
-            .from('video_reviews')
-            .select('*');
+    .from('video_ratings')  // ここを変更
+    .select('*');
 
         if (reviewError) throw reviewError;
 
@@ -808,11 +808,36 @@ export const submitVideoRating = async (
 ) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
+    
+    // UUIDからYouTube IDに変換
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(videoId);
+    let youtube_id = videoId;
+    
+    if (isUuid) {
+        const { data: videoData, error: videoError } = await supabase
+            .from('videos')
+            .select('youtube_id')
+            .eq('id', videoId)
+            .single();
+            
+        if (videoError) {
+            console.error('Error getting YouTube ID from UUID:', videoError);
+            throw videoError;
+        }
+        
+        if (!videoData || !videoData.youtube_id) {
+            console.error('No YouTube ID found for UUID:', videoId);
+            throw new Error('No YouTube ID found for this video');
+        }
+        
+        youtube_id = videoData.youtube_id;
+    }
 
+    // YouTube IDを使用して評価を保存
     const { data, error } = await supabase
         .from('video_ratings')
         .upsert([{
-            video_id: videoId,
+            video_id: youtube_id,
             user_id: user.id,
             overall,
             clarity,
@@ -835,7 +860,6 @@ export const submitVideoRating = async (
 
     return data;
 };
-
 
 // getAllVideoRatings 関数の修正
 export const getAllVideoRatings = async (videoId: string) => {
@@ -871,7 +895,7 @@ export const getAllVideoRatings = async (videoId: string) => {
             .from('video_ratings')
             .select(`
                 *,
-                profiles!video_ratings_user_id_fkey (
+                profiles:user_id (
                     id,
                     username,
                     avatar_url
@@ -927,20 +951,20 @@ export const getUserVideoRating = async (videoId: string) => {
             youtube_id = videoData.youtube_id;
         }
 
-        // YouTube IDでユーザーの評価を取得
-        const { data: ratingData, error: ratingError } = await supabase
-            .from('video_ratings')
-            .select(`
-                *,
-                profiles!video_ratings_user_id_fkey (
-                    id,
-                    username,
-                    avatar_url
-                )
-            `)
-            .eq('video_id', youtube_id)
-            .eq('user_id', user.id)
-            .maybeSingle();
+// getUserVideoRating関数の問題部分
+const { data: ratingData, error: ratingError } = await supabase
+    .from('video_ratings')
+    .select(`
+        *,
+        profiles:user_id (
+            id,
+            username,
+            avatar_url
+        )
+    `)
+    .eq('video_id', youtube_id)  // ここでYouTube IDを使用している
+    .eq('user_id', user.id)
+    .maybeSingle();
 
         if (ratingError) {
             console.error('Error fetching user video rating:', ratingError);

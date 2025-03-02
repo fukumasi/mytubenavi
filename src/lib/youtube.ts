@@ -140,7 +140,7 @@ interface SearchOptions {
 async function getReviewCountForVideoUUID(videoUUID: string): Promise<number> {
  try {
      const { data: reviews, error: reviewError } = await supabase
-         .from('video_reviews')
+         .from('video_ratings')
          .select('*', { count: 'exact' })
          .eq('video_id', videoUUID);
 
