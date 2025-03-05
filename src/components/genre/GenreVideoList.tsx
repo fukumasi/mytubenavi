@@ -1,3 +1,5 @@
+// src/components/genre/GenreVideoList.tsx
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -100,29 +102,57 @@ export default function GenreVideoList() {
         setSortConfig({ key, direction });
     };
 
+    // ソートロジックを改善
     const sortedVideos = useCallback(() => {
         if (!sortConfig) return videos;
 
         return [...videos].sort((a, b) => {
+            // ★ここからソートロジックの修正★
             const aValue = a[sortConfig.key];
             const bValue = b[sortConfig.key];
+            const direction = sortConfig.direction === 'asc' ? 1 : -1;
 
-            if (aValue === undefined || bValue === undefined) {
-                return 0;
+            // undefined/nullの処理
+            if (aValue === undefined || aValue === null) {
+                return direction * -1; // undefinedは後ろにソート
             }
+            if (bValue === undefined || bValue === null) {
+                return direction; // undefinedは後ろにソート
+            }
+
+            // 文字列比較
             if (typeof aValue === 'string' && typeof bValue === 'string') {
-                return sortConfig.direction === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
-            }
-            if (typeof aValue === 'number' && typeof bValue === 'number') {
-                return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
-            }
-
-            // Dateオブジェクトの比較
-            if (aValue instanceof Date && bValue instanceof Date) {
-                return sortConfig.direction === 'asc' ? aValue.getTime() - bValue.getTime() : bValue.getTime() - aValue.getTime();
+                // published_atは日付文字列として特別扱い
+                if (sortConfig.key === 'published_at') {
+                    return direction * (new Date(aValue).getTime() - new Date(bValue).getTime());
+                }
+                return direction * aValue.localeCompare(bValue);
             }
 
-            return 0; // 型が異なる場合は変更を加えない
+            // 数値比較
+            if (
+                (typeof aValue === 'number' || typeof aValue === 'string') &&
+                (typeof bValue === 'number' || typeof bValue === 'string')
+            ) {
+                const aNum = typeof aValue === 'string' ? parseFloat(aValue) : aValue;
+                const bNum = typeof bValue === 'string' ? parseFloat(bValue) : bValue;
+
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return direction * (aNum - bNum);
+                }
+            }
+
+            // オブジェクト比較（万が一のケース）
+            if (typeof aValue === 'object' && typeof bValue === 'object') {
+                if (aValue instanceof Date && bValue instanceof Date) {
+                    return direction * (aValue.getTime() - bValue.getTime());
+                }
+                // JSONに変換して比較
+                return direction * JSON.stringify(aValue).localeCompare(JSON.stringify(bValue));
+            }
+
+            // デフォルト: 変更なし
+            return 0;
         });
     }, [videos, sortConfig]);
 
@@ -199,9 +229,19 @@ export default function GenreVideoList() {
                                                 </TableCell>
                                                 <TableCell>{video.rating?.toFixed(1) || '-'}</TableCell>
                                                 <TableCell>{video.review_count?.toLocaleString() || '-'}</TableCell>
-                                                <TableCell>{video.channel_title}</TableCell>
-                                                <TableCell>{new Date(video.published_at).toLocaleDateString('ja-JP')}</TableCell>
-                                                <TableCell>{(video.view_count / 10000).toFixed(1)}万 回視聴</TableCell>
+                                                <TableCell>
+                                                    <a
+                                                        href={`https://www.youtube.com/channel/${video.channel_id}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-indigo-600 hover:underline"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        {video.channel_title}
+                                                    </a>
+                                                </TableCell>
+                                                <TableCell>{video.published_at ? new Date(video.published_at).toLocaleDateString('ja-JP') : '-'}</TableCell>
+                                                <TableCell>{video.view_count ? (video.view_count / 10000).toFixed(1) + '万 回視聴' : '-'}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>

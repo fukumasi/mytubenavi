@@ -54,6 +54,44 @@ function convertReviewToVideoRating(review: any): VideoRating {
     };
 }
 
+// URLを自動リンク化する関数
+const autoLinkText = (text: string): React.ReactNode => {
+    if (!text) return '';
+
+    // URLを検出する正規表現
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+
+    // テキストを分割してURLとそれ以外に分ける
+    const parts = text.split(urlRegex);
+    const matches = text.match(urlRegex) || [];
+
+    // 結果の配列
+    const result: React.ReactNode[] = [];
+
+    // パーツとマッチを組み合わせる
+    parts.forEach((part, index) => {
+        if (part) {
+            result.push(<span key={`text-${index}`}>{part}</span>);
+        }
+        if (matches[index]) {
+            result.push(
+                <a
+                    key={`link-${index}`}
+                    href={matches[index]}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-600 hover:text-indigo-800 hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {matches[index]}
+                </a>
+            );
+        }
+    });
+
+    return result;
+};
+
 export default function VideoDetail() {
     const { videoId } = useParams();
     const [video, setVideo] = useState<Video | null>(null);
@@ -412,24 +450,21 @@ export default function VideoDetail() {
     };
 
     return (
-        <div className="container mx-auto p-4 space-y-6">
+        <div className="container mx-auto p-2 space-y-2" style={{ maxWidth: '1200px' }}>
             {/* 動画プレイヤーセクション */}
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="max-w-4xl mx-auto relative pt-[56.25%]">
-                    <div className="absolute top-0 left-0 w-full h-full">
-                        <VideoPlayer
-                            videoId={video.youtube_id}
-                            width="100%"
-                            height="100%"
-                        />
-                    </div>
-                </div>
+                {/* ここのネストされたdivを削除し、直接VideoPlayerを呼び出す */}
+                <VideoPlayer
+                    videoId={video.youtube_id}
+                    width="100%"
+                    height="100%"
+                />
 
-                {/* 動画情報ヘッダー */}
-                <div className="p-6">
-                    <h1 className="text-2xl font-bold mb-2">{video.title}</h1>
+                {/* 動画情報ヘッダー - 余白を最小化 */}
+                <div className="p-2" style={{ marginTop: 0, paddingTop: 0 }}>
+                    <h1 className="text-2xl font-bold mb-1">{video.title}</h1>
 
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-4 text-gray-600">
                             <span>{video.view_count?.toLocaleString() || 0} 回視聴</span>
                             <span>投稿日: {new Date(video.published_at).toLocaleDateString()}</span>
@@ -438,35 +473,44 @@ export default function VideoDetail() {
                     </div>
 
                     {/* チャンネル情報とジャンル */}
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-4">
-                            <img
-                                src={`https://www.youtube.com/channel/${video.channel_id}/picture`}
-                                alt={video.channel_title}
-                                className="w-12 h-12 rounded-full"
-                                onError={(e) => {
-                                    e.currentTarget.src = '/default-avatar.jpg';
-                                }}
-                            />
-                            <div>
-                                <h2 className="font-medium">{video.channel_title}</h2>
-                                <span className="text-sm text-gray-600">{video.genre_id}</span>
-                            </div>
+                            <a
+                                href={`https://www.youtube.com/channel/${video.channel_id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-3 hover:text-indigo-600"
+                            >
+                                <img
+                                    src={`https://www.youtube.com/channel/${video.channel_id}/picture`}
+                                    alt={video.channel_title}
+                                    className="w-12 h-12 rounded-full"
+                                    onError={(e) => {
+                                        e.currentTarget.src = '/default-avatar.jpg';
+                                    }}
+                                />
+                                <div>
+                                    <h2 className="font-medium">{video.channel_title}</h2>
+                                    <span className="text-sm text-gray-600">{video.genre_id}</span>
+                                </div>
+                            </a>
                         </div>
                     </div>
 
                     {/* 動画説明 */}
-                    <div className="mt-4">
+                    <div className="mt-1">
                         <div>
-                            <p className={`text-gray-700 whitespace-pre-wrap ${
+                            <div className={`text-gray-700 whitespace-pre-wrap ${
                                 !isDescriptionExpanded ? 'line-clamp-2' : ''
                                 }`}>
-                                {isDescriptionExpanded ? video.description : video.description.slice(0, 150) + '...'}
-                            </p>
+                                {isDescriptionExpanded
+                                    ? autoLinkText(video.description)
+                                    : autoLinkText(video.description.slice(0, 150) + '...')}
+                            </div>
                             {video.description.length > 150 && (
                                 <button
                                     onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                                    className="text-indigo-600 hover:text-indigo-800 mt-2 text-sm font-medium"
+                                    className="text-indigo-600 hover:text-indigo-800 mt-1 text-sm font-medium"
                                 >
                                     {isDescriptionExpanded ? '閉じる' : '続きを見る'}
                                 </button>
@@ -477,12 +521,12 @@ export default function VideoDetail() {
             </div>
 
             {/* 評価セクション全体をグリッドレイアウトにする */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* 左側カラム */}
                 <div>
                     {/* 総合評価セクション */}
-                    <div className="bg-white rounded-lg shadow-md p-6 mb-4">
-                        <h2 className="text-xl font-bold mb-6">総合評価</h2>
+                    <div className="bg-white rounded-lg shadow-md p-4 mb-4">
+                        <h2 className="text-xl font-bold mb-4">総合評価</h2>
 
                         {/* 評価項目を2列で表示 */}
                         <div className="grid grid-cols-2 gap-4 mb-4">
@@ -530,7 +574,7 @@ export default function VideoDetail() {
                         </div>
 
                         {/* 総合評価の表示 */}
-                        <div className="border-t pt-4 mt-4">
+                        <div className="border-t pt-3 mt-3">
                             <div className="flex items-center justify-between">
                                 <span className="font-semibold">総合評価</span>
                                 <div className="flex items-center">
@@ -547,8 +591,8 @@ export default function VideoDetail() {
 
                     {/* あなたの評価セクション - ログインしている場合のみ表示 */}
                     {isLoggedIn && userRatingItem && (
-                        <div className="bg-white rounded-lg shadow-md p-6 mb-4">
-                            <h2 className="text-xl font-bold mb-6">あなたの評価</h2>
+                        <div className="bg-white rounded-lg shadow-md p-4 mb-4">
+                            <h2 className="text-xl font-bold mb-4">あなたの評価</h2>
                             <div>
                                 {/* 評価項目を2列で表示 */}
                                 <div className="grid grid-cols-2 gap-4 mb-4">
@@ -577,17 +621,17 @@ export default function VideoDetail() {
                                     </div>
                                 </div>
 
-                                <div className="mt-4 text-gray-700">{userRatingItem.comment}</div>
+                                <div className="mt-3 text-gray-700">{userRatingItem.comment}</div>
                             </div>
                         </div>
                     )}
 
                     {/* 全ての評価セクション - 他のユーザーの評価がある場合のみ表示 */}
                     {otherRatings.length > 0 && (
-                        <div className="bg-white rounded-lg shadow-md p-6">
-                            <h2 className="text-xl font-bold mb-6">全ての評価</h2>
+                        <div className="bg-white rounded-lg shadow-md p-4">
+                            <h2 className="text-xl font-bold mb-4">全ての評価</h2>
                             {otherRatings.map((rating) => (
-                                <div key={rating.id} className="border-b pb-4 mb-4">
+                                <div key={rating.id} className="border-b pb-3 mb-3">
                                     <div className="flex items-center mb-2">
                                         <img
                                             src={rating.profiles?.avatar_url || '/default-avatar.jpg'}
@@ -635,19 +679,19 @@ export default function VideoDetail() {
                 <div>
                     {/* 評価フォーム - ログインしている場合のみ表示 */}
                     {isLoggedIn && (
-                        <div className="bg-white rounded-lg shadow-md p-6">
-                            <h2 className="text-xl font-bold mb-6">評価を投稿</h2>
+                        <div className="bg-white rounded-lg shadow-md p-4">
+                            <h2 className="text-xl font-bold mb-4">評価を投稿</h2>
                             <VideoRatingForm
-                            videoId={video.id}
-                            onSubmit={async () => {
-                                await refreshData();
-                            }}
-                            initialRatings={userRating || undefined}
-                        />
-                    </div>
-                )}
+                                videoId={video.id}
+                                onSubmit={async () => {
+                                    await refreshData();
+                                }}
+                                initialRatings={userRating || undefined}
+                            />
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
-    </div>
-);
+    );
 }

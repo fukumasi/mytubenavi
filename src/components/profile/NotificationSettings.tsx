@@ -26,8 +26,8 @@ const defaultSettings: NotificationSetting[] = [
     category: 'general'
   },
   {
-    id: 'comments',
-    type: 'comments',
+    id: 'reviews',
+    type: 'reviews',
     title: 'コメント通知',
     description: 'あなたの投稿へのコメントを通知',
     enabled: true,
@@ -90,12 +90,16 @@ export default function NotificationSettings() {
   const { user } = useAuth();
 
   useEffect(() => {
-    loadSettings();
+    if (user) {
+      loadSettings();
+    } else {
+      setLoading(false);
+    }
   }, [user]);
 
   const loadSettings = async () => {
     if (!user) {
-      console.warn('ユーザーが認証されていません。');
+      setLoading(false);
       return;
     }
 
@@ -109,78 +113,16 @@ export default function NotificationSettings() {
 
       if (error) {
         console.error("設定の取得エラー", error);
+        // エラーが「レコードが見つからない」の場合
+        if (error.code === 'PGRST116') {
+          // 新しい設定を作成
+          await createDefaultSettings();
+          return;
+        }
+        throw error;
       }
 
-      if (error || !data) {
-        // データが存在しない場合は初期値を挿入
-        const { data: newData, error: insertError } = await supabase
-          .from('notification_preferences')
-          .insert({
-            user_id: user.id,
-            email_notifications: true,
-            push_notifications: true,
-            in_app_notifications: true,
-            notification_types: {
-                newVideos: false,
-                comments: false,
-                ratings: false,
-                favorites: false,
-                mentions: false,
-                follows: false,
-                achievements: false,
-                recommendations: false,
-                milestones: false,
-                subscriptions: false
-            }
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error("設定の挿入エラー", insertError);
-          throw insertError;
-        }
-
-        if (newData) {
-            setSettings(prevSettings => prevSettings.map(setting => {
-                if (setting.id === 'emailNotifications') {
-                    return { ...setting, enabled: newData.email_notifications };
-                } else if (setting.id === 'pushNotifications') {
-                    return { ...setting, enabled: newData.push_notifications };
-                } else if (setting.id === 'inAppNotifications') {
-                    return { ...setting, enabled: newData.in_app_notifications };
-                } else if (setting.id === 'newVideos') {
-                    return { ...setting, enabled: newData.notification_types?.newVideos ?? false };
-                } else if (setting.id === 'comments') {
-                    return { ...setting, enabled: newData.notification_types?.comments ?? false };
-                } else if (setting.id === 'ratings') {
-                    return { ...setting, enabled: newData.notification_types?.ratings ?? false };
-                } else if (setting.id === 'favorites') {
-                    return { ...setting, enabled: newData.notification_types?.favorites ?? false };
-                }
-                return setting;
-            }));
-        }
-      } else {
-          setSettings(prevSettings => prevSettings.map(setting => {
-              if (setting.id === 'emailNotifications') {
-                  return { ...setting, enabled: data.email_notifications };
-              } else if (setting.id === 'pushNotifications') {
-                  return { ...setting, enabled: data.push_notifications };
-              } else if (setting.id === 'inAppNotifications') {
-                  return { ...setting, enabled: data.in_app_notifications };
-              } else if (setting.id === 'newVideos') {
-                  return { ...setting, enabled: data.notification_types?.newVideos ?? false };
-              } else if (setting.id === 'comments') {
-                  return { ...setting, enabled: data.notification_types?.comments ?? false };
-              } else if (setting.id === 'ratings') {
-                  return { ...setting, enabled: data.notification_types?.ratings ?? false };
-              } else if (setting.id === 'favorites') {
-                  return { ...setting, enabled: data.notification_types?.favorites ?? false };
-              }
-              return setting;
-          }));
-      }
+      updateSettingsFromData(data);
     } catch (err) {
       console.error('設定の読み込みエラー:', err);
       setError('設定の読み込みに失敗しました。しばらく経ってから再度お試しください。');
@@ -189,27 +131,13 @@ export default function NotificationSettings() {
     }
   };
 
-  const handleToggle = async (settingId: NotificationSetting['id']) => {
+  const createDefaultSettings = async () => {
+    if (!user) return;
+
     try {
-      setSaving(true);
-      setError(null);
-      setSuccessMessage(null);
-
-      if (!user) throw new Error('認証されていません');
-
-      const updatedSettings = settings.map(setting =>
-        setting.id === settingId ? { ...setting, enabled: !setting.enabled } : setting
-      );
-
-      const emailNotifications = updatedSettings.find(s => s.id === 'emailNotifications')?.enabled ?? true;
-      const pushNotifications = updatedSettings.find(s => s.id === 'pushNotifications')?.enabled ?? true;
-      const inAppNotifications = updatedSettings.find(s => s.id === 'inAppNotifications')?.enabled ?? true;
-
-      type NotificationTypes = NonNullable<NotificationPreferences['notificationTypes']>;
-
-      const notificationTypes: NotificationTypes = {
-        newVideos: false,
-        comments: false,
+      const notificationTypes = {
+        newVideos: true,
+        reviews: true,
         ratings: false,
         favorites: false,
         mentions: false,
@@ -220,36 +148,93 @@ export default function NotificationSettings() {
         subscriptions: false
       };
 
+      const { data, error } = await supabase
+        .from('notification_preferences')
+        .insert({
+          user_id: user.id,
+          email_notifications: true,
+          push_notifications: true,
+          in_app_notifications: true,
+          notification_types: notificationTypes
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      if (data) updateSettingsFromData(data);
+    } catch (err) {
+      console.error("設定の作成エラー", err);
+      setError('設定の作成に失敗しました。');
+    }
+  };
+
+  const updateSettingsFromData = (data: any) => {
+    if (!data) return;
+
+    setSettings(prevSettings => prevSettings.map(setting => {
+      if (setting.id === 'emailNotifications') {
+        return { ...setting, enabled: data.email_notifications };
+      } else if (setting.id === 'pushNotifications') {
+        return { ...setting, enabled: data.push_notifications };
+      } else if (setting.id === 'inAppNotifications') {
+        return { ...setting, enabled: data.in_app_notifications };
+      } else if (setting.category === 'general' && setting.id in (data.notification_types || {})) {
+        return { ...setting, enabled: data.notification_types?.[setting.id] ?? setting.enabled };
+      }
+      return setting;
+    }));
+  };
+
+  const handleToggle = async (settingId: NotificationSetting['id']) => {
+    try {
+      setSaving(true);
+      setError(null);
+      setSuccessMessage(null);
+
+      if (!user) throw new Error('認証されていません');
+
+      // 設定を更新
+      const updatedSettings = settings.map(setting =>
+        setting.id === settingId ? { ...setting, enabled: !setting.enabled } : setting
+      );
+      setSettings(updatedSettings);
+
+      // データベース用のデータを準備
+      const emailNotifications = updatedSettings.find(s => s.id === 'emailNotifications')?.enabled ?? true;
+      const pushNotifications = updatedSettings.find(s => s.id === 'pushNotifications')?.enabled ?? true;
+      const inAppNotifications = updatedSettings.find(s => s.id === 'inAppNotifications')?.enabled ?? true;
+
+      // 通知タイプの設定を抽出
+      const notificationTypes: Record<string, boolean> = {};
+      
       updatedSettings
-        .filter(s => s.category === 'general')
+        .filter(s => s.category === 'general' && s.id !== 'inAppNotifications')
         .forEach(setting => {
-          if (setting.id in notificationTypes) {
-            notificationTypes[setting.id as keyof NotificationTypes] = setting.enabled;
-          }
+          notificationTypes[setting.id] = setting.enabled;
         });
 
-      const newPreferences = {
-        user_id: user.id,
-        email_notifications: emailNotifications,
-        push_notifications: pushNotifications,
-        in_app_notifications: inAppNotifications,
-        notification_types: notificationTypes,
-        updated_at: new Date().toISOString()
-      };
-
+      // データベースを更新
       const { error: updateError } = await supabase
         .from('notification_preferences')
-        .upsert(newPreferences, { onConflict: 'user_id' });
+        .upsert({
+          user_id: user.id,
+          email_notifications: emailNotifications,
+          push_notifications: pushNotifications,
+          in_app_notifications: inAppNotifications,
+          notification_types: notificationTypes,
+          updated_at: new Date().toISOString()
+        });
 
       if (updateError) throw updateError;
 
-      setSettings(updatedSettings);
       setSuccessMessage('設定を更新しました');
       setTimeout(() => setSuccessMessage(null), 3000);
 
     } catch (err) {
       console.error('設定の更新エラー:', err);
       setError('設定の更新に失敗しました。しばらく経ってから再度お試しください。');
+      // エラーが発生した場合、元の設定に戻す
+      loadSettings();
     } finally {
       setSaving(false);
     }

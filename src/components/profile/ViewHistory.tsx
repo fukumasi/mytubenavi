@@ -1,7 +1,7 @@
 // src/components/profile/ViewHistory.tsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Clock } from 'lucide-react';
+import { Eye, Clock, Star } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import ProfileLayout from './ProfileLayout';
 import type { Video } from '../../types';
@@ -37,13 +37,16 @@ export default function ViewHistory() {
                    ?.filter(history => history.videos !== null)
                    .map(history => ({
                        id: history.videos.id,
+                       youtube_id: history.videos.id, // 必須プロパティ
                        title: history.videos.title,
+                       description: '', // 必須プロパティ
                        thumbnail: history.videos.thumbnail,
-                       channelTitle: history.videos.channel_title,
-                       publishedAt: history.viewed_at,
-                       viewCount: history.videos.view_count,
+                       channel_title: history.videos.channel_title,
+                       published_at: history.viewed_at,
+                       view_count: history.videos.view_count,
                        rating: history.videos.rating,
-                       duration: history.videos.duration
+                       duration: history.videos.duration,
+                       review_count: 0 // 必須プロパティ
                    })) || [];
 
                setHistory(formattedVideos);
@@ -93,7 +96,15 @@ export default function ViewHistory() {
                    </span>
                </div>
                {history.length === 0 ? (
-                   <p className="text-center text-gray-600">視聴履歴はありません</p>
+                   <div className="text-center py-8">
+                       <p className="text-gray-600">視聴履歴はありません</p>
+                       <button
+                           onClick={() => navigate('/')}
+                           className="mt-4 text-indigo-600 hover:text-indigo-500"
+                       >
+                           動画を探す
+                       </button>
+                   </div>
                ) : (
                    <div className="space-y-4">
                        {history.map((video) => (
@@ -122,23 +133,23 @@ export default function ViewHistory() {
                                        </h3>
 
                                        <div className="flex items-center text-sm text-gray-600 mb-2">
-                                           <span className="font-medium">{video.channelTitle}</span>
+                                           <span className="font-medium">{video.channel_title}</span>
                                        </div>
 
                                        <div className="flex items-center space-x-4 text-sm text-gray-500">
                                            <div className="flex items-center">
                                                <Eye className="h-4 w-4 mr-1" />
-                                               <span>{(video.viewCount / 10000).toFixed(1)}万回視聴</span>
+                                               <span>{(video.view_count / 10000).toFixed(1)}万回視聴</span>
                                            </div>
                                            {video.rating !== undefined && (
                                                <div className="flex items-center">
-                                                   <Clock className="h-4 w-4 text-yellow-400 mr-1" />
+                                                   <Star className="h-4 w-4 text-yellow-400 mr-1" />
                                                    <span>{video.rating.toFixed(1)}</span>
                                                </div>
                                            )}
                                            <div className="flex items-center">
                                                <Clock className="h-4 w-4 mr-1" />
-                                               <span>{new Date(video.publishedAt).toLocaleDateString('ja-JP')}</span>
+                                               <span>{new Date(video.published_at).toLocaleDateString('ja-JP')}</span>
                                            </div>
                                        </div>
                                    </div>

@@ -3,56 +3,22 @@ import { Star } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ProfileLayout from './ProfileLayout';
 import { supabase } from '../../lib/supabase';
-import type { Review } from '../../types';
 
-interface ReviewCardProps {
-  review: Review;
-  onVideoClick: (videoId: string) => void;
+// シンプルな拡張型を定義
+interface ReviewItem {
+  id: string;
+  video_id: string;
+  user_id: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+  updated_at?: string;
+  videoTitle: string;
 }
-
-const ReviewCard = ({ review, onVideoClick }: ReviewCardProps) => {
-  if (!review.created_at) return null;
-
-  return (
-    <div
-      onClick={() => onVideoClick(review.video_id)}
-      className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-100"
-    >
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center space-x-2">
-            <Star className="h-5 w-5 text-yellow-400" />
-            <span className="font-medium">{review.rating}</span>
-          </div>
-          <span className="text-sm text-gray-500">
-            {new Date(review.created_at).toLocaleDateString('ja-JP')}
-          </span>
-        </div>
-
-        <h3 className="text-lg font-medium text-gray-900 mb-3">
-          {review.videos?.title || '削除された動画'}
-        </h3>
-        
-        <p className="text-gray-700 whitespace-pre-wrap mb-3">{review.comment}</p>
-        
-        {review.profiles && (
-          <div className="flex items-center space-x-2 text-sm text-gray-500">
-            <img
-              src={review.profiles.avatar_url || '/default-avatar.jpg'}
-              alt={review.profiles.username}
-              className="w-6 h-6 rounded-full"
-            />
-            <span>{review.profiles.username}</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 const ReviewHistory = () => {
   const navigate = useNavigate();
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,47 +26,65 @@ const ReviewHistory = () => {
     const fetchReviews = async () => {
       try {
         setLoading(true);
+        
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('認証されていません');
 
-        // まず reviews を取得
-        const { data: reviewsData, error: reviewsError } = await supabase
-          .from('reviews')
-          .select(`
-            *,
-            profiles!reviews_user_id_fkey (
-              id,
-              username,
-              avatar_url
-            )
-          `)
+        // video_ratingsテーブルからレビュー情報を取得
+        const { data: ratingsData, error: ratingsError } = await supabase
+          .from('video_ratings')
+          .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
 
-        if (reviewsError) throw reviewsError;
-
-        // 次に videos の情報を取得
-        if (reviewsData) {
-          const videoIds = reviewsData.map(review => review.video_id);
-          const { data: videosData, error: videosError } = await supabase
-            .from('videos')
-            .select('id, title')
-            .in('id', videoIds);
-
-          if (videosError) throw videosError;
-
-          // reviews と videos のデータを結合
-          const combinedData = reviewsData.map(review => ({
-            ...review,
-            videos: videosData?.find(video => video.id === review.video_id)
-          }));
-
-          setReviews(combinedData);
+        if (ratingsError) throw ratingsError;
+        if (!ratingsData || ratingsData.length === 0) {
+          setReviews([]);
+          setLoading(false);
+          return;
         }
+
+        // 動画IDのリストを取得
+        const videoIds = ratingsData.map(rating => rating.video_id);
+
+        // videosテーブルからタイトル情報を取得
+        const { data: videosData } = await supabase
+          .from('videos')
+          .select('youtube_id, title')
+          .in('youtube_id', videoIds);
+
+        // 動画IDをキーとしたタイトルマップを作成
+        const titleMap: Record<string, string> = {};
+        if (videosData && videosData.length > 0) {
+          videosData.forEach(video => {
+            if (video.youtube_id && video.title) {
+              titleMap[video.youtube_id] = video.title;
+            }
+          });
+        }
+
+        // レビューデータに動画タイトルを追加
+        const formattedReviews = ratingsData.map(rating => {
+          // 動画IDに対応するタイトルを取得、なければデフォルト値を使用
+          const videoTitle = titleMap[rating.video_id] || `YouTube動画 (ID: ${rating.video_id})`;
+          
+          return {
+            id: rating.id,
+            video_id: rating.video_id,
+            user_id: rating.user_id,
+            rating: rating.overall || 3, 
+            comment: rating.comment || '',
+            created_at: rating.created_at,
+            updated_at: rating.updated_at,
+            videoTitle: videoTitle
+          };
+        });
+
+        setReviews(formattedReviews);
+        setLoading(false);
       } catch (err) {
         console.error('Error fetching reviews:', err);
         setError('レビューの読み込みに失敗しました。');
-      } finally {
         setLoading(false);
       }
     };
@@ -112,66 +96,130 @@ const ReviewHistory = () => {
     navigate(`/video/${videoId}`);
   };
 
-  const renderContent = () => {
-    if (loading) {
-      return (
+  if (loading) {
+    return (
+      <ProfileLayout>
         <div className="flex justify-center items-center min-h-[200px]">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
         </div>
-      );
-    }
+      </ProfileLayout>
+    );
+  }
 
-    if (error) {
-      return (
-        <div className="text-center py-8">
+  if (error) {
+    return (
+      <ProfileLayout>
+        <div className="text-center py-6">
           <p className="text-red-600">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-4 text-indigo-600 hover:text-indigo-500"
+            className="mt-3 text-indigo-600 hover:text-indigo-500"
           >
             再読み込み
           </button>
         </div>
-      );
-    }
+      </ProfileLayout>
+    );
+  }
 
-    if (reviews.length === 0) {
-      return (
-        <div className="text-center py-8">
+  if (reviews.length === 0) {
+    return (
+      <ProfileLayout>
+        <div className="text-center py-6">
           <p className="text-gray-600">まだレビューを投稿していません。</p>
           <button
             onClick={() => navigate('/')}
-            className="mt-4 text-indigo-600 hover:text-indigo-500"
+            className="mt-3 text-indigo-600 hover:text-indigo-500"
           >
             動画を探す
           </button>
         </div>
-      );
-    }
-
-    return (
-      <div className="space-y-4">
-        {reviews.map((review) => (
-          <ReviewCard
-            key={review.id}
-            review={review}
-            onVideoClick={handleVideoClick}
-          />
-        ))}
-      </div>
+      </ProfileLayout>
     );
-  };
+  }
 
   return (
     <ProfileLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="space-y-4">
+        <div className="flex justify-between items-center mb-2">
           <h2 className="text-xl font-semibold text-gray-900">評価・レビュー履歴</h2>
-          <span className="text-sm text-gray-500">
-            {!loading && !error && `${reviews.length}件のレビュー`}
-          </span>
+          <span className="text-sm text-gray-500">{reviews.length}件のレビュー</span>
         </div>
-        {renderContent()}
+
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  動画
+                </th>
+                <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ width: '90px' }}>
+                  評価
+                </th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  コメント
+                </th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ width: '100px' }}>
+                  投稿日
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {reviews.map(review => (
+                <tr 
+                  key={review.id}
+                  onClick={() => handleVideoClick(review.video_id)}
+                  className="hover:bg-gray-50 cursor-pointer"
+                >
+                  <td className="px-3 py-3 align-top">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0 h-14 w-20 overflow-hidden rounded">
+                        <img 
+                          className="h-full w-full object-cover" 
+                          src={`https://img.youtube.com/vi/${review.video_id}/mqdefault.jpg`} 
+                          alt=""
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/placeholder.jpg';
+                          }}
+                        />
+                      </div>
+                      <div className="ml-3">
+                        <div className="text-sm font-medium text-gray-900 line-clamp-2 max-w-xs">
+                          {review.videoTitle}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          ID: {review.video_id}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-2 py-3 whitespace-nowrap text-center align-top">
+                    <div className="flex items-center justify-center">
+                      <div className="flex">
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <Star 
+                            key={star} 
+                            className={`h-3 w-3 ${star <= review.rating ? 'text-yellow-400' : 'text-gray-300'}`}
+                            fill={star <= review.rating ? "currentColor" : "none"}
+                          />
+                        ))}
+                      </div>
+                      <span className="ml-1 text-xs text-gray-700">{review.rating}</span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 align-top">
+                    <div className="text-xs text-gray-900 line-clamp-2 max-w-xs">
+                      {review.comment || "コメントなし"}
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-500 align-top">
+                    {new Date(review.created_at).toLocaleDateString('ja-JP')}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </ProfileLayout>
   );

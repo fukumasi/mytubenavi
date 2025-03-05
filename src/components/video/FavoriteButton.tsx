@@ -8,11 +8,11 @@ interface FavoriteButtonProps {
 }
 
 export const FavoriteButton: React.FC<FavoriteButtonProps> = ({ videoId }) => {
-  const { currentUser } = useAuth();
+  const { user } = useAuth();
   const { isFavorite, isLoading, toggleFavorite } = useFavorites(videoId);
 
   const handleClick = () => {
-    if (!currentUser) {
+    if (!user) {
       alert('お気に入り機能を使用するにはログインしてください。');
       return;
     }

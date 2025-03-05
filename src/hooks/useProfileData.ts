@@ -1,106 +1,145 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Video, Review } from '../types';
 
-interface DbVideo {
-id: string;
-title: string;
-thumbnail: string;
-channel_title: string;
-published_at: string;
-view_count: number;
-rating: number;
-duration: string;
-}
-
-interface FavoriteRecord {
-video: DbVideo;
-}
-
-interface HistoryRecord {
-video: DbVideo;
-}
-
 export function useProfileData() {
-const [favoriteVideos, setFavoriteVideos] = useState<Video[]>([]);
-const [reviewHistory, setReviewHistory] = useState<Review[]>([]);
-const [viewHistory, setViewHistory] = useState<Video[]>([]);
-const [loading, setLoading] = useState(true);
-const [error, setError] = useState<string | null>(null);
+  const [favoriteVideos, setFavoriteVideos] = useState<Video[]>([]);
+  const [reviewHistory, setReviewHistory] = useState<Review[]>([]);
+  const [viewHistory, setViewHistory] = useState<Video[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-useEffect(() => {
-  const fetchProfileData = async () => {
+  const fetchProfileData = useCallback(async () => {
     try {
+      setLoading(true);
+      setError(null);
+      
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
-      const [
-        { data: favorites }, 
-        { data: reviews }, 
-        { data: history }
-      ] = await Promise.all([
-        supabase
-          .from('favorites')
-          .select('video:video_id(*)')
-          .eq('user_id', user.id),
-        supabase
-          .from('reviews')
-          .select('*, video:video_id(*)')
-          .eq('user_id', user.id),
-        supabase
-          .from('view_history')
-          .select('video:video_id(*)')
-          .eq('user_id', user.id)
-      ]);
+      // お気に入り動画の取得
+      const { data: favoritesData, error: favoritesError } = await supabase
+        .from('favorites')
+        .select(`
+          *,
+          video:videos (
+            id,
+            title,
+            thumbnail,
+            channel_title,
+            published_at,
+            view_count,
+            rating,
+            duration
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-      const parsedFavorites = favorites as unknown as FavoriteRecord[];
-      setFavoriteVideos((parsedFavorites || []).map(f => ({
-        id: f.video.id,
-        youtube_id: f.video.id,
-        title: f.video.title,
-        description: '',
-        thumbnail: f.video.thumbnail,
-        duration: f.video.duration,
-        view_count: f.video.view_count,
-        rating: f.video.rating,
-        published_at: f.video.published_at,
-        channel_title: f.video.channel_title,
-        review_count: 0,
-      } as Video)));
+      if (favoritesError) throw favoritesError;
 
-      setReviewHistory(reviews ?? []);
+      const validFavorites = favoritesData
+        ?.map(fav => fav.video)
+        .filter(Boolean)
+        .map(video => ({
+          id: video.id,
+          youtube_id: video.id, // 必須フィールド
+          title: video.title,
+          description: '', // 必須フィールド
+          thumbnail: video.thumbnail,
+          channel_title: video.channel_title,
+          published_at: video.published_at,
+          view_count: video.view_count,
+          rating: video.rating,
+          duration: video.duration,
+          review_count: 0 // 必須フィールド
+        })) || [];
 
-      const parsedHistory = history as unknown as HistoryRecord[];
-      setViewHistory((parsedHistory || []).map(h => ({
-        id: h.video.id,
-        youtube_id: h.video.id,
-        title: h.video.title,
-        description: '',
-        thumbnail: h.video.thumbnail,
-        duration: h.video.duration,
-        view_count: h.video.view_count,
-        rating: h.video.rating,
-        published_at: h.video.published_at,
-        channel_title: h.video.channel_title,
-        review_count: 0,
-      } as Video)));
+      setFavoriteVideos(validFavorites);
+
+      // レビュー履歴の取得
+      const { data: reviewsData, error: reviewsError } = await supabase
+        .from('reviews')
+        .select(`
+          *,
+          profiles (
+            id,
+            username,
+            avatar_url
+          ),
+          videos (
+            id,
+            title,
+            thumbnail,
+            channel_title
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (reviewsError) throw reviewsError;
+      setReviewHistory(reviewsData || []);
+
+      // 視聴履歴の取得
+      const { data: historyData, error: historyError } = await supabase
+        .from('view_history')
+        .select(`
+          *,
+          videos (
+            id,
+            title,
+            thumbnail,
+            channel_title,
+            published_at,
+            view_count,
+            rating,
+            duration
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('viewed_at', { ascending: false });
+
+      if (historyError) throw historyError;
+
+      const validHistory = historyData
+        ?.filter(history => history.videos)
+        .map(history => ({
+          id: history.videos.id,
+          youtube_id: history.videos.id, // 必須フィールド
+          title: history.videos.title,
+          description: '', // 必須フィールド
+          thumbnail: history.videos.thumbnail,
+          channel_title: history.videos.channel_title,
+          published_at: history.viewed_at, // 視聴日時を使用
+          view_count: history.videos.view_count,
+          rating: history.videos.rating,
+          duration: history.videos.duration,
+          review_count: 0 // 必須フィールド
+        })) || [];
+
+      setViewHistory(validHistory);
 
     } catch (err) {
+      console.error('プロフィールデータの取得に失敗:', err);
       setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました');
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetchProfileData();
+  }, [fetchProfileData]);
+
+  return {
+    favoriteVideos,
+    reviewHistory,
+    viewHistory,
+    loading,
+    error,
+    refresh: fetchProfileData
   };
-
-  fetchProfileData();
-}, []);
-
-return {
-  favoriteVideos,
-  reviewHistory,
-  viewHistory,
-  loading,
-  error,
-  refresh: () => setLoading(true)
-};
 }

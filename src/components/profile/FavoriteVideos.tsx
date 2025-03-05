@@ -5,8 +5,6 @@ import ProfileLayout from './ProfileLayout';
 import { supabase } from '../../lib/supabase';
 import type { Video } from '../../types';
 
-// 残りのコードは変更なし
-
 interface FavoriteVideoCardProps {
     video: Video;
 }
@@ -39,13 +37,13 @@ function FavoriteVideoCard({ video }: FavoriteVideoCardProps) {
                     </h3>
 
                     <div className="flex items-center text-sm text-gray-600 mb-2">
-                        <span className="font-medium">{video.channelTitle}</span>
+                        <span className="font-medium">{video.channel_title}</span>
                     </div>
 
                     <div className="flex items-center space-x-4 text-sm text-gray-500">
                         <div className="flex items-center">
                             <Eye className="h-4 w-4 mr-1" />
-                            <span>{(video.viewCount / 10000).toFixed(1)}万回視聴</span>
+                            <span>{(video.view_count / 10000).toFixed(1)}万回視聴</span>
                         </div>
                         {video.rating && (
                             <div className="flex items-center">
@@ -55,7 +53,7 @@ function FavoriteVideoCard({ video }: FavoriteVideoCardProps) {
                         )}
                         <div className="flex items-center">
                             <Clock className="h-4 w-4 mr-1" />
-                            <span>{new Date(video.publishedAt).toLocaleDateString('ja-JP')}</span>
+                            <span>{new Date(video.published_at).toLocaleDateString('ja-JP')}</span>
                         </div>
                     </div>
                 </div>
@@ -137,13 +135,16 @@ export default function FavoriteVideos() {
             *,
             video:videos (
               id,
+              youtube_id,
               title,
+              description,
               thumbnail,
-              channelTitle:channel_title,
-              publishedAt:published_at,
-              viewCount:view_count,
+              channel_title,
+              published_at,
+              view_count,
               rating,
-              duration
+              duration,
+              review_count
             )
           `)
                     .eq('user_id', user.id)
@@ -151,13 +152,10 @@ export default function FavoriteVideos() {
 
                 if (favoritesError) throw favoritesError;
 
-
                 // Videoがnullでないことを確認し、Video型としてアサート
                 const validVideos = favoritesData?.map(fav => fav.video).filter((video): video is Video => video !== null) || [];
 
                 setVideos(validVideos);
-
-
             } catch (err) {
                 console.error('お気に入り動画の取得に失敗:', err);
                 setError('お気に入り動画の読み込みに失敗しました');

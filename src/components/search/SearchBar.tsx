@@ -1,6 +1,4 @@
-// src/components/search/SearchBar.tsx
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search } from 'lucide-react';
 
@@ -9,10 +7,28 @@ export default function SearchBar() {
   const [searchParams] = useSearchParams();
   const [query, setQuery] = useState(searchParams.get('q') || '');
 
+  // 検索後にクエリをクリアするための効果
+  useEffect(() => {
+    // ページ遷移後に検索窓の内容をクリア
+    const handleRouteChange = () => {
+      setQuery('');
+    };
+
+    // イベントリスナーを設定
+    window.addEventListener('popstate', handleRouteChange);
+
+    // クリーンアップ関数
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+    };
+  }, []);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
       navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+      // 検索実行後にクエリをクリア
+      setQuery('');
     }
   };
 

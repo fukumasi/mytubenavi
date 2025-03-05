@@ -2,17 +2,18 @@
 
 import { Bell, MessageSquare, Star, Heart, Trophy, UserPlus, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useNotifications } from '@/contexts/NotificationContext';
+import { useNotifications } from '../../hooks/useNotifications';
 import ProfileLayout from './ProfileLayout';
-import { Notification, NotificationType } from '@/types/notification';
+import { Notification, NotificationType } from '../../types/notification';
 
 interface NotificationIconProps {
   type: NotificationType;
 }
 
 function NotificationIcon({ type }: NotificationIconProps) {
-  const icons = {
-    comment: <MessageSquare className="h-5 w-5" />,
+  // 正確な NotificationType の値に基づいてアイコンを設定
+  const icons: Record<NotificationType, JSX.Element> = {
+    review: <MessageSquare className="h-5 w-5" />,
     rating: <Star className="h-5 w-5" />,
     favorite: <Heart className="h-5 w-5" />,
     new_video: <Bell className="h-5 w-5" />,
@@ -42,7 +43,7 @@ const NotificationItem = ({ notification, onRead, onClick }: NotificationItemPro
     }}
     className={`
       p-4 rounded-lg cursor-pointer transition-colors
-      ${!notification.isRead ? 'bg-blue-50 hover:bg-blue-100' : 'bg-white'}
+      ${!notification.isRead ? 'bg-blue-50 hover:bg-blue-100' : 'bg-white hover:bg-gray-50'}
     `}
   >
     <div className="flex items-start space-x-4">
