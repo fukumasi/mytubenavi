@@ -1,3 +1,4 @@
+// src/components/video/VideoPlayer.tsx
 import React, { useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -23,27 +24,76 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
  const playerInstanceRef = useRef<any>(null);
  const { user } = useAuth();
 
- const recordViewHistory = async (videoId: string) => {
+ const recordViewHistory = async (youtubeId: string) => {
    if (!user) {
      console.log('ユーザーが認証されていません');
      return;
    }
    try {
-     const { error } = await supabase
+     // まず、YouTubeのIDから内部IDを取得
+     const { data: videoData, error: videoError } = await supabase
+       .from('videos')
+       .select('id')
+       .eq('youtube_id', youtubeId)
+       .maybeSingle();
+     
+     if (videoError) {
+       console.error('動画IDの取得に失敗:', videoError);
+       return;
+     }
+     
+     if (!videoData) {
+       console.error('動画が見つかりません:', youtubeId);
+       return;
+     }
+     
+     const internalVideoId = videoData.id;
+     
+     // 既存のレコードを確認
+     const { data: existingRecord, error: checkError } = await supabase
        .from('view_history')
-       .upsert(
-         {
-           user_id: user.id,
-           video_id: videoId,
+       .select('id')
+       .eq('user_id', user.id)
+       .eq('video_id', internalVideoId)
+       .maybeSingle();
+    
+     if (checkError) {
+       console.error('視聴履歴の確認に失敗:', checkError);
+       return;
+     }
+    
+     if (existingRecord) {
+       // 既存のレコードを更新
+       const { error: updateError } = await supabase
+         .from('view_history')
+         .update({
            viewed_at: new Date().toISOString(),
-         },
-         {
-           onConflict: 'user_id,video_id',
-         }
-       );
-
-     if (error) {
-       console.error('視聴履歴の記録に失敗:', error);
+           updated_at: new Date().toISOString()
+         })
+         .eq('id', existingRecord.id);
+      
+       if (updateError) {
+         console.error('視聴履歴の更新に失敗:', updateError);
+       } else {
+         console.log('視聴履歴を更新しました');
+       }
+     } else {
+       // 新しいレコードを挿入
+       const { error: insertError } = await supabase
+         .from('view_history')
+         .insert({
+           user_id: user.id,
+           video_id: internalVideoId,
+           viewed_at: new Date().toISOString(),
+           created_at: new Date().toISOString(),
+           updated_at: new Date().toISOString()
+         });
+      
+       if (insertError) {
+         console.error('視聴履歴の挿入に失敗:', insertError);
+       } else {
+         console.log('視聴履歴を追加しました');
+       }
      }
    } catch (error) {
      console.error('視聴履歴の記録に失敗:', error);

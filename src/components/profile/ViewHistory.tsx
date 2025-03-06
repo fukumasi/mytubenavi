@@ -6,8 +6,13 @@ import { supabase } from '../../lib/supabase';
 import ProfileLayout from './ProfileLayout';
 import type { Video } from '../../types';
 
+// 視聴履歴用に拡張した型を定義
+interface HistoryVideo extends Video {
+   viewed_at?: string;
+}
+
 export default function ViewHistory() {
-   const [history, setHistory] = useState<Video[]>([]);
+   const [history, setHistory] = useState<HistoryVideo[]>([]);
    const [loading, setLoading] = useState(true);
    const [error, setError] = useState<string | null>(null);
    const navigate = useNavigate();
@@ -24,7 +29,7 @@ export default function ViewHistory() {
 
                const response = await supabase
                    .from('view_history')
-                   .select('*, videos(id, title, thumbnail, channel_title, published_at, view_count, rating, duration)')
+                   .select('*, videos(id, youtube_id, title, thumbnail, channel_title, published_at, view_count, rating, duration)')
                    .eq('user_id', user.id)
                    .order('viewed_at', { ascending: false });
 
@@ -33,24 +38,26 @@ export default function ViewHistory() {
                    throw response.error;
                }
 
-               const formattedVideos: Video[] = response.data
+               const formattedVideos: HistoryVideo[] = response.data
                    ?.filter(history => history.videos !== null)
                    .map(history => ({
                        id: history.videos.id,
-                       youtube_id: history.videos.id, // 必須プロパティ
-                       title: history.videos.title,
+                       youtube_id: history.videos.youtube_id || '',  // 正しく取得
+                       title: history.videos.title || '不明な動画',
                        description: '', // 必須プロパティ
-                       thumbnail: history.videos.thumbnail,
-                       channel_title: history.videos.channel_title,
-                       published_at: history.viewed_at,
-                       view_count: history.videos.view_count,
+                       thumbnail: history.videos.thumbnail || '/placeholder.jpg',
+                       channel_title: history.videos.channel_title || '不明なチャンネル',
+                       published_at: history.videos.published_at,
+                       view_count: history.videos.view_count || 0,
                        rating: history.videos.rating,
                        duration: history.videos.duration,
-                       review_count: 0 // 必須プロパティ
+                       review_count: 0, // 必須プロパティ
+                       viewed_at: history.viewed_at // 視聴時間を追加
                    })) || [];
 
                setHistory(formattedVideos);
            } catch (err) {
+               console.error('視聴履歴の取得エラー:', err);
                setError(err instanceof Error ? err.message : '不明なエラーが発生しました');
            } finally {
                setLoading(false);
@@ -109,16 +116,19 @@ export default function ViewHistory() {
                    <div className="space-y-4">
                        {history.map((video) => (
                            <div
-                               key={video.id}
-                               onClick={() => navigate(`/video/${video.id}`)}
+                               key={`${video.id}-${video.viewed_at}`}
+                               onClick={() => navigate(`/video/${video.youtube_id}`)}
                                className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
                            >
                                <div className="flex p-4">
                                    <div className="relative flex-shrink-0 w-48">
                                        <img
-                                           src={video.thumbnail}
+                                           src={video.thumbnail || '/placeholder.jpg'}
                                            alt={video.title}
                                            className="w-full h-27 object-cover rounded-lg"
+                                           onError={(e) => {
+                                               (e.target as HTMLImageElement).src = '/placeholder.jpg';
+                                           }}
                                        />
                                        {video.duration && (
                                            <span className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
@@ -139,7 +149,7 @@ export default function ViewHistory() {
                                        <div className="flex items-center space-x-4 text-sm text-gray-500">
                                            <div className="flex items-center">
                                                <Eye className="h-4 w-4 mr-1" />
-                                               <span>{(video.view_count / 10000).toFixed(1)}万回視聴</span>
+                                               <span>{video.view_count ? `${(video.view_count / 10000).toFixed(1)}万回視聴` : '再生回数不明'}</span>
                                            </div>
                                            {video.rating !== undefined && (
                                                <div className="flex items-center">
@@ -149,7 +159,7 @@ export default function ViewHistory() {
                                            )}
                                            <div className="flex items-center">
                                                <Clock className="h-4 w-4 mr-1" />
-                                               <span>{new Date(video.published_at).toLocaleDateString('ja-JP')}</span>
+                                               <span>視聴日: {new Date(video.viewed_at || video.published_at).toLocaleDateString('ja-JP')}</span>
                                            </div>
                                        </div>
                                    </div>

@@ -43,7 +43,7 @@ export function useNotifications() {
       await notificationService.markAsRead(id);
       
       setNotifications(prev => 
-        prev.map(n => n.id === id ? {...n, isRead: true} : n)
+        prev.map(n => n.id === id ? {...n, is_read: true} : n)
       );
     } catch (err) {
       console.error('通知既読エラー:', err);
@@ -56,20 +56,24 @@ export function useNotifications() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { error } = await supabase
-        .from('notifications')
-        .update({ isRead: true })
-        .eq('user_id', user.id)
-        .eq('isRead', false);
-
-      if (error) throw error;
+      await notificationService.markAllAsRead(user.id);
       
       setNotifications(prev => 
-        prev.map(n => ({ ...n, isRead: true }))
+        prev.map(n => ({ ...n, is_read: true }))
       );
     } catch (err) {
       console.error('すべての通知既読エラー:', err);
       setError('通知の更新に失敗しました');
+    }
+  };
+
+  const deleteNotification = async (id: string) => {
+    try {
+      await notificationService.deleteNotification(id);
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (err) {
+      console.error('通知削除エラー:', err);
+      setError('通知の削除に失敗しました');
     }
   };
 
@@ -80,7 +84,7 @@ export function useNotifications() {
   };
 
   const getUnreadCount = useCallback(() => {
-    return notifications.filter(n => !n.isRead).length;
+    return notifications.filter(n => !n.is_read).length;
   }, [notifications]);
 
   useEffect(() => {
@@ -116,6 +120,7 @@ export function useNotifications() {
     fetchNotifications,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
     filterNotifications,
     unreadCount: getUnreadCount()
   };

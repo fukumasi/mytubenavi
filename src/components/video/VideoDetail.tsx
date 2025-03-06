@@ -465,12 +465,14 @@ export default function VideoDetail() {
                     <h1 className="text-2xl font-bold mb-1">{video.title}</h1>
 
                     <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-4 text-gray-600">
-                            <span>{video.view_count?.toLocaleString() || 0} 回視聴</span>
-                            <span>投稿日: {new Date(video.published_at).toLocaleDateString()}</span>
-                            <FavoriteButton videoId={video.id} />
-                        </div>
-                    </div>
+    <div className="flex items-center gap-4 text-gray-600">
+        <span>{video.view_count?.toLocaleString() || 0} 回視聴</span>
+        <span>投稿日: {new Date(video.published_at).toLocaleDateString()}</span>
+    </div>
+    {/* ボタンを別の要素として配置 */}
+    <FavoriteButton videoId={video.id} />
+</div>
+
 
                     {/* チャンネル情報とジャンル */}
                     <div className="flex items-center justify-between mb-2">

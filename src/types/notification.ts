@@ -1,111 +1,121 @@
 // src/types/notification.ts
 
-export enum NotificationType {
-  Review = 'review',
-  Rating = 'rating',
-  Favorite = 'favorite', 
-  NewVideo = 'new_video',
-  System = 'system',
-  Mention = 'mention',
-  Follow = 'follow',
-  Achievement = 'achievement',
-  Recommendation = 'recommendation',
-  Milestone = 'milestone',
-  Subscription = 'subscription'
- }
- 
- export interface Notification {
+export type NotificationType = 
+  | 'video_comment' 
+  | 'review_reply' 
+  | 'like' 
+  | 'follow' 
+  | 'system'
+  | 'new_video'
+  | 'review_mention'
+  | 'rating'
+  | 'favorite'
+  | 'mention'
+  | 'achievement'
+  | 'recommendation'
+  | 'milestone'
+  | 'subscription';
+
+export interface Notification {
   id: string;
-  userId: string; 
+  user_id: string;
   type: NotificationType;
   title: string;
   message: string;
-  isRead: boolean;
-  createdAt: Date | string;
-  updatedAt?: Date | string;
-  link?: string;
+  source_id?: string; // 関連するリソースのID（動画ID、コメントIDなど）
+  source_type?: string; // リソースのタイプ（video, commentなど）
+  created_at: string;
+  updated_at?: string;
+  is_read: boolean;
+  link?: string; // クリック時のリダイレクト先
+  thumbnail_url?: string; // 通知に関連する画像（あれば）
+  priority?: 'high' | 'medium' | 'low';
+  action_taken?: boolean;
+  sender_id?: string;
+  notification_group?: string;
+  expiration_date?: string;
+  display_duration?: number;
   metadata?: NotificationMetadata;
-  priority: 'high' | 'medium' | 'low';
-  actionTaken: boolean;
-  senderId?: string;
-  notificationGroup?: string;
-  expirationDate?: Date | string;
-  displayDuration?: number;
- }
- 
- export interface NotificationMetadata {
-  videoId?: string;
-  reviewId?: string;
-  ratingId?: string;
-  userId?: string;
-  achievementId?: string;
-  milestoneId?: string;
-  subscriptionId?: string;
-  recommendationData?: {
+}
+
+export interface NotificationMetadata {
+  video_id?: string;
+  review_id?: string;
+  rating_id?: string;
+  user_id?: string;
+  achievement_id?: string;
+  milestone_id?: string;
+  subscription_id?: string;
+  recommendation_data?: {
     source: string;
-    confidenceScore: number;
+    confidence_score: number;
   };
-  interactionHistory?: {
-    lastInteraction: string;
-    interactionCount: number;
+  interaction_history?: {
+    last_interaction: string;
+    interaction_count: number;
   };
-  additionalData?: Record<string, unknown>;
- }
- 
- export interface NotificationPreferences {
-  userId: string;
-  emailNotifications: boolean;
-  pushNotifications: boolean;
-  inAppNotifications: boolean;
-  notificationTypes: {
-    reviews: boolean;
-    ratings: boolean;
-    favorites: boolean;
-    newVideos: boolean;
-    mentions: boolean;
-    follows: boolean;
-    achievements: boolean;
-    recommendations: boolean;
-    milestones: boolean;
-    subscriptions: boolean;
-  };
-  quietHours: {
-    enabled: boolean;
-    startTime?: string;
-    endTime?: string;
-    timezone?: string;
-  };
-  frequencySettings: {
-    maxNotificationsPerDay: number;
-    batchNotifications: boolean;
-    batchIntervalMinutes: number;
-  };
-  createdAt: Date | string;
-  updatedAt: Date | string;
- }
- 
- export interface NotificationBatchSettings {
+  additional_data?: Record<string, unknown>;
+}
+
+export interface NotificationPreference {
+  id: string;
+  user_id: string;
+  // 通知タイプ設定
+  video_comments: boolean; // 自分の動画へのコメント通知
+  review_replies: boolean; // レビューへの返信通知
+  likes: boolean; // いいね通知
+  follows: boolean; // フォロー通知
+  system_notifications: boolean; // システム通知
+  new_videos: boolean; // 登録チャンネルの新着動画通知
+  ratings: boolean; // 評価通知
+  favorites: boolean; // お気に入り通知
+  mentions: boolean; // メンション通知
+  achievements: boolean; // 実績通知
+  recommendations: boolean; // おすすめ通知
+  milestones: boolean; // マイルストーン通知
+  subscriptions: boolean; // 購読通知
+  
+  // 通知方法設定
+  email_notifications: boolean; // メール通知を受け取るか
+  push_notifications: boolean; // プッシュ通知を受け取るか
+  in_app_notifications: boolean; // アプリ内通知を受け取るか
+  
+  // 高度な設定（オプション）
+  quiet_hours_enabled?: boolean;
+  quiet_hours_start?: string;
+  quiet_hours_end?: string;
+  quiet_hours_timezone?: string;
+  
+  max_notifications_per_day?: number;
+  batch_notifications?: boolean;
+  batch_interval_minutes?: number;
+  
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationBatchSettings {
   enabled: boolean;
-  maxBatchSize: number;
-  deliveryInterval: number;
-  priorityThreshold: 'high' | 'medium' | 'low';
- }
- 
- export interface NotificationChannelConfig {
+  max_batch_size: number;
+  delivery_interval: number;
+  priority_threshold: 'high' | 'medium' | 'low';
+}
+
+export interface NotificationChannelConfig {
   email: {
     enabled: boolean;
-    templateId?: string;
+    template_id?: string;
   };
   push: {
     enabled: boolean;
-    platformSettings?: {
+    platform_settings?: {
       ios?: boolean;
       android?: boolean;
       web?: boolean;
     };
   };
-  inApp: {
+  in_app: {
     enabled: boolean;
-    displayDuration?: number;
+    display_duration?: number;
   };
- }
+}

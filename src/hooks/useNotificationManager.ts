@@ -6,8 +6,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   Notification, 
   NotificationType, 
-  NotificationPreferences 
+  NotificationPreference 
 } from '../types/notification';
+import { notificationService } from '../services/notificationService';
 
 const RECONNECT_DELAY = 5000; // 再接続の待機時間（ミリ秒）
 
@@ -15,7 +16,7 @@ export const useNotificationManager = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
+  const [preferences, setPreferences] = useState<NotificationPreference | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   
@@ -31,13 +32,13 @@ export const useNotificationManager = () => {
       const { data, error: fetchError } = await supabase
         .from('notifications')
         .select('*')
-        .eq('userId', user.id)
-        .order('createdAt', { ascending: false });
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
       if (fetchError) throw fetchError;
 
       setNotifications(data || []);
-      setUnreadCount(data?.filter((n: Notification) => !n.isRead).length || 0);
+      setUnreadCount(data?.filter((n: Notification) => !n.is_read).length || 0);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('通知の取得に失敗しました'));
@@ -51,36 +52,9 @@ export const useNotificationManager = () => {
     if (!user) return;
 
     try {
-      const { data, error: fetchError } = await supabase
-        .from('notification_preferences')
-        .select('*')
-        .eq('userId', user.id)
-        .single();
-
-      if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
-
-      if (!data) {
-        const defaultPreferences: Partial<NotificationPreferences> = {
-          userId: user.id,
-          emailNotifications: true,
-          pushNotifications: true,
-          inAppNotifications: true,
-          updatedAt: new Date().toISOString()
-        };
-
-        const { data: newPrefs, error: insertError } = await supabase
-          .from('notification_preferences')
-          .insert([defaultPreferences])
-          .select()
-          .single();
-
-        if (insertError) throw insertError;
-        setPreferences(newPrefs);
-        setError(null);
-      } else {
-        setPreferences(data);
-        setError(null);
-      }
+      const preferences = await notificationService.getNotificationPreferences(user.id);
+      setPreferences(preferences);
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('通知設定の取得に失敗しました'));
       console.error('Error fetching preferences:', err);
@@ -96,25 +70,22 @@ export const useNotificationManager = () => {
     if (!user) return null;
 
     try {
-      const notification = {
-        userId: user.id,
+      const notification: Omit<Notification, 'id' | 'created_at' | 'is_read'> = {
+        user_id: user.id,
         type,
         title,
         message,
-        metadata: data,
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        priority: 'medium' as const,
-        actionTaken: false
+        source_id: data?.source_id as string,
+        source_type: data?.source_type as string,
+        link: data?.link as string,
+        thumbnail_url: data?.thumbnail_url as string,
+        priority: data?.priority as 'high' | 'medium' | 'low' || 'medium',
+        action_taken: false,
+        sender_id: data?.sender_id as string,
+        metadata: data?.metadata as any
       };
 
-      const { data: newNotification, error } = await supabase
-        .from('notifications')
-        .insert([notification])
-        .select()
-        .single();
-
-      if (error) throw error;
+      const newNotification = await notificationService.createNotification(notification);
 
       setNotifications(prev => [newNotification, ...prev]);
       setUnreadCount(prev => prev + 1);
@@ -129,22 +100,12 @@ export const useNotificationManager = () => {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      const timestamp = new Date().toISOString();
-      const { error } = await supabase
-        .from('notifications')
-        .update({ 
-          isRead: true,
-          readAt: timestamp,
-          updatedAt: timestamp
-        })
-        .eq('id', notificationId);
-
-      if (error) throw error;
+      await notificationService.markAsRead(notificationId);
 
       setNotifications(prev =>
         prev.map(n =>
           n.id === notificationId 
-            ? { ...n, isRead: true, readAt: timestamp, updatedAt: timestamp } 
+            ? { ...n, is_read: true, updated_at: new Date().toISOString() } 
             : n
         )
       );
@@ -160,25 +121,13 @@ export const useNotificationManager = () => {
     if (!user) return;
 
     try {
-      const timestamp = new Date().toISOString();
-      const { error } = await supabase
-        .from('notifications')
-        .update({ 
-          isRead: true,
-          readAt: timestamp,
-          updatedAt: timestamp
-        })
-        .eq('userId', user.id)
-        .eq('isRead', false);
-
-      if (error) throw error;
+      await notificationService.markAllAsRead(user.id);
 
       setNotifications(prev =>
         prev.map(n => ({ 
           ...n, 
-          isRead: true, 
-          readAt: timestamp,
-          updatedAt: timestamp 
+          is_read: true, 
+          updated_at: new Date().toISOString()
         }))
       );
       setUnreadCount(0);
@@ -191,16 +140,11 @@ export const useNotificationManager = () => {
 
   const deleteNotification = async (notificationId: string) => {
     try {
-      const { error } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('id', notificationId);
-
-      if (error) throw error;
+      await notificationService.deleteNotification(notificationId);
 
       const deletedNotification = notifications.find(n => n.id === notificationId);
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
-      if (deletedNotification && !deletedNotification.isRead) {
+      if (deletedNotification && !deletedNotification.is_read) {
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
       setError(null);
@@ -210,23 +154,14 @@ export const useNotificationManager = () => {
     }
   };
 
-  const updatePreferences = async (newPreferences: Partial<NotificationPreferences>) => {
+  const updatePreferences = async (newPreferences: Partial<NotificationPreference>) => {
     if (!user) return;
 
     try {
-      const timestamp = new Date().toISOString();
-      const { error } = await supabase
-        .from('notification_preferences')
-        .upsert({
-          userId: user.id,
-          ...newPreferences,
-          updatedAt: timestamp
-        });
-
-      if (error) throw error;
+      await notificationService.updateNotificationPreferences(user.id, newPreferences);
 
       setPreferences(prev => 
-        prev ? { ...prev, ...newPreferences, updatedAt: timestamp } : null
+        prev ? { ...prev, ...newPreferences, updated_at: new Date().toISOString() } : null
       );
       setError(null);
     } catch (err) {
@@ -247,19 +182,19 @@ export const useNotificationManager = () => {
             event: '*',
             schema: 'public',
             table: 'notifications',
-            filter: `userId=eq.${user.id}`
+            filter: `user_id=eq.${user.id}`
           },
           (payload) => {
             const { new: newNotification, old: oldNotification, eventType } = payload as {
               new: Notification;
-              old: { id: string, isRead?: boolean }; // isRead をオプショナルにした
+              old: { id: string, is_read?: boolean };
               eventType: 'INSERT' | 'UPDATE' | 'DELETE';
             };
 
             switch (eventType) {
               case 'INSERT':
                 setNotifications(prev => [newNotification, ...prev]);
-                if (!newNotification.isRead) {
+                if (!newNotification.is_read) {
                   setUnreadCount(prev => prev + 1);
                 }
                 break;
@@ -270,16 +205,16 @@ export const useNotificationManager = () => {
                   )
                 );
                 // 既読状態が変更された場合に未読カウントを更新
-                if (oldNotification && (newNotification.isRead !== oldNotification.isRead)) { // oldNotificationがundefinedでないことを確認
+                if (oldNotification && (newNotification.is_read !== oldNotification.is_read)) {
                   setUnreadCount(prev => 
-                    newNotification.isRead ? prev - 1 : prev + 1
+                    newNotification.is_read ? prev - 1 : prev + 1
                   );
                 }
                 break;
               case 'DELETE':
                 const wasUnread = notifications.find(
                   n => n.id === oldNotification.id
-                )?.isRead === false;
+                )?.is_read === false;
                 setNotifications(prev =>
                   prev.filter(n => n.id !== oldNotification.id)
                 );

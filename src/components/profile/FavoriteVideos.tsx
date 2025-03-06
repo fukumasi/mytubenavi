@@ -14,13 +14,13 @@ function FavoriteVideoCard({ video }: FavoriteVideoCardProps) {
 
     return (
         <div
-            onClick={() => navigate(`/video/${video.id}`)}
+            onClick={() => navigate(`/video/${video.youtube_id}`)}
             className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
         >
             <div className="flex p-4">
                 <div className="relative flex-shrink-0 w-48">
                     <img
-                        src={video.thumbnail}
+                        src={video.thumbnail || '/placeholder.jpg'}
                         alt={video.title}
                         className="w-full h-27 object-cover rounded-lg"
                     />
@@ -43,7 +43,7 @@ function FavoriteVideoCard({ video }: FavoriteVideoCardProps) {
                     <div className="flex items-center space-x-4 text-sm text-gray-500">
                         <div className="flex items-center">
                             <Eye className="h-4 w-4 mr-1" />
-                            <span>{(video.view_count / 10000).toFixed(1)}万回視聴</span>
+                            <span>{video.view_count ? `${(video.view_count / 10000).toFixed(1)}万回視聴` : '再生回数不明'}</span>
                         </div>
                         {video.rating && (
                             <div className="flex items-center">
@@ -53,7 +53,7 @@ function FavoriteVideoCard({ video }: FavoriteVideoCardProps) {
                         )}
                         <div className="flex items-center">
                             <Clock className="h-4 w-4 mr-1" />
-                            <span>{new Date(video.published_at).toLocaleDateString('ja-JP')}</span>
+                            <span>{video.published_at ? new Date(video.published_at).toLocaleDateString('ja-JP') : '日付不明'}</span>
                         </div>
                     </div>
                 </div>
@@ -110,7 +110,7 @@ function FavoriteVideosContent({ videos, loading, error }: FavoriteVideosContent
     return (
         <div className="space-y-4">
             {videos.map((video) => (
-                <FavoriteVideoCard key={video.id} video={video} />
+                <FavoriteVideoCard key={video.youtube_id || video.id} video={video} />
             ))}
         </div>
     );
@@ -129,31 +129,37 @@ export default function FavoriteVideos() {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) throw new Error('認証されていません');
 
+                // お気に入り動画の情報を取得
                 const { data: favoritesData, error: favoritesError } = await supabase
                     .from('favorites')
                     .select(`
-            *,
-            video:videos (
-              id,
-              youtube_id,
-              title,
-              description,
-              thumbnail,
-              channel_title,
-              published_at,
-              view_count,
-              rating,
-              duration,
-              review_count
-            )
-          `)
+                        *,
+                        videos!inner (
+                          id,
+                          youtube_id,
+                          title,
+                          description,
+                          thumbnail,
+                          channel_title,
+                          published_at,
+                          view_count,
+                          rating,
+                          duration,
+                          review_count
+                        )
+                    `)
                     .eq('user_id', user.id)
                     .order('created_at', { ascending: false });
 
                 if (favoritesError) throw favoritesError;
 
-                // Videoがnullでないことを確認し、Video型としてアサート
-                const validVideos = favoritesData?.map(fav => fav.video).filter((video): video is Video => video !== null) || [];
+                // videosの中身を抽出して、Videoの配列に変換
+                const validVideos = favoritesData
+                    .filter(item => item.videos)
+                    .map(item => ({
+                        ...item.videos,
+                        favorited_at: item.created_at
+                    }));
 
                 setVideos(validVideos);
             } catch (err) {

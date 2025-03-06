@@ -12,21 +12,24 @@ interface NotificationIconProps {
 
 function NotificationIcon({ type }: NotificationIconProps) {
   // 正確な NotificationType の値に基づいてアイコンを設定
-  const icons: Record<NotificationType, JSX.Element> = {
-    review: <MessageSquare className="h-5 w-5" />,
-    rating: <Star className="h-5 w-5" />,
-    favorite: <Heart className="h-5 w-5" />,
-    new_video: <Bell className="h-5 w-5" />,
-    system: <Bell className="h-5 w-5" />,
-    mention: <MessageSquare className="h-5 w-5" />,
-    follow: <UserPlus className="h-5 w-5" />,
-    achievement: <Trophy className="h-5 w-5" />,
-    recommendation: <TrendingUp className="h-5 w-5" />,
-    milestone: <Trophy className="h-5 w-5" />,
-    subscription: <UserPlus className="h-5 w-5" />
+  const icons: Record<string, JSX.Element> = {
+    'video_comment': <MessageSquare className="h-5 w-5" />,
+    'review_reply': <MessageSquare className="h-5 w-5" />,
+    'like': <Heart className="h-5 w-5" />,
+    'follow': <UserPlus className="h-5 w-5" />,
+    'system': <Bell className="h-5 w-5" />,
+    'new_video': <Bell className="h-5 w-5" />,
+    'review_mention': <MessageSquare className="h-5 w-5" />,
+    'rating': <Star className="h-5 w-5" />,
+    'favorite': <Heart className="h-5 w-5" />,
+    'mention': <MessageSquare className="h-5 w-5" />,
+    'achievement': <Trophy className="h-5 w-5" />,
+    'recommendation': <TrendingUp className="h-5 w-5" />,
+    'milestone': <Trophy className="h-5 w-5" />,
+    'subscription': <UserPlus className="h-5 w-5" />
   };
 
-  return <div className="text-gray-500">{icons[type]}</div>;
+  return <div className="text-gray-500">{icons[type] || <Bell className="h-5 w-5" />}</div>;
 }
 
 interface NotificationItemProps {
@@ -43,7 +46,7 @@ const NotificationItem = ({ notification, onRead, onClick }: NotificationItemPro
     }}
     className={`
       p-4 rounded-lg cursor-pointer transition-colors
-      ${!notification.isRead ? 'bg-blue-50 hover:bg-blue-100' : 'bg-white hover:bg-gray-50'}
+      ${!notification.is_read ? 'bg-blue-50 hover:bg-blue-100' : 'bg-white hover:bg-gray-50'}
     `}
   >
     <div className="flex items-start space-x-4">
@@ -56,7 +59,7 @@ const NotificationItem = ({ notification, onRead, onClick }: NotificationItemPro
           {notification.message}
         </p>
         <p className="text-xs text-gray-400 mt-1">
-          {new Date(notification.createdAt).toLocaleDateString('ja-JP', {
+          {new Date(notification.created_at).toLocaleDateString('ja-JP', {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
@@ -77,16 +80,18 @@ const NotificationItem = ({ notification, onRead, onClick }: NotificationItemPro
 export default function NotificationList() {
   const navigate = useNavigate();
   const { notifications, markAsRead, markAllAsRead } = useNotifications();
-  const unreadNotifications = notifications.filter(n => !n.isRead);
+  const unreadNotifications = notifications.filter(n => !n.is_read);
 
   const handleNotificationClick = (notification: Notification) => {
-    if (notification.metadata?.videoId) {
-      navigate(`/video/${notification.metadata.videoId}`);
+    if (notification.metadata?.video_id) {
+      navigate(`/video/${notification.metadata.video_id}`);
+    } else if (notification.source_id && notification.source_type === 'video') {
+      navigate(`/video/${notification.source_id}`);
     } else if (notification.link) {
       navigate(notification.link);
     }
 
-    if (!notification.actionTaken && notification.type !== 'new_video') {
+    if (!notification.action_taken && notification.type !== 'new_video') {
       handleRequiredAction(notification);
     }
   };
@@ -95,6 +100,7 @@ export default function NotificationList() {
     switch (notification.type) {
       case 'follow':
       case 'mention':
+      case 'review_mention':
         // アクション処理
         break;
       default:

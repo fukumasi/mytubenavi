@@ -1,13 +1,13 @@
+// src/components/profile/NotificationSettings.tsx
 import { useEffect, useState } from 'react';
-import { Bell, MessageSquare, Star, Eye, Mail, Smartphone, AlertCircle } from 'lucide-react';
+import { Bell, MessageSquare, Star, Mail, Smartphone, AlertCircle, Heart, UserPlus, Trophy, TrendingUp } from 'lucide-react';
 import ProfileLayout from './ProfileLayout';
-import { supabase } from '../../lib/supabase';
-import { NotificationPreferences } from '../../types/notification';
+import { NotificationPreference } from '../../types/notification';
+import { useNotificationManager } from '../../hooks/useNotificationManager';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface NotificationSetting {
-  id: keyof NotificationPreferences['notificationTypes'] | 'emailNotifications' | 'pushNotifications' | 'inAppNotifications';
-  type: string;
+  id: keyof NotificationPreference;
   title: string;
   description: string;
   enabled: boolean;
@@ -15,183 +15,160 @@ interface NotificationSetting {
   category: 'general' | 'email' | 'push';
 }
 
-const defaultSettings: NotificationSetting[] = [
-  {
-    id: 'newVideos',
-    type: 'newVideos',
-    title: '新着動画通知',
-    description: 'お気に入りチャンネルの新着動画を通知',
-    enabled: true,
-    icon: <Bell className="h-5 w-5" />,
-    category: 'general'
-  },
-  {
-    id: 'reviews',
-    type: 'reviews',
-    title: 'コメント通知',
-    description: 'あなたの投稿へのコメントを通知',
-    enabled: true,
-    icon: <MessageSquare className="h-5 w-5" />,
-    category: 'general'
-  },
-  {
-    id: 'ratings',
-    type: 'ratings',
-    title: '評価通知',
-    description: 'あなたの投稿への評価を通知',
-    enabled: false,
-    icon: <Star className="h-5 w-5" />,
-    category: 'general'
-  },
-  {
-    id: 'favorites',
-    type: 'favorites',
-    title: 'お気に入り通知',
-    description: 'お気に入り登録された時に通知',
-    enabled: false,
-    icon: <Eye className="h-5 w-5" />,
-    category: 'general'
-  },
-  {
-    id: 'emailNotifications',
-    type: 'email',
-    title: 'メール通知',
-    description: '重要な通知をメールで受け取る',
-    enabled: true,
-    icon: <Mail className="h-5 w-5" />,
-    category: 'email'
-  },
-  {
-    id: 'pushNotifications',
-    type: 'push',
-    title: 'プッシュ通知',
-    description: 'モバイルデバイスへのプッシュ通知',
-    enabled: true,
-    icon: <Smartphone className="h-5 w-5" />,
-    category: 'push'
-  },
-  {
-    id: 'inAppNotifications',
-    type: 'inApp',
-    title: 'アプリ内通知',
-    description: 'アプリ内で通知を受け取る',
-    enabled: true,
-    icon: <Bell className="h-5 w-5" />,
-    category: 'general'
-  }
-];
-
 export default function NotificationSettings() {
-  const [settings, setSettings] = useState<NotificationSetting[]>(defaultSettings);
+  const [settings, setSettings] = useState<NotificationSetting[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const { user } = useAuth();
+  const { preferences, updatePreferences } = useNotificationManager();
 
   useEffect(() => {
-    if (user) {
-      loadSettings();
-    } else {
-      setLoading(false);
-    }
-  }, [user]);
-
-  const loadSettings = async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('notification_preferences')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error) {
-        console.error("設定の取得エラー", error);
-        // エラーが「レコードが見つからない」の場合
-        if (error.code === 'PGRST116') {
-          // 新しい設定を作成
-          await createDefaultSettings();
-          return;
+    if (preferences) {
+      const newSettings: NotificationSetting[] = [
+        {
+          id: 'video_comments',
+          title: '動画コメント通知',
+          description: 'あなたの動画に新しいコメントが投稿された時',
+          enabled: preferences.video_comments,
+          icon: <MessageSquare className="h-5 w-5" />,
+          category: 'general'
+        },
+        {
+          id: 'review_replies',
+          title: 'レビュー返信通知',
+          description: 'あなたのレビューに返信があった時',
+          enabled: preferences.review_replies,
+          icon: <MessageSquare className="h-5 w-5" />,
+          category: 'general'
+        },
+        {
+          id: 'likes',
+          title: 'いいね通知',
+          description: 'あなたの投稿にいいねがついた時',
+          enabled: preferences.likes,
+          icon: <Heart className="h-5 w-5" />,
+          category: 'general'
+        },
+        {
+          id: 'follows',
+          title: 'フォロー通知',
+          description: '新しいフォロワーがいた時',
+          enabled: preferences.follows,
+          icon: <UserPlus className="h-5 w-5" />,
+          category: 'general'
+        },
+        {
+          id: 'system_notifications',
+          title: 'システム通知',
+          description: 'サービスのアップデートやお知らせ',
+          enabled: preferences.system_notifications,
+          icon: <Bell className="h-5 w-5" />,
+          category: 'general'
+        },
+        {
+          id: 'new_videos',
+          title: '新着動画通知',
+          description: 'お気に入りチャンネルの新着動画を通知',
+          enabled: preferences.new_videos,
+          icon: <Bell className="h-5 w-5" />,
+          category: 'general'
+        },
+        {
+          id: 'ratings',
+          title: '評価通知',
+          description: 'あなたの投稿への評価を通知',
+          enabled: preferences.ratings || false,
+          icon: <Star className="h-5 w-5" />,
+          category: 'general'
+        },
+        {
+          id: 'favorites',
+          title: 'お気に入り通知',
+          description: 'お気に入り登録された時に通知',
+          enabled: preferences.favorites || false,
+          icon: <Heart className="h-5 w-5" />,
+          category: 'general'
+        },
+        {
+          id: 'mentions',
+          title: 'メンション通知',
+          description: 'あなたがメンションされた時に通知',
+          enabled: preferences.mentions || false,
+          icon: <MessageSquare className="h-5 w-5" />,
+          category: 'general'
+        },
+        {
+          id: 'achievements',
+          title: '実績通知',
+          description: '新しい実績を獲得した時に通知',
+          enabled: preferences.achievements || false, 
+          icon: <Trophy className="h-5 w-5" />,
+          category: 'general'
+        },
+        {
+          id: 'recommendations',
+          title: 'おすすめ通知',
+          description: 'あなたに合ったおすすめコンテンツの通知',
+          enabled: preferences.recommendations || false,
+          icon: <TrendingUp className="h-5 w-5" />,
+          category: 'general'
+        },
+        {
+          id: 'milestones',
+          title: 'マイルストーン通知',
+          description: '特定の利用実績に達した時の通知',
+          enabled: preferences.milestones || false,
+          icon: <Trophy className="h-5 w-5" />,
+          category: 'general'
+        },
+        {
+          id: 'subscriptions',
+          title: '購読通知',
+          description: '購読関連の通知',
+          enabled: preferences.subscriptions || false,
+          icon: <Bell className="h-5 w-5" />,
+          category: 'general'
+        },
+        {
+          id: 'email_notifications',
+          title: 'メール通知',
+          description: '重要な通知をメールで受け取る',
+          enabled: preferences.email_notifications,
+          icon: <Mail className="h-5 w-5" />,
+          category: 'email'
+        },
+        {
+          id: 'push_notifications',
+          title: 'プッシュ通知',
+          description: 'モバイルデバイスへのプッシュ通知',
+          enabled: preferences.push_notifications,
+          icon: <Smartphone className="h-5 w-5" />,
+          category: 'push'
+        },
+        {
+          id: 'in_app_notifications',
+          title: 'アプリ内通知',
+          description: 'アプリ内で通知を受け取る',
+          enabled: preferences.in_app_notifications || true,
+          icon: <Bell className="h-5 w-5" />,
+          category: 'general'
         }
-        throw error;
-      }
+      ];
 
-      updateSettingsFromData(data);
-    } catch (err) {
-      console.error('設定の読み込みエラー:', err);
-      setError('設定の読み込みに失敗しました。しばらく経ってから再度お試しください。');
-    } finally {
+      setSettings(newSettings);
       setLoading(false);
     }
-  };
+  }, [preferences]);
 
-  const createDefaultSettings = async () => {
+  const handleToggle = async (settingId: keyof NotificationPreference) => {
     if (!user) return;
 
-    try {
-      const notificationTypes = {
-        newVideos: true,
-        reviews: true,
-        ratings: false,
-        favorites: false,
-        mentions: false,
-        follows: false,
-        achievements: false,
-        recommendations: false,
-        milestones: false,
-        subscriptions: false
-      };
-
-      const { data, error } = await supabase
-        .from('notification_preferences')
-        .insert({
-          user_id: user.id,
-          email_notifications: true,
-          push_notifications: true,
-          in_app_notifications: true,
-          notification_types: notificationTypes
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      if (data) updateSettingsFromData(data);
-    } catch (err) {
-      console.error("設定の作成エラー", err);
-      setError('設定の作成に失敗しました。');
-    }
-  };
-
-  const updateSettingsFromData = (data: any) => {
-    if (!data) return;
-
-    setSettings(prevSettings => prevSettings.map(setting => {
-      if (setting.id === 'emailNotifications') {
-        return { ...setting, enabled: data.email_notifications };
-      } else if (setting.id === 'pushNotifications') {
-        return { ...setting, enabled: data.push_notifications };
-      } else if (setting.id === 'inAppNotifications') {
-        return { ...setting, enabled: data.in_app_notifications };
-      } else if (setting.category === 'general' && setting.id in (data.notification_types || {})) {
-        return { ...setting, enabled: data.notification_types?.[setting.id] ?? setting.enabled };
-      }
-      return setting;
-    }));
-  };
-
-  const handleToggle = async (settingId: NotificationSetting['id']) => {
     try {
       setSaving(true);
       setError(null);
       setSuccessMessage(null);
-
-      if (!user) throw new Error('認証されていません');
 
       // 設定を更新
       const updatedSettings = settings.map(setting =>
@@ -200,32 +177,16 @@ export default function NotificationSettings() {
       setSettings(updatedSettings);
 
       // データベース用のデータを準備
-      const emailNotifications = updatedSettings.find(s => s.id === 'emailNotifications')?.enabled ?? true;
-      const pushNotifications = updatedSettings.find(s => s.id === 'pushNotifications')?.enabled ?? true;
-      const inAppNotifications = updatedSettings.find(s => s.id === 'inAppNotifications')?.enabled ?? true;
-
-      // 通知タイプの設定を抽出
-      const notificationTypes: Record<string, boolean> = {};
+      const updatedPreferences: Partial<NotificationPreference> = {};
       
-      updatedSettings
-        .filter(s => s.category === 'general' && s.id !== 'inAppNotifications')
-        .forEach(setting => {
-          notificationTypes[setting.id] = setting.enabled;
-        });
+      // 型安全な方法で設定値を割り当て
+      updatedSettings.forEach(setting => {
+        // TypeScriptの型チェックを満たすために、型アサーションを使用
+        (updatedPreferences as any)[setting.id] = setting.enabled;
+      });
 
       // データベースを更新
-      const { error: updateError } = await supabase
-        .from('notification_preferences')
-        .upsert({
-          user_id: user.id,
-          email_notifications: emailNotifications,
-          push_notifications: pushNotifications,
-          in_app_notifications: inAppNotifications,
-          notification_types: notificationTypes,
-          updated_at: new Date().toISOString()
-        });
-
-      if (updateError) throw updateError;
+      await updatePreferences(updatedPreferences);
 
       setSuccessMessage('設定を更新しました');
       setTimeout(() => setSuccessMessage(null), 3000);
@@ -233,8 +194,20 @@ export default function NotificationSettings() {
     } catch (err) {
       console.error('設定の更新エラー:', err);
       setError('設定の更新に失敗しました。しばらく経ってから再度お試しください。');
-      // エラーが発生した場合、元の設定に戻す
-      loadSettings();
+      
+      // エラーが発生した場合は、元の状態に戻す
+      if (preferences) {
+        const originalSettings = settings.map(setting => {
+          // 元の値を取得
+          const originalValue = (preferences as any)[setting.id];
+          return {
+            ...setting,
+            // undefined の場合はデフォルト値を使用
+            enabled: originalValue !== undefined ? originalValue : setting.enabled
+          };
+        });
+        setSettings(originalSettings);
+      }
     } finally {
       setSaving(false);
     }
