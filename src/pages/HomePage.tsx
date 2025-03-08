@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { Genre } from '@/types';
 import { useNavigate } from 'react-router-dom';
+import PremiumPromotion from '../components/home/PremiumPromotion';
 
 const GenreList = lazy(() => import('@/components/home/GenreList'));
 const AdsSection = lazy(() => import('@/components/home/AdsSection'));
@@ -19,7 +20,9 @@ export default function HomePage() {
             <div className="container mx-auto px-4">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     <aside className="lg:col-span-2 hidden lg:block">
-                        <div className="sticky top-4">
+                        <div className="sticky top-24 space-y-6">
+                            {/* プレミアム会員プロモーション - 左カラムに配置、top-24でヘッダー下に配置 */}
+                            <PremiumPromotion />
                             {/*  ソート機能などを追加する場合はここに記述 */}
                         </div>
                     </aside>
@@ -44,7 +47,8 @@ export default function HomePage() {
                     </main>
 
                     <aside className="lg:col-span-2 hidden lg:block">
-                        <div className="sticky top-4">
+                        <div className="sticky top-24">
+                            {/* 広告も同様にtop-24でヘッダー下に配置 */}
                             <AdsSection />
                         </div>
                     </aside>

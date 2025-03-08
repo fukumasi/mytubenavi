@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Eye, Clock, ExternalLink, AlertTriangle, BarChart } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+import LoadingSpinner from '../ui/LoadingSpinner';
 
 interface Promotion {
   id: string;
@@ -16,6 +17,8 @@ interface Promotion {
   clicks: number;
   videoId: string;
   status: 'active' | 'scheduled' | 'ended';
+  price?: number;
+  ctr?: number;
 }
 
 interface RawSlotBooking {
@@ -38,18 +41,18 @@ interface RawSlotBooking {
 }
 
 interface ActivePromotionsProps {
-  promotions: Promotion[];
+  promotions?: Promotion[]; // オプショナルに変更
 }
 
-export default function ActivePromotions({ promotions: initialPromotions }: ActivePromotionsProps) {
-  const { currentUser } = useAuth();
+export default function ActivePromotions({ promotions: initialPromotions = [] }: ActivePromotionsProps) {
+  const { user } = useAuth();
   const [promotions, setPromotions] = useState<Promotion[]>(initialPromotions);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchPromotions = async () => {
-      if (!currentUser?.id) return;
+      if (!user?.id) return;
 
       try {
         setLoading(true);
@@ -72,7 +75,7 @@ export default function ActivePromotions({ promotions: initialPromotions }: Acti
             clicks,
             status
           `)
-          .eq('youtuber_id', currentUser.id)
+          .eq('user_id', user.id)
           .eq('status', 'active');
 
         if (fetchError) throw fetchError;
@@ -99,8 +102,14 @@ export default function ActivePromotions({ promotions: initialPromotions }: Acti
       }
     };
 
-    fetchPromotions();
-  }, [currentUser]);
+    // 初期プロモーションが提供された場合はそれを使用し、そうでなければAPIから取得
+    if (initialPromotions && initialPromotions.length > 0) {
+      setPromotions(initialPromotions);
+      setLoading(false);
+    } else {
+      fetchPromotions();
+    }
+  }, [user, initialPromotions]); // 依存配列を更新
 
   const handlePreview = (videoId: string) => {
     window.open(`/video/${videoId}`, '_blank');
@@ -119,10 +128,10 @@ export default function ActivePromotions({ promotions: initialPromotions }: Acti
     );
   }
 
-  if (loading) {
+  if (loading && (!initialPromotions || initialPromotions.length === 0)) {
     return (
       <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+        <LoadingSpinner />
         <p className="mt-4 text-gray-600">読み込み中...</p>
       </div>
     );
@@ -150,12 +159,16 @@ export default function ActivePromotions({ promotions: initialPromotions }: Acti
               <div key={promo.id} className="p-6 flex items-start space-x-4">
                 <div className="relative flex-shrink-0 w-48">
                   <img
-                    src={promo.thumbnail}
+                    src={promo.thumbnail || '/placeholder.jpg'}
                     alt={promo.title}
                     className="w-full h-27 object-cover rounded-lg"
                   />
-                  <span className="absolute top-2 right-2 px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                    掲載中
+                  <span className={`absolute top-2 right-2 px-2 py-1 text-xs font-medium rounded-full 
+                    ${promo.status === 'active' ? 'bg-green-100 text-green-800' : 
+                      promo.status === 'scheduled' ? 'bg-yellow-100 text-yellow-800' : 
+                      'bg-gray-100 text-gray-800'}`}>
+                    {promo.status === 'active' ? '掲載中' : 
+                     promo.status === 'scheduled' ? '掲載予定' : '掲載終了'}
                   </span>
                 </div>
 
@@ -200,7 +213,7 @@ export default function ActivePromotions({ promotions: initialPromotions }: Acti
                   <div className="mt-2 text-sm text-gray-500">
                     CTR: {promo.impressions > 0 
                       ? ((promo.clicks / promo.impressions) * 100).toFixed(2)
-                      : '0.00'}%
+                      : promo.ctr ? promo.ctr.toFixed(2) : '0.00'}%
                   </div>
                 </div>
               </div>

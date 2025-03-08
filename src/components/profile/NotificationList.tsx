@@ -77,10 +77,23 @@ const NotificationItem = ({ notification, onRead, onClick }: NotificationItemPro
   </div>
 );
 
-export default function NotificationList() {
+interface NotificationListProps {
+  limit?: number;
+  showHeader?: boolean;
+  withLayout?: boolean;
+}
+
+export default function NotificationList({ 
+  limit, 
+  showHeader = true,
+  withLayout = true
+}: NotificationListProps = {}) {
   const navigate = useNavigate();
   const { notifications, markAsRead, markAllAsRead } = useNotifications();
   const unreadNotifications = notifications.filter(n => !n.is_read);
+  
+  // 表示する通知の制限
+  const displayNotifications = limit ? notifications.slice(0, limit) : notifications;
 
   const handleNotificationClick = (notification: Notification) => {
     if (notification.metadata?.video_id) {
@@ -108,9 +121,9 @@ export default function NotificationList() {
     }
   };
 
-  return (
-    <ProfileLayout>
-      <div className="space-y-6">
+  const notificationContent = (
+    <div className="space-y-6">
+      {showHeader && (
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-2">
             <h2 className="text-xl font-semibold text-gray-900">通知</h2>
@@ -129,26 +142,42 @@ export default function NotificationList() {
             </button>
           )}
         </div>
+      )}
 
-        {notifications.length === 0 ? (
-          <div className="text-center py-12">
-            <Bell className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">通知はありません</h3>
-            <p className="mt-1 text-sm text-gray-500">新しい通知が届くとここに表示されます。</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {notifications.map(notification => (
-              <NotificationItem
-                key={notification.id}
-                notification={notification}
-                onRead={markAsRead}
-                onClick={handleNotificationClick}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </ProfileLayout>
+      {displayNotifications.length === 0 ? (
+        <div className="text-center py-6">
+          <Bell className="mx-auto h-10 w-10 text-gray-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">通知はありません</h3>
+          <p className="mt-1 text-sm text-gray-500">新しい通知が届くとここに表示されます。</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {displayNotifications.map(notification => (
+            <NotificationItem
+              key={notification.id}
+              notification={notification}
+              onRead={markAsRead}
+              onClick={handleNotificationClick}
+            />
+          ))}
+          {limit && notifications.length > limit && (
+            <div className="text-center pt-2">
+              <button
+                onClick={() => navigate('/profile/notifications')}
+                className="text-sm text-indigo-600 hover:text-indigo-500"
+              >
+                すべての通知を見る
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
+
+  if (withLayout) {
+    return <ProfileLayout>{notificationContent}</ProfileLayout>;
+  }
+
+  return notificationContent;
 }

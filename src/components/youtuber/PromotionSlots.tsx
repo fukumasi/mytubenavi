@@ -4,7 +4,19 @@ import { useState, useEffect } from 'react';
 import { DollarSign, Clock, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import type { PromotionSlot } from '../../types';
+import { useNavigate } from 'react-router-dom';
+import LoadingSpinner from '../ui/LoadingSpinner';
+
+// PromotionSlot型の定義を修正
+interface PromotionSlot {
+  id: string;
+  name: string;
+  description: string;
+  position: string; // positionプロパティを追加
+  type: string;
+  available_count: number; // available_countプロパティを追加
+  status: string;
+}
 
 interface BookingFormData {
   videoUrl: string;
@@ -13,14 +25,15 @@ interface BookingFormData {
 }
 
 const PRICE_PER_DAY = {
-  premium: 10000,
-  sidebar: 5000,
-  genre: 3000,
-  related: 2000
+  home_top: 10000,
+  home_side: 5000,
+  genre_top: 3000,
+  search_top: 2000
 };
 
 export default function PromotionSlots() {
-  const { currentUser } = useAuth();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [slots, setSlots] = useState<PromotionSlot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [showBookingForm, setShowBookingForm] = useState(false);
@@ -33,7 +46,10 @@ export default function PromotionSlots() {
   });
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!user) {
+      navigate('/login', { state: { from: location.pathname } });
+      return;
+    }
 
     const fetchSlots = async () => {
       try {
@@ -74,7 +90,7 @@ export default function PromotionSlots() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [currentUser]);
+  }, [user, navigate]);
 
   const calculateBookingPrice = () => {
     if (!selectedSlot || !bookingData.startDate || !bookingData.endDate) return 0;
@@ -84,11 +100,11 @@ export default function PromotionSlots() {
     const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
     const slot = slots.find(s => s.id === selectedSlot);
     
-    return days * (PRICE_PER_DAY[slot?.type as keyof typeof PRICE_PER_DAY] || 0);
+    return days * (PRICE_PER_DAY[slot?.position as keyof typeof PRICE_PER_DAY] || 0);
   };
 
   const handleBookSlot = async () => {
-    if (!currentUser || !selectedSlot) return;
+    if (!user || !selectedSlot) return;
 
     try {
       setLoading(true);
@@ -98,19 +114,22 @@ export default function PromotionSlots() {
         .from('slot_bookings')
         .insert([{
           slot_id: selectedSlot,
-          user_id: currentUser.id,
+          user_id: user.id, // user.uidをuser.idに変更
           video_url: bookingData.videoUrl,
           start_date: bookingData.startDate,
           end_date: bookingData.endDate,
           price: price,
           tax: price * 0.1,
-          total_amount: price * 1.1
+          total_amount: price * 1.1,
+          status: 'pending'
         }]);
 
       if (bookingError) throw bookingError;
       
-      setShowBookingForm(false);
-      setBookingData({ videoUrl: '', startDate: '', endDate: '' });
+      // 成功後、予約完了ページまたはダッシュボードへリダイレクト
+      navigate('/youtuber/dashboard', { 
+        state: { message: '掲載枠の予約が完了しました。審査後に掲載が開始されます。' } 
+      });
     } catch (err) {
       console.error('Error booking slot:', err);
       setError('予約に失敗しました');
@@ -132,7 +151,7 @@ export default function PromotionSlots() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <LoadingSpinner />
       </div>
     );
   }
@@ -192,7 +211,7 @@ export default function PromotionSlots() {
                 </div>
                 <div className="flex items-center text-gray-900 font-medium">
                   <DollarSign className="h-4 w-4 mr-1" />
-                  <span>{PRICE_PER_DAY[slot.type as keyof typeof PRICE_PER_DAY].toLocaleString()}円/日</span>
+                  <span>{PRICE_PER_DAY[slot.position as keyof typeof PRICE_PER_DAY].toLocaleString()}円/日</span>
                 </div>
               </div>
 
@@ -212,7 +231,7 @@ export default function PromotionSlots() {
       </div>
 
       {showBookingForm && selectedSlot && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-2xl w-full p-6">
             <h3 className="text-lg font-bold text-gray-900 mb-4">掲載枠の予約</h3>
             
@@ -225,12 +244,12 @@ export default function PromotionSlots() {
                   type="url"
                   value={bookingData.videoUrl}
                   onChange={(e) => handleBookingFormChange('videoUrl', e.target.value)}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  className="w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                   placeholder="https://www.youtube.com/watch?v="
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     掲載開始日
@@ -239,7 +258,7 @@ export default function PromotionSlots() {
                     type="date"
                     value={bookingData.startDate}
                     onChange={(e) => handleBookingFormChange('startDate', e.target.value)}
-                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    className="w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                   />
                 </div>
                 <div>
@@ -250,7 +269,7 @@ export default function PromotionSlots() {
                     type="date"
                     value={bookingData.endDate}
                     onChange={(e) => handleBookingFormChange('endDate', e.target.value)}
-                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    className="w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                   />
                 </div>
               </div>

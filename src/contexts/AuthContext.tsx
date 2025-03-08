@@ -1,178 +1,382 @@
 // src/contexts/AuthContext.tsx
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '../lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
 import type { Profile } from '../types';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
+
+// プレミアム会員のステータス情報を表す型
+interface PremiumStatus {
+  isActive: boolean;
+  plan: string | null;
+  expiresAt: string | null;
+  daysRemaining: number | null;
+}
 
 interface AuthContextType {
- currentUser: User | null;
- session: Session | null;
- user: User | null;
- youtuberProfile: Profile | null;
- signUp: (email: string, password: string, metadata?: any) => Promise<any>;
- signIn: (email: string, password: string) => Promise<any>;
- signOut: () => Promise<void>;
- resetPassword: (email: string) => Promise<any>;
+  user: User | null;
+  session: Session | null;
+  loading: boolean;
+  isAuthenticated: boolean;
+  youtuberProfile: Profile | null;
+  isPremium: boolean;
+  premiumStatus: PremiumStatus | null;
+  signUp: (email: string, password: string, metadata?: any) => Promise<any>;
+  signIn: (email: string, password: string) => Promise<any>;
+  signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<any>;
+  updatePremiumStatus: (status: boolean, plan?: string, expiresAt?: string) => Promise<void>;
+  refreshPremiumStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
- currentUser: null,
- session: null,
- user: null,
- youtuberProfile: null,
- signUp: async () => {},
- signIn: async () => {},
- signOut: async () => {},
- resetPassword: async () => {}
+  user: null,
+  session: null,
+  loading: true,
+  isAuthenticated: false,
+  youtuberProfile: null,
+  isPremium: false,
+  premiumStatus: null,
+  signUp: async () => {},
+  signIn: async () => {},
+  signOut: async () => {},
+  resetPassword: async () => {},
+  updatePremiumStatus: async () => {},
+  refreshPremiumStatus: async () => {}
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
- const [currentUser, setCurrentUser] = useState<User | null>(null);
- const [session, setSession] = useState<Session | null>(null);
- const [youtuberProfile, setYoutuberProfile] = useState<Profile | null>(null);
- const [isInitializing, setIsInitializing] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [youtuberProfile, setYoutuberProfile] = useState<Profile | null>(null);
+  const [isPremium, setIsPremium] = useState<boolean>(false);
+  const [premiumStatus, setPremiumStatus] = useState<PremiumStatus | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
- useEffect(() => {
-   const initializeAuth = async () => {
-     try {
-       const { data: { session: currentSession } } = await supabase.auth.getSession();
-       
-       if (currentSession) {
-         setSession(currentSession);
-         setCurrentUser(currentSession.user);
+  // プレミアムステータスを計算する関数
+  const calculatePremiumStatus = (profileData: any): PremiumStatus | null => {
+    if (!profileData) return null;
+    
+    // プレミアム会員ではない場合
+    if (!profileData.is_premium) {
+      return {
+        isActive: false,
+        plan: null,
+        expiresAt: null,
+        daysRemaining: null
+      };
+    }
+    
+    // 有効期限を確認
+    const expiresAt = profileData.premium_expiry;
+    const now = new Date();
+    const expiryDate = expiresAt ? new Date(expiresAt) : null;
+    
+    // 有効期限が過ぎている場合
+    if (expiryDate && expiryDate < now) {
+      return {
+        isActive: false,
+        plan: profileData.premium_plan || 'expired',
+        expiresAt,
+        daysRemaining: 0
+      };
+    }
+    
+    // 有効期限までの残り日数を計算
+    const daysRemaining = expiryDate 
+      ? Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) 
+      : null;
+    
+    return {
+      isActive: true,
+      plan: profileData.premium_plan || 'standard',
+      expiresAt,
+      daysRemaining
+    };
+  };
 
-         const { data } = await supabase
-           .from('profiles')
-           .select('*')
-           .eq('id', currentSession.user.id)
-           .single();
-         
-         setYoutuberProfile(data);
-       } else {
-         // 初期化時にセッションがない場合は、ログアウトは行わない
-         setCurrentUser(null);
-         setSession(null);
-         setYoutuberProfile(null);
-       }
+  // プロフィールからプレミアム情報を取得して設定する関数
+  const fetchAndSetPremiumInfo = async (userId: string) => {
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+        setIsPremium(false);
+        setPremiumStatus(null);
+        return;
+      }
+      
+      // プレミアムステータスを計算
+      const status = calculatePremiumStatus(profileData);
+      
+      // ステートを更新
+      setIsPremium(!!status?.isActive);
+      setPremiumStatus(status);
+      
+      // プレミアムステータスが有効期限切れの場合、自動的に更新
+      if (status && !status.isActive && profileData.is_premium) {
+        // ステータスを自動的に非プレミアムに更新
+        await supabase
+          .from('profiles')
+          .update({ 
+            is_premium: false,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId);
+      }
+    } catch (error) {
+      console.error('Error fetching premium info:', error);
+      setIsPremium(false);
+      setPremiumStatus(null);
+    }
+  };
 
-       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-         console.log('Auth event:', event);
-         console.log('New session:', newSession);
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        // セッション取得
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        
+        if (currentSession) {
+          setSession(currentSession);
+          setUser(currentSession.user);
 
-         if (newSession) {
-           setSession(newSession);
-           setCurrentUser(newSession.user);
+          // プレミアム情報取得
+          await fetchAndSetPremiumInfo(currentSession.user.id);
 
-           const { data } = await supabase
-             .from('profiles')
-             .select('*')
-             .eq('id', newSession.user.id)
-             .single();
-           
-           setYoutuberProfile(data);
-         } else if (event === 'SIGNED_OUT') {
-           // 明示的なログアウト時のみ状態をクリア
-           setCurrentUser(null);
-           setSession(null);
-           setYoutuberProfile(null);
-         }
-       });
+          // YouTuberプロフィール取得
+          const { data: youtuberData, error: youtuberError } = await supabase
+            .from('youtuber_profiles')
+            .select('*')
+            .eq('user_id', currentSession.user.id)
+            .single();
+          
+          if (youtuberError && youtuberError.code !== 'PGRST116') {
+            // PGRST116は「結果が見つからない」エラーなので、それ以外はログに出力
+            console.error('Youtuber profile fetch error:', youtuberError);
+          }
+          
+          setYoutuberProfile(youtuberData || null);
+        } else {
+          // 初期化時にセッションがない場合はステートをリセット
+          setUser(null);
+          setSession(null);
+          setYoutuberProfile(null);
+          setIsPremium(false);
+          setPremiumStatus(null);
+        }
 
-       setIsInitializing(false);
-       return () => {
-         subscription.unsubscribe();
-       };
-     } catch (error) {
-       console.error('Authentication initialization error:', error);
-       setCurrentUser(null);
-       setSession(null);
-       setYoutuberProfile(null);
-       setIsInitializing(false);
-     }
-   };
+        // 認証状態変更時のリスナー
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+          console.log('Auth event:', event);
+          
+          if (newSession) {
+            setSession(newSession);
+            setUser(newSession.user);
 
-   initializeAuth();
- }, []);
+            // プレミアム情報取得
+            await fetchAndSetPremiumInfo(newSession.user.id);
 
- const signUp = async (email: string, password: string, metadata?: any) => {
-   const { data, error } = await supabase.auth.signUp({
-     email,
-     password,
-     options: { data: metadata }
-   });
-   if (!error && data.user) {
-     setCurrentUser(data.user);
-   }
-   return { data, error };
- };
+            // YouTuberプロフィール取得
+            const { data: youtuberData, error: youtuberError } = await supabase
+              .from('youtuber_profiles')
+              .select('*')
+              .eq('user_id', newSession.user.id)
+              .single();
+            
+            if (youtuberError && youtuberError.code !== 'PGRST116') {
+              console.error('Youtuber profile fetch error on auth change:', youtuberError);
+            }
+            
+            setYoutuberProfile(youtuberData || null);
+          } else if (event === 'SIGNED_OUT') {
+            // 明示的なログアウト時のみ状態をクリア
+            setUser(null);
+            setSession(null);
+            setYoutuberProfile(null);
+            setIsPremium(false);
+            setPremiumStatus(null);
+          }
+        });
 
- const signIn = async (email: string, password: string) => {
-   const { data, error } = await supabase.auth.signInWithPassword({
-     email,
-     password
-   });
-   if (!error && data.user) {
-     setCurrentUser(data.user);
-   }
-   return { data, error };
- };
+        // 初期化完了
+        setLoading(false);
+        
+        return () => {
+          subscription.unsubscribe();
+        };
+      } catch (error) {
+        console.error('Authentication initialization error:', error);
+        setUser(null);
+        setSession(null);
+        setYoutuberProfile(null);
+        setIsPremium(false);
+        setPremiumStatus(null);
+        setLoading(false);
+      }
+    };
 
- const signOut = async (): Promise<void> => {
-   try {
-     // まず状態をクリア
-     setCurrentUser(null);
-     setSession(null);
-     setYoutuberProfile(null);
-     
-     // ログアウト処理を実行
-     const { error } = await supabase.auth.signOut();
-     if (error) throw error;
-     
-     // ローカルストレージからトークンを削除
-     localStorage.removeItem('sb-access-token');
-     localStorage.removeItem('sb-refresh-token');
-     
-     // Supabaseの認証情報を削除する
-     Object.keys(localStorage).forEach(key => {
-       if (key.startsWith('sb-') && key.includes('-auth-token')) {
-         localStorage.removeItem(key);
-       }
-     });
-     
-     // ここでリロードしない - 代わりにリダイレクトは呼び出し元で行う
-   } catch (error) {
-     console.error('Sign out error:', error);
-   }
- };
+    initializeAuth();
+  }, []);
 
- const resetPassword = async (email: string) => {
-   const { data, error } = await supabase.auth.resetPasswordForEmail(email);
-   return { data, error };
- };
+  const signUp = async (email: string, password: string, metadata?: any) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: metadata }
+      });
+      
+      if (!error && data.user) {
+        setUser(data.user);
+      }
+      
+      return { data, error };
+    } catch (error) {
+      console.error('Sign up error:', error);
+      return { data: null, error };
+    }
+  };
 
- const value = {
-   currentUser,
-   session,
-   user: currentUser,
-   youtuberProfile,
-   signUp,
-   signIn,
-   signOut,
-   resetPassword
- };
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (!error && data.user) {
+        setUser(data.user);
+      }
+      
+      return { data, error };
+    } catch (error) {
+      console.error('Sign in error:', error);
+      return { data: null, error };
+    }
+  };
 
- // 初期化中はローディング表示やnullを返すことも可能
- if (isInitializing) {
-   return <div>Loading...</div>; // または null を返す
- }
+  const signOut = async (): Promise<void> => {
+    try {
+      // まず状態をクリア
+      setUser(null);
+      setSession(null);
+      setYoutuberProfile(null);
+      setIsPremium(false);
+      setPremiumStatus(null);
+      
+      // ログアウト処理を実行
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // ローカルストレージからトークンを削除
+      localStorage.removeItem('sb-access-token');
+      localStorage.removeItem('sb-refresh-token');
+      
+      // Supabaseの認証情報を削除する
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('sb-') && key.includes('-auth-token')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
 
- return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const resetPassword = async (email: string) => {
+    try {
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      });
+      
+      return { data, error };
+    } catch (error) {
+      console.error('Reset password error:', error);
+      return { data: null, error };
+    }
+  };
+
+  // プレミアムステータスを更新する関数を拡張
+  const updatePremiumStatus = async (
+    status: boolean,
+    plan?: string,
+    expiresAt?: string
+  ): Promise<void> => {
+    try {
+      if (!user) return;
+      
+      const updateData: any = { 
+        is_premium: status,
+        updated_at: new Date().toISOString()
+      };
+      
+      // オプションパラメータがある場合は追加
+      if (plan) updateData.premium_plan = plan;
+      if (expiresAt) updateData.premium_expiry = expiresAt;
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update(updateData)
+        .eq('id', user.id);
+        
+      if (error) throw error;
+      
+      // 更新後にプレミアム情報を再取得
+      await fetchAndSetPremiumInfo(user.id);
+      
+    } catch (error) {
+      console.error('Premium status update error:', error);
+    }
+  };
+
+  // プレミアムステータスを明示的に更新する関数
+  const refreshPremiumStatus = async (): Promise<void> => {
+    try {
+      if (!user) return;
+      await fetchAndSetPremiumInfo(user.id);
+    } catch (error) {
+      console.error('Premium status refresh error:', error);
+    }
+  };
+
+  const value = {
+    user,
+    session,
+    loading,
+    isAuthenticated: !!user,
+    youtuberProfile,
+    isPremium,
+    premiumStatus,
+    signUp,
+    signIn,
+    signOut,
+    resetPassword,
+    updatePremiumStatus,
+    refreshPremiumStatus
+  };
+
+  // 初期化中はローディング表示
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {
- const context = useContext(AuthContext);
- if (!context) {
-   throw new Error('useAuth must be used within an AuthProvider');
- }
- return context;
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };
