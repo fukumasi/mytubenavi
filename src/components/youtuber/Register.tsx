@@ -1,10 +1,10 @@
 // src/components/youtuber/Register.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { AlertCircle, Youtube, Upload, Link as LinkIcon } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
-import { useYoutuberSync } from '../../hooks/useYoutuberSync';
+import { AlertCircle, Youtube, Upload, Link as LinkIcon, Check } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { useYoutuberSync } from '@/hooks/useYoutuberSync';
 
 const categories = [
   { id: 'music', name: '音楽' },
@@ -19,10 +19,11 @@ const categories = [
 
 export default function Register() {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const { syncChannel, syncStatus } = useYoutuberSync(); // useYoutuberSync フック
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [formData, setFormData] = useState({
     channelName: '',
     channelUrl: '',
@@ -32,9 +33,11 @@ export default function Register() {
   });
   const [avatar, setAvatar] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
+  const [channelIdValid, setChannelIdValid] = useState(false);
+  const [channelId, setChannelId] = useState('');
 
-    // ローディング状態とエラーメッセージを syncStatus から取得
-    const isLoading = ['syncing', 'loading'].includes(syncStatus.status);
+  // ローディング状態とエラーメッセージを syncStatus から取得
+  const isLoading = ['syncing', 'loading'].includes(syncStatus.status);
   const syncError = syncStatus.status === 'error' ? syncStatus.message : null;
 
   useEffect(() => {
@@ -42,6 +45,46 @@ export default function Register() {
       setAvatarPreview(currentUser.user_metadata.avatar_url);
     }
   }, [currentUser]);
+
+  // ユーザーがYouTuberとして既に登録されているか確認
+  useEffect(() => {
+    const checkYoutuberStatus = async () => {
+      if (!currentUser) return;
+      
+      try {
+        // プロフィールとYouTuberプロフィールの両方をチェック
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', currentUser.id)
+          .single();
+          
+        if (profileError && profileError.code !== 'PGRST116') {
+          // PGRST116は「結果が見つからない」エラーなので無視
+          throw profileError;
+        }
+        
+        const { data: youtuberData, error: youtuberError } = await supabase
+          .from('youtuber_profiles')
+          .select('*')
+          .eq('id', currentUser.id)
+          .single();
+          
+        if (youtuberError && youtuberError.code !== 'PGRST116') {
+          throw youtuberError;
+        }
+        
+        if ((profileData && profileData.role === 'youtuber') || youtuberData) {
+          // 既にYouTuberとして登録されている場合はダッシュボードにリダイレクト
+          navigate('/youtuber/dashboard');
+        }
+      } catch (err) {
+        console.error('Error checking youtuber status:', err);
+      }
+    };
+    
+    checkYoutuberStatus();
+  }, [currentUser, navigate]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -52,6 +95,76 @@ export default function Register() {
       }
       setAvatar(file);
       setAvatarPreview(URL.createObjectURL(file));
+    }
+  };
+
+  // URLからチャンネルIDを抽出する関数
+  const extractChannelId = (url: string): string | null => {
+    let extractedId: string | null = null;
+    
+    // channel/[ID] 形式の場合
+    const channelMatch = url.match(/youtube\.com\/channel\/([\w-]+)/);
+    if (channelMatch && channelMatch[1]) {
+      return channelMatch[1];
+    }
+    
+    // c/[name] 形式の場合
+    const cMatch = url.match(/youtube\.com\/c\/([\w-]+)/);
+    if (cMatch) {
+      return null; // この形式ではチャンネルIDを直接取得できない
+    }
+    
+    // @username 形式の場合
+    const atMatch = url.match(/youtube\.com\/@([\w-]+)/);
+    if (atMatch) {
+      return null; // この形式ではチャンネルIDを直接取得できない
+    }
+    
+    // user/[name] 形式の場合
+    const userMatch = url.match(/youtube\.com\/user\/([\w-]+)/);
+    if (userMatch) {
+      return null; // この形式ではチャンネルIDを直接取得できない
+    }
+    
+    return extractedId;
+  };
+
+  // チャンネルURLの検証
+  const validateChannelUrl = async (url: string) => {
+    // 基本的なURL形式チェック
+    const youtubeUrlPattern = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
+    if (!youtubeUrlPattern.test(url)) {
+      setError('有効なYouTubeチャンネルURLを入力してください');
+      setChannelIdValid(false);
+      return false;
+    }
+    
+    // チャンネルIDを抽出
+    const extracted = extractChannelId(url);
+    if (extracted) {
+      setChannelId(extracted);
+      setSuccess('チャンネルIDを正常に検出しました');
+      setChannelIdValid(true);
+      return true;
+    } else {
+      // IDが直接抽出できない場合は警告を表示するがブロックはしない
+      setSuccess('');
+      setError('チャンネルIDを直接抽出できません。同期処理で解決を試みます。');
+      setChannelIdValid(false);
+      return true; // 同期処理で解決を試みるため、trueを返す
+    }
+  };
+
+  const handleUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value;
+    setFormData({ ...formData, channelUrl: url });
+    setError('');
+    setSuccess('');
+    
+    if (url) {
+      await validateChannelUrl(url);
+    } else {
+      setChannelIdValid(false);
     }
   };
 
@@ -72,13 +185,54 @@ export default function Register() {
         return;
       }
 
-       // チャンネル情報の同期。await で完了を待つ。
+      // 入力値の検証
+      if (!formData.channelName.trim()) {
+        setError('チャンネル名を入力してください');
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.channelUrl.trim()) {
+        setError('チャンネルURLを入力してください');
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.category) {
+        setError('カテゴリーを選択してください');
+        setLoading(false);
+        return;
+      }
+
+      // チャンネルURLの最終検証
+      const isUrlValid = await validateChannelUrl(formData.channelUrl);
+      if (!isUrlValid) {
+        setLoading(false);
+        return;
+      }
+
+      // 既に同じチャンネルURLで登録されていないか確認
+      const { data: existingChannel, error: checkError } = await supabase
+        .from('youtuber_profiles')
+        .select('id')
+        .eq('channel_url', formData.channelUrl);
+        
+      if (checkError) {
+        console.error('Channel check error:', checkError);
+      } else if (existingChannel && existingChannel.length > 0 && existingChannel[0].id !== currentUser.id) {
+        setError('このチャンネルは既に他のユーザーによって登録されています');
+        setLoading(false);
+        return;
+      }
+
+      // チャンネル情報の同期。await で完了を待つ。
       await syncChannel(formData.channelUrl);
 
-        // useYoutuberSync のエラーをチェック。
+      // useYoutuberSync のエラーをチェック。
       if (syncStatus.status === 'error') {
-          setError(syncStatus.message || 'チャンネル情報の同期に失敗しました。URLを確認してください。'); // より具体的なエラーメッセージ、message がない場合のフォールバック
-          return; // エラーが発生したら、以降の処理を中断
+        setError(syncStatus.message || 'チャンネル情報の同期に失敗しました。URLを確認してください。');
+        setLoading(false);
+        return; // エラーが発生したら、以降の処理を中断
       }
 
       let avatarUrl = currentUser.user_metadata?.avatar_url;
@@ -114,7 +268,8 @@ export default function Register() {
         if (updateError) throw updateError;
       }
 
-      // YouTuber登録
+      // トランザクション的に両方のテーブルを更新
+      // 1. プロフィールテーブルの更新
       const { error: registerError } = await supabase
         .from('profiles')
         .upsert([
@@ -124,25 +279,49 @@ export default function Register() {
             channel_url: formData.channelUrl,
             description: formData.description,
             category: formData.category,
-            role: 'youtuber'
+            role: 'youtuber',
+            updated_at: new Date().toISOString()
           }
         ]);
 
       if (registerError) throw registerError;
 
-      // ユーザーメタデータにチャンネル名とロールを保存
+      // 2. YouTuberプロファイルテーブルの更新
+      const { error: youtuberProfileError } = await supabase
+        .from('youtuber_profiles')
+        .upsert([
+          {
+            id: currentUser.id,
+            channel_id: channelId || null, // 抽出されたチャンネルIDがあれば使用
+            channel_name: formData.channelName,
+            channel_url: formData.channelUrl,
+            channel_description: formData.description,
+            category: formData.category,
+            verification_status: 'pending',
+            updated_at: new Date().toISOString()
+          }
+        ]);
+
+      if (youtuberProfileError) {
+        console.error('YouTuber profile registration error:', youtuberProfileError);
+        throw youtuberProfileError;
+      }
+
+      // 3. ユーザーメタデータの更新
       const { error: metadataError } = await supabase.auth.updateUser({
         data: {
           channel_name: formData.channelName,
           role: 'youtuber'
         }
       });
+      
       if (metadataError) throw metadataError;
 
+      // 登録完了、ダッシュボードへリダイレクト
       navigate('/youtuber/dashboard');
-    } catch (err:any) {
+    } catch (err: any) {
       console.error('Registration error:', err);
-      setError('登録に失敗しました。もう一度お試しください。');
+      setError(`登録に失敗しました: ${err.message || 'もう一度お試しください'}`);
     } finally {
       setLoading(false);
     }
@@ -189,13 +368,22 @@ export default function Register() {
 
         {/* エラーメッセージの表示 */}
         {(error || syncError) && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
-                <div className="flex items-center text-red-600">
-                <AlertCircle className="h-5 w-5 mr-2" />
-                {/* 通常のエラーと同期エラーの両方を表示 */}
-                <span className="text-sm">{error || syncError}</span>
-                </div>
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+            <div className="flex items-center text-red-600">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              <span className="text-sm">{error || syncError}</span>
             </div>
+          </div>
+        )}
+
+        {/* 成功メッセージの表示 */}
+        {success && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
+            <div className="flex items-center text-green-600">
+              <Check className="h-5 w-5 mr-2" />
+              <span className="text-sm">{success}</span>
+            </div>
+          </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -266,12 +454,17 @@ export default function Register() {
                 type="url"
                 id="channelUrl"
                 value={formData.channelUrl}
-                onChange={(e) => setFormData({ ...formData, channelUrl: e.target.value })}
-                className="flex-1 block w-full rounded-none rounded-r-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                onChange={handleUrlChange}
+                className={`flex-1 block w-full rounded-none rounded-r-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${
+                  channelIdValid ? 'border-green-500' : ''
+                }`}
                 placeholder="https://www.youtube.com/channel/..."
                 required
               />
             </div>
+            <p className="mt-1 text-xs text-gray-500">
+              例: https://www.youtube.com/channel/UCxxxxxxxx (channel IDで始まるURLが最適です)
+            </p>
           </div>
 
           {/* カテゴリー */}
@@ -340,10 +533,9 @@ export default function Register() {
           <div>
             <button
               type="submit"
-              disabled={loading || isLoading} // loading または isLoading が true のときに disabled
+              disabled={loading || isLoading}
               className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
             >
-              {/* loading だけでなく isLoading もチェック */}
               {(loading || isLoading) ? '処理中...' : 'YouTuberとして登録'}
             </button>
           </div>

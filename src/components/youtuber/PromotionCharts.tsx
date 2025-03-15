@@ -9,29 +9,32 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
-  TooltipProps
-} from 'recharts';
-import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
-
-interface ChartData {
+  TooltipProps,
+  ComposedChart,
+  Area
+ } from 'recharts';
+ import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
+ 
+ interface ChartData {
   date: string;
   impressions: number;
   clicks: number;
   ctr: number;
-}
-
-interface PromotionChartsProps {
+  revenue?: number;
+ }
+ 
+ interface PromotionChartsProps {
   data: ChartData[];
   timeRange: 'week' | 'month' | 'year';
-}
-
-interface CustomTooltipProps extends TooltipProps<ValueType, NameType> {
+ }
+ 
+ interface CustomTooltipProps extends TooltipProps<ValueType, NameType> {
   active?: boolean;
   payload?: any[];
   label?: string;
-}
-
-export default function PromotionCharts({ data, timeRange }: PromotionChartsProps) {
+ }
+ 
+ export default function PromotionCharts({ data, timeRange }: PromotionChartsProps) {
   const formatXAxis = (date: string) => {
     const d = new Date(date);
     const formatOptions: Record<string, Intl.DateTimeFormatOptions> = {
@@ -39,26 +42,29 @@ export default function PromotionCharts({ data, timeRange }: PromotionChartsProp
       month: { day: 'numeric' as const },
       year: { month: 'short' as const }
     };
-
+ 
     return d.toLocaleDateString('ja-JP', formatOptions[timeRange]);
   };
-
+ 
   const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
     if (!active || !payload || !payload.length) return null;
-
+ 
     const getValueLabel = (name: string) => {
       const labels: Record<string, string> = {
         impressions: 'インプレッション',
         clicks: 'クリック数',
-        ctr: 'CTR'
+        ctr: 'CTR',
+        revenue: '収益'
       };
       return labels[name] || name;
     };
-
+ 
     const formatValue = (name: string, value: number) => {
-      return name === 'ctr' ? `${value.toFixed(2)}%` : value.toLocaleString();
+      if (name === 'ctr') return `${value.toFixed(2)}%`;
+      if (name === 'revenue') return `¥${value.toLocaleString()}`;
+      return value.toLocaleString();
     };
-
+ 
     return (
       <div className="bg-white p-4 border border-gray-200 rounded-lg shadow-sm">
         <p className="text-sm font-medium text-gray-900 mb-2">
@@ -76,11 +82,11 @@ export default function PromotionCharts({ data, timeRange }: PromotionChartsProp
       </div>
     );
   };
-
+ 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="bg-white p-4 rounded-lg shadow-sm">
-        <h3 className="text-sm font-medium text-gray-900 mb-4">インプレッション推移</h3>
+        <h3 className="text-sm font-medium text-gray-900 mb-4">インプレッション / クリック推移</h3>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
@@ -114,11 +120,20 @@ export default function PromotionCharts({ data, timeRange }: PromotionChartsProp
                 dot={false}
                 activeDot={{ r: 6 }}
               />
+              <Line
+                type="monotone"
+                dataKey="clicks"
+                name="クリック数"
+                stroke="#EC4899"
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 6 }}
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
-
+ 
       <div className="bg-white p-4 rounded-lg shadow-sm">
         <h3 className="text-sm font-medium text-gray-900 mb-4">CTR推移</h3>
         <div className="h-64">
@@ -137,7 +152,7 @@ export default function PromotionCharts({ data, timeRange }: PromotionChartsProp
               <YAxis
                 stroke="#6B7280"
                 fontSize={12}
-                tickFormatter={(value: number) => `${value}%`}
+                tickFormatter={(value: number) => `${value.toFixed(1)}%`}
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend 
@@ -156,6 +171,55 @@ export default function PromotionCharts({ data, timeRange }: PromotionChartsProp
           </ResponsiveContainer>
         </div>
       </div>
+ 
+      <div className="bg-white p-4 rounded-lg shadow-sm lg:col-span-2">
+        <h3 className="text-sm font-medium text-gray-900 mb-4">収益推移</h3>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart
+              data={data}
+              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis
+                dataKey="date"
+                tickFormatter={formatXAxis}
+                stroke="#6B7280"
+                fontSize={12}
+              />
+              <YAxis
+                stroke="#6B7280"
+                fontSize={12}
+                tickFormatter={(value: number) => `¥${value.toLocaleString()}`}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend 
+                verticalAlign="top"
+                height={36}
+                fontSize={12}
+              />
+              <Area
+                type="monotone"
+                dataKey="revenue"
+                name="収益"
+                fill="#FBBF24"
+                fillOpacity={0.3}
+                stroke="#F59E0B"
+                strokeWidth={2}
+              />
+              <Line
+                type="monotone"
+                dataKey="revenue"
+                name="収益"
+                stroke="#F59E0B"
+                strokeWidth={0}
+                dot={{ stroke: '#F59E0B', strokeWidth: 2, r: 4 }}
+                activeDot={{ r: 6 }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
-}
+ }

@@ -43,6 +43,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Missing Supabase environment variables');
 }
 
+// 型定義を更新
+export interface VideoReviewCountResponse {
+    id: string;
+    title: string;
+    youtube_id: string;
+    review_count: number;
+}
+
+// @ts-ignore
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
         persistSession: true,
@@ -50,14 +59,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         detectSessionInUrl: true
     }
 });
-
-// 型定義を更新
-export interface VideoReviewCountResponse { // export追加
-    id: string;
-    title: string;
-    youtube_id: string;
-    review_count: number;
-}
 
 // 型定義を追加
 interface SupabaseVideoResponse {
@@ -80,9 +81,9 @@ interface SupabaseVideoResponse {
 }
 
 // SupabaseVideo型からVideo型への変換
-const mapSupabaseVideoToVideo = (video: SupabaseVideoResponse | VideoReviewCountResponse): Video => { // 型を追加
+const mapSupabaseVideoToVideo = (video: SupabaseVideoResponse | VideoReviewCountResponse): Video => {
     const isSupabaseVideoResponse = (video: SupabaseVideoResponse | VideoReviewCountResponse): video is SupabaseVideoResponse => {
-        return 'description' in video; // descriptionプロパティの有無で型を判別
+        return 'description' in video;
     };
 
     const base: Video = {
@@ -860,7 +861,6 @@ export const submitVideoRating = async (
 
     return data;
 };
-
 // getAllVideoRatings 関数の修正
 export const getAllVideoRatings = async (videoId: string) => {
     try {
@@ -951,20 +951,20 @@ export const getUserVideoRating = async (videoId: string) => {
             youtube_id = videoData.youtube_id;
         }
 
-// getUserVideoRating関数の問題部分
-const { data: ratingData, error: ratingError } = await supabase
-    .from('video_ratings')
-    .select(`
-        *,
-        profiles:user_id (
-            id,
-            username,
-            avatar_url
-        )
-    `)
-    .eq('video_id', youtube_id)  // ここでYouTube IDを使用している
-    .eq('user_id', user.id)
-    .maybeSingle();
+        // getUserVideoRating関数の問題部分
+        const { data: ratingData, error: ratingError } = await supabase
+            .from('video_ratings')
+            .select(`
+                *,
+                profiles:user_id (
+                    id,
+                    username,
+                    avatar_url
+                )
+            `)
+            .eq('video_id', youtube_id)  // ここでYouTube IDを使用している
+            .eq('user_id', user.id)
+            .maybeSingle();
 
         if (ratingError) {
             console.error('Error fetching user video rating:', ratingError);
@@ -978,7 +978,6 @@ const { data: ratingData, error: ratingError } = await supabase
         return null;
     }
 };
-
 
 
 export const updateVideoReviewCount = async (videoId: string): Promise<number> => {

@@ -136,6 +136,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // YouTuberプロフィールを取得する関数 - 406エラー回避のため、profiles テーブルからデータを取得するように変更
+  const fetchYoutuberProfile = async (userId: string) => {
+    try {
+      // profiles テーブルからデータを取得してYouTuberプロフィール情報を構築
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+        setYoutuberProfile(null);
+        return;
+      }
+      
+      // profileデータからYouTuber情報に必要なデータを抽出
+      const youtuberProfileData = {
+        id: profileData.id,
+        username: profileData.username,
+        bio: profileData.bio,
+        avatar_url: profileData.avatar_url,
+        channel_name: profileData.username || 'チャンネル未設定',
+        channel_url: profileData.channel_url || '',
+        description: profileData.description || '',
+        created_at: profileData.created_at,
+        updated_at: profileData.updated_at,
+        // YouTuber固有のフィールドをprofileから構築
+        subscribers: 0,
+        total_views: 0
+      };
+      
+      setYoutuberProfile(youtuberProfileData as Profile);
+    } catch (error) {
+      console.error('Error fetching youtuber profile:', error);
+      setYoutuberProfile(null);
+    }
+  };
+
   useEffect(() => {
     const initializeAuth = async () => {
       try {
@@ -150,18 +189,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await fetchAndSetPremiumInfo(currentSession.user.id);
 
           // YouTuberプロフィール取得
-          const { data: youtuberData, error: youtuberError } = await supabase
-            .from('youtuber_profiles')
-            .select('*')
-            .eq('user_id', currentSession.user.id)
-            .single();
-          
-          if (youtuberError && youtuberError.code !== 'PGRST116') {
-            // PGRST116は「結果が見つからない」エラーなので、それ以外はログに出力
-            console.error('Youtuber profile fetch error:', youtuberError);
-          }
-          
-          setYoutuberProfile(youtuberData || null);
+          await fetchYoutuberProfile(currentSession.user.id);
         } else {
           // 初期化時にセッションがない場合はステートをリセット
           setUser(null);
@@ -183,17 +211,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await fetchAndSetPremiumInfo(newSession.user.id);
 
             // YouTuberプロフィール取得
-            const { data: youtuberData, error: youtuberError } = await supabase
-              .from('youtuber_profiles')
-              .select('*')
-              .eq('user_id', newSession.user.id)
-              .single();
-            
-            if (youtuberError && youtuberError.code !== 'PGRST116') {
-              console.error('Youtuber profile fetch error on auth change:', youtuberError);
-            }
-            
-            setYoutuberProfile(youtuberData || null);
+            await fetchYoutuberProfile(newSession.user.id);
           } else if (event === 'SIGNED_OUT') {
             // 明示的なログアウト時のみ状態をクリア
             setUser(null);

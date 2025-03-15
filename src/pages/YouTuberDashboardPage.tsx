@@ -2,21 +2,21 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import Dashboard from '../components/youtuber/Dashboard';
+import PromotionDashboard from '../components/youtuber/PromotionDashboard';
 
 const YouTuberDashboardPage: React.FC = () => {
- const { currentUser, youtuberProfile } = useAuth();
+  const { user, youtuberProfile } = useAuth();
 
- // 認証済みユーザーでかつYouTuber登録がされていない場合は登録ページへリダイレクト
- if (!currentUser) {
-   return <Navigate to="/login" replace />;
- }
+  // 認証済みユーザーでかつYouTuber登録がされていない場合は登録ページへリダイレクト
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
- if (!youtuberProfile) {
-   return <Navigate to="/youtuber/register" replace />;
- }
+  if (!youtuberProfile) {
+    return <Navigate to="/youtuber/register" replace />;
+  }
 
- return <Dashboard />;
+  return <PromotionDashboard />;
 };
 
 export default YouTuberDashboardPage;

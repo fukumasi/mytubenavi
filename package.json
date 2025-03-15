@@ -16,9 +16,12 @@
     "db:stop": "supabase stop"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^6.7.2",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
+    "@fortawesome/react-fontawesome": "^0.2.2",
     "@headlessui/react": "^2.0.0",
-    "@stripe/react-stripe-js": "^3.1.1",
-    "@stripe/stripe-js": "^5.6.0",
+    "@stripe/react-stripe-js": "^3.3.0",
+    "@stripe/stripe-js": "^5.10.0",
     "@supabase/supabase-js": "^2.48.1",
     "@types/recharts": "^1.8.29",
     "axios": "^1.7.9",
@@ -48,6 +51,7 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
     "postcss": "^8.5.1",
+    "supabase": "^2.15.8",
     "supabase-cli": "^0.0.21",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.2.2",

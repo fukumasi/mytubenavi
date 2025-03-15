@@ -2,20 +2,23 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import PromotionSlots from '../components/youtuber/PromotionSlots';
 import PromotionDashboard from '../components/youtuber/PromotionDashboard';
 
 const PromotionPage: React.FC = () => {
- const { currentUser, youtuberProfile } = useAuth();
+  const { user, youtuberProfile } = useAuth();
 
- if (!currentUser) {
-   return <Navigate to="/login" replace />;
- }
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
- if (!youtuberProfile) {
-   return <Navigate to="/youtuber/register" replace />;
- }
+  // YouTuberユーザーの場合はダッシュボードを表示
+  if (youtuberProfile) {
+    return <PromotionDashboard />;
+  }
 
- return <PromotionDashboard />;
+  // 一般ユーザーの場合は掲載枠一覧を表示
+  return <PromotionSlots />;
 };
 
 export default PromotionPage;

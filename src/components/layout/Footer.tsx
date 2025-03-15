@@ -1,4 +1,43 @@
+import { useAuth } from '../../contexts/AuthContext';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
+
 export default function Footer() {
+  const { user } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+  
+  useEffect(() => {
+    const checkAdminRole = async () => {
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
+      
+      // profilesテーブルからrole情報を取得
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        
+        if (error) {
+          console.error('管理者権限の確認エラー:', error);
+          setIsAdmin(false);
+          return;
+        }
+        
+        setIsAdmin(data?.role === 'admin');
+      } catch (err) {
+        console.error('管理者権限の確認中にエラーが発生しました:', err);
+        setIsAdmin(false);
+      }
+    };
+    
+    checkAdminRole();
+  }, [user]);
+
   return (
     <footer className="bg-white border-t border-gray-200 mt-12">
       <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
@@ -79,6 +118,13 @@ export default function Footer() {
                   利用規約
                 </a>
               </li>
+              {isAdmin && (
+                <li>
+                  <Link to="/admin" className="text-sm text-gray-600 hover:text-gray-900">
+                    管理者ダッシュボード
+                  </Link>
+                </li>
+              )}
             </ul>
           </div>
 

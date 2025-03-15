@@ -50,7 +50,7 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
       const { data: userHistory, error: historyError } = await supabase
         .from('view_history')
         .select('video_id')
-        .eq('user_id', user.id);
+        .eq('id', user.id);
 
       if (historyError) {
         console.error('視聴履歴の取得エラー:', historyError);
@@ -60,7 +60,7 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
       const { data: userFavorites, error: favoritesError } = await supabase
         .from('favorites')
         .select('video_id')
-        .eq('user_id', user.id);
+        .eq('id', user.id);
 
       if (favoritesError) {
         console.error('お気に入りの取得エラー:', favoritesError);
@@ -71,7 +71,7 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
       const { data: userInterests, error: interestsError } = await supabase
         .from('user_interests')
         .select('genre')
-        .eq('user_id', user.id);
+        .eq('id', user.id);
 
       if (interestsError) {
         console.error('興味ジャンルの取得エラー:', interestsError);
@@ -82,7 +82,7 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
       const { data: connections, error: connectionsError } = await supabase
         .from('connections')
         .select('connected_user_id, status')
-        .eq('user_id', user.id);
+        .eq('id', user.id);
 
       if (connectionsError) {
         console.error('接続情報の取得エラー:', connectionsError);
@@ -118,7 +118,7 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
           const { data: userVideos, error: videosError } = await supabase
             .from('view_history')
             .select('video_id')
-            .eq('user_id', otherUser.id);
+            .eq('id', otherUser.id);
 
           if (videosError) {
             console.error(`ユーザー${otherUser.id}の視聴履歴取得エラー:`, videosError);
@@ -128,7 +128,7 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
           const { data: userFavs, error: favsError } = await supabase
             .from('favorites')
             .select('video_id')
-            .eq('user_id', otherUser.id);
+            .eq('id', otherUser.id);
 
           if (favsError) {
             console.error(`ユーザー${otherUser.id}のお気に入り取得エラー:`, favsError);
@@ -148,7 +148,7 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
           const { data: genres, error: genresError } = await supabase
             .from('user_interests')
             .select('genre')
-            .eq('user_id', otherUser.id);
+            .eq('id', otherUser.id);
 
           if (genresError) {
             console.error(`ユーザー${otherUser.id}の興味ジャンル取得エラー:`, genresError);
@@ -218,7 +218,7 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
       const { error: connectionError } = await supabase
         .from('connections')
         .insert([{
-          user_id: user.id,
+          id: user.id,
           connected_user_id: userId,
           status: 'pending',
           created_at: new Date().toISOString()
@@ -233,7 +233,7 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
       await supabase
         .from('notifications')
         .insert([{
-          user_id: userId,
+          id: userId,
           type: 'connection_request',
           title: '新しい接続リクエスト',
           message: `${user.user_metadata?.name || '新しいユーザー'}さんから接続リクエストが届きました。`,
@@ -265,7 +265,7 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
       const { error: reactionError } = await supabase
         .from('user_reactions')
         .insert([{
-          user_id: user.id,
+          id: user.id,
           target_user_id: userId,
           reaction_type: isPositive ? 'like' : 'dislike',
           created_at: new Date().toISOString()

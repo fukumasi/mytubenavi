@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+import PremiumPaymentForm from './PremiumPaymentForm';
+import { useStripeContext } from '../../contexts/StripeContext';
 
 interface PlanOption {
   id: string;
@@ -18,6 +20,8 @@ const PremiumUpgrade: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<string>('monthly');
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const { resetPaymentState, paymentSuccess } = useStripeContext();
   
   const plans: PlanOption[] = [
     {
@@ -62,6 +66,9 @@ const PremiumUpgrade: React.FC = () => {
   ];
 
   useEffect(() => {
+    // コンポーネントマウント時に決済状態をリセット
+    resetPaymentState();
+    
     // ユーザーがすでにプレミアム会員かチェック
     const checkPremiumStatus = async () => {
       if (!user) return;
@@ -85,13 +92,57 @@ const PremiumUpgrade: React.FC = () => {
     };
     
     checkPremiumStatus();
-  }, [user, navigate]);
+    
+    // クリーンアップ関数
+    return () => {
+      resetPaymentState();
+    };
+  }, [user, navigate, resetPaymentState]);
+
+  // 決済成功後の処理
+  useEffect(() => {
+    if (paymentSuccess) {
+      // 支払い成功時、ダッシュボードにリダイレクト
+      navigate('/premium/dashboard', { 
+        state: { 
+          success: true, 
+          message: 'プレミアム会員へのアップグレードが完了しました！'
+        } 
+      });
+    }
+  }, [paymentSuccess, navigate]);
 
   const handlePlanSelect = (planId: string) => {
     setSelectedPlan(planId);
   };
 
   const handleUpgrade = async () => {
+    if (!user) {
+      navigate('/login', { state: { redirectTo: '/premium/upgrade' } });
+      return;
+    }
+
+    // Stripe決済画面を表示
+    setShowPaymentForm(true);
+  };
+
+  const handlePaymentSuccess = (subscriptionId: string) => {
+    // 支払い成功後、ダッシュボードにリダイレクト
+    navigate('/premium/dashboard', { 
+      state: { 
+        success: true, 
+        message: 'プレミアム会員へのアップグレードが完了しました！',
+        subscriptionId
+      } 
+    });
+  };
+  
+  const handlePaymentCancel = () => {
+    setShowPaymentForm(false);
+  };
+
+  // 仮の決済処理（開発中のため）
+  const handleTempUpgrade = async () => {
     if (!user) {
       navigate('/login', { state: { redirectTo: '/premium/upgrade' } });
       return;
@@ -111,7 +162,7 @@ const PremiumUpgrade: React.FC = () => {
       expiry.setMonth(expiry.getMonth() + selectedPlanDetails.duration);
 
       // プロフィールテーブルのプレミアムステータスを更新
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from('profiles')
         .update({
           is_premium: true,
@@ -121,10 +172,10 @@ const PremiumUpgrade: React.FC = () => {
         })
         .eq('id', user.id);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
 
       // 支払い履歴テーブルに記録を追加（本来はStripe決済成功後に行う）
-      await supabase
+      const { error: insertError } = await supabase
         .from('premium_payments')
         .insert({
           user_id: user.id,
@@ -135,6 +186,8 @@ const PremiumUpgrade: React.FC = () => {
           expires_at: expiry.toISOString()
         });
 
+      if (insertError) throw insertError;
+
       // 成功したらプレミアムダッシュボードへリダイレクト
       navigate('/premium/dashboard', { 
         state: { 
@@ -142,9 +195,9 @@ const PremiumUpgrade: React.FC = () => {
           message: 'プレミアム会員へのアップグレードが完了しました！' 
         } 
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('プレミアム登録中にエラーが発生しました:', err);
-      setError('プレミアム会員登録に失敗しました。もう一度お試しください。');
+      setError('プレミアム会員登録に失敗しました。もう一度お試しください。' + (err.message || ''));
     } finally {
       setLoading(false);
     }
@@ -194,6 +247,27 @@ const PremiumUpgrade: React.FC = () => {
       </div>
     );
   };
+
+  // 決済フォーム表示モードの場合
+  if (showPaymentForm) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold mb-6">プレミアム会員のお支払い</h1>
+        
+        <PremiumPaymentForm 
+          selectedPlan={selectedPlan as 'monthly' | 'quarterly' | 'yearly'}
+          onSuccess={handlePaymentSuccess}
+          onCancel={handlePaymentCancel}
+        />
+
+        <div className="mt-8 bg-blue-50 border-l-4 border-blue-500 p-4 text-blue-800 rounded-r">
+          <p className="text-sm">
+            <strong>お支払い情報は安全に処理されます。</strong> クレジットカード情報はStripeの安全な環境で保管され、当サイトのサーバーには保存されません。
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -264,13 +338,30 @@ const PremiumUpgrade: React.FC = () => {
       </div>
 
       <div className="text-center">
-        <button
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={handleUpgrade}
-          disabled={loading}
-        >
-          {loading ? '処理中...' : `プレミアム会員に登録する (¥${plans.find(p => p.id === selectedPlan)?.price.toLocaleString()})`}
-        </button>
+        <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+          <button
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleUpgrade}
+            disabled={loading}
+          >
+            {loading ? '処理中...' : `Stripeで支払う (¥${plans.find(p => p.id === selectedPlan)?.price.toLocaleString()})`}
+          </button>
+          
+          <button
+            className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-8 rounded-lg shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleTempUpgrade}
+            disabled={loading}
+          >
+            {loading ? '処理中...' : `テスト登録 (実際の決済なし)`}
+          </button>
+        </div>
+        
+        <div className="mt-4 bg-yellow-50 border-l-4 border-yellow-500 p-4 text-yellow-800 rounded-r text-left">
+          <p>
+            <strong>開発中の機能：</strong> Stripe決済システムはテスト段階です。実際の決済を行う前に、テスト登録ボタンでプレミアム機能をお試しいただけます。
+          </p>
+        </div>
+        
         <p className="mt-4 text-gray-600 text-sm">
           登録することで、<a href="/terms-of-service" className="text-blue-600 hover:underline">利用規約</a>と
           <a href="/privacy-policy" className="text-blue-600 hover:underline">プライバシーポリシー</a>に同意したものとみなされます。

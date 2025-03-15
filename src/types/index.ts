@@ -116,47 +116,29 @@ export interface Review {
     videos?: Video;
 }
 
+// PromotionSlot型の修正 - データベーススキーマに合わせる
 export interface PromotionSlot {
     id: string;
-    youtuber_id: string; // ProfileのIDを参照
     name: string;
     type: 'premium' | 'sidebar' | 'genre' | 'related';
     price: number;
     max_videos: number;
     description?: string;
-    image_url?: string;
-    created_at: string;
-    updated_at: string;
-    status: 'active' | 'inactive';
-    available_count?: number; // 元のファイルから移動
+    youtube_id?: string; 
+    created_at?: string;
+    updated_at?: string;
+    status: 'available' | 'inactive';
+    video_id?: string; // データベースにあるフィールド
+    // 以下は実際のデータベースにはないが、UIで使用されるフィールド
     bookings?: Array<{
         count: number;
     }>;
     current_bookings_count?: number;
     total_earnings?: number;
-    position?: 'top' | 'side' | 'bottom';
-    visibility?: 'public' | 'private';
-    start_time?: string;
-    end_time?: string;
-    target_genres?: string[];
 }
 
-export interface SlotBooking {
-    id: string;
-    user_id: string;     // ProfileのIDを参照
-    slot_id: string;    // PromotionSlotのIDを参照
-    video_id: string;   // VideoのIDを参照
-    start_date: string;
-    end_date: string;
-    status: 'pending' | 'active' | 'completed' | 'cancelled';
-    total_price: number;
-    created_at: string;
-    updated_at: string;
-    payment_status?: 'pending' | 'paid' | 'refunded';
-    payment_id?: string;
-    promotion_slot?: PromotionSlot;
-    video?: Video;
-}
+// SlotBookingを削除し、types/promotion.tsで定義したものを使用する
+// export interface SlotBooking { ... }
 
 export interface PromotionStats {
     totalBookings: number;
