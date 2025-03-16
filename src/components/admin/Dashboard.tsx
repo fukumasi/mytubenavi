@@ -2,16 +2,19 @@
 
 import React, { useState } from 'react';
 import PromotionSlots from './PromotionSlots';
+import UserManagement from './UserManagement';
+import UserStatistics from './UserStatistics';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faFilm, 
   faUsers, 
   faChartLine, 
   faCog, 
-  faMoneyBillWave 
+  faMoneyBillWave,
+  faChartBar
 } from '@fortawesome/free-solid-svg-icons';
 
-type DashboardTab = 'promotions' | 'users' | 'analytics' | 'settings' | 'payments';
+type DashboardTab = 'promotions' | 'users' | 'user-stats' | 'analytics' | 'settings' | 'payments';
 
 const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<DashboardTab>('promotions');
@@ -22,6 +25,8 @@ const Dashboard: React.FC = () => {
         return <PromotionSlots />;
       case 'users':
         return <UserManagement />;
+      case 'user-stats':
+        return <UserStatistics />;
       case 'analytics':
         return <Analytics />;
       case 'settings':
@@ -34,17 +39,15 @@ const Dashboard: React.FC = () => {
   };
 
   // プレースホルダーコンポーネント
-  const UserManagement = () => (
-    <div className="p-6 bg-white rounded shadow">
-      <h2 className="text-xl font-semibold mb-4">ユーザー管理</h2>
-      <p>この機能は現在開発中です。</p>
-    </div>
-  );
-
   const Analytics = () => (
     <div className="p-6 bg-white rounded shadow">
       <h2 className="text-xl font-semibold mb-4">分析</h2>
       <p>この機能は現在開発中です。</p>
+      {/* 分析タブでもユーザー統計を表示 */}
+      <div className="mt-8">
+        <h3 className="text-lg font-semibold mb-2">ユーザー統計</h3>
+        <UserStatistics />
+      </div>
     </div>
   );
 
@@ -89,6 +92,17 @@ const Dashboard: React.FC = () => {
               >
                 <FontAwesomeIcon icon={faUsers} className="mr-2" />
                 ユーザー管理
+              </button>
+            </li>
+            <li>
+              <button
+                className={`w-full text-left px-4 py-2 rounded flex items-center ${
+                  activeTab === 'user-stats' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+                }`}
+                onClick={() => setActiveTab('user-stats')}
+              >
+                <FontAwesomeIcon icon={faChartBar} className="mr-2" />
+                ユーザー統計
               </button>
             </li>
             <li>

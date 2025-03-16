@@ -1,11 +1,18 @@
 // src/pages/AdminDashboardPage.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, createContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import AdminDashboard from '../components/admin/Dashboard';
 import UserManagement from '../components/admin/UserManagement';
+import UserStatistics from '../components/admin/UserStatistics';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
+
+// 管理者ダッシュボードのコンテキスト
+export const AdminContext = createContext({
+  refreshData: () => {},
+  lastUpdate: new Date()
+});
 
 interface StatCountProps {
   title: string;
@@ -31,7 +38,15 @@ const AdminDashboardPage: React.FC = () => {
   const [videoCount, setVideoCount] = useState<number>(0);
   const [reviewCount, setReviewCount] = useState<number>(0);
   const [statsLoading, setStatsLoading] = useState<boolean>(true);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const navigate = useNavigate();
+
+  // データ更新関数
+  const refreshData = () => {
+    console.log('全データをリフレッシュします...');
+    setLastUpdate(new Date());
+    fetchStats();
+  };
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -75,57 +90,122 @@ const AdminDashboardPage: React.FC = () => {
     checkAdminStatus();
   }, [navigate]);
 
-  // サイト全体の統計情報を取得
+  // Profilesテーブルの変更を監視するサブスクリプション
   useEffect(() => {
-    const fetchStats = async () => {
-      setStatsLoading(true);
-      try {
-        // ユーザー数を取得
-        const { count: userCountData, error: userError } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true });
-        
-        if (userError) {
-          console.error('ユーザー数の取得に失敗しました:', userError);
-        } else {
-          setUserCount(userCountData || 0);
-        }
+    if (!isAdmin) return;
 
-        // 動画数を取得
-        const { count: videoCountData, error: videoError } = await supabase
-          .from('videos')
-          .select('*', { count: 'exact', head: true });
-        
-        if (videoError) {
-          console.error('動画数の取得に失敗しました:', videoError);
-        } else {
-          setVideoCount(videoCountData || 0);
-        }
+    // profiles テーブルの変更を監視するサブスクリプションを設定
+    const subscription = supabase
+      .channel('admin-dashboard-profiles')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'profiles' 
+      }, (payload) => {
+        console.log('プロファイルが更新されました。データをリフレッシュします。', payload);
+        refreshData();
+      })
+      .subscribe();
 
-        // レビュー数を取得
-        const { count: reviewCountData, error: reviewError } = await supabase
-          .from('video_ratings')
-          .select('*', { count: 'exact', head: true });
-        
-        if (reviewError) {
-          console.error('レビュー数の取得に失敗しました:', reviewError);
-        } else {
-          setReviewCount(reviewCountData || 0);
-        }
-      } catch (error) {
-        console.error('統計情報の取得に失敗しました:', error);
-      } finally {
-        setStatsLoading(false);
-      }
+    // videos テーブルの変更を監視
+    const videosSubscription = supabase
+      .channel('admin-dashboard-videos')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'videos' 
+      }, () => {
+        console.log('動画データが更新されました。データをリフレッシュします。');
+        refreshData();
+      })
+      .subscribe();
+
+    // ratings テーブルの変更を監視
+    const ratingsSubscription = supabase
+      .channel('admin-dashboard-ratings')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'video_ratings' 
+      }, () => {
+        console.log('評価データが更新されました。データをリフレッシュします。');
+        refreshData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+      supabase.removeChannel(videosSubscription);
+      supabase.removeChannel(ratingsSubscription);
     };
+  }, [isAdmin]);
 
+  // サイト全体の統計情報を取得
+  const fetchStats = async () => {
+    if (!isAdmin) return;
+
+    setStatsLoading(true);
+    try {
+      // キャッシュ回避のタイムスタンプ
+      const timestamp = new Date().getTime();
+      console.log(`統計情報を取得します (${timestamp})...`);
+
+      // ユーザー数を取得
+      const { count: userCountData, error: userError } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+      
+      if (userError) {
+        console.error('ユーザー数の取得に失敗しました:', userError);
+      } else {
+        setUserCount(userCountData || 0);
+      }
+
+      // 動画数を取得
+      const { count: videoCountData, error: videoError } = await supabase
+        .from('videos')
+        .select('*', { count: 'exact', head: true });
+      
+      if (videoError) {
+        console.error('動画数の取得に失敗しました:', videoError);
+      } else {
+        setVideoCount(videoCountData || 0);
+      }
+
+      // レビュー数を取得
+      const { count: reviewCountData, error: reviewError } = await supabase
+        .from('video_ratings')
+        .select('*', { count: 'exact', head: true });
+      
+      if (reviewError) {
+        console.error('レビュー数の取得に失敗しました:', reviewError);
+      } else {
+        setReviewCount(reviewCountData || 0);
+      }
+
+      console.log(`統計情報取得完了: ユーザー ${userCountData || 0}件, 動画 ${videoCountData || 0}件, レビュー ${reviewCountData || 0}件`);
+    } catch (error) {
+      console.error('統計情報の取得に失敗しました:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     if (isAdmin) {
       fetchStats();
     }
-  }, [isAdmin]);
+  }, [isAdmin, lastUpdate]);
 
   const handleTabChange = (tab: string) => {
+    console.log(`タブを切り替えます: ${activeTab} → ${tab}`);
     setActiveTab(tab);
+    // タブ切り替え時に明示的にデータを更新
+    setLastUpdate(new Date());
+    // 遅延を少し入れて、状態の更新が完了してからデータを取得
+    setTimeout(() => {
+      refreshData();
+    }, 50);
   };
 
   if (loading) {
@@ -140,127 +220,166 @@ const AdminDashboardPage: React.FC = () => {
     return null; // すでにナビゲートしているので何も表示しない
   }
 
+  // 管理ダッシュボードのコンテキスト値
+  const contextValue = {
+    refreshData,
+    lastUpdate
+  };
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">管理者ダッシュボード</h1>
-      
-      {/* 統計概要 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <StatCount
-          title="登録ユーザー数"
-          count={userCount}
-          loading={statsLoading}
-          bgColor="bg-white"
-        />
-        <StatCount
-          title="登録動画数"
-          count={videoCount}
-          loading={statsLoading}
-          bgColor="bg-white"
-        />
-        <StatCount
-          title="レビュー数"
-          count={reviewCount}
-          loading={statsLoading}
-          bgColor="bg-white"
-        />
-      </div>
-      
-      {/* タブナビゲーション */}
-      <div className="bg-white rounded-lg shadow mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="flex -mb-px">
-            <button
-              onClick={() => handleTabChange('users')}
-              className={`py-4 px-6 font-medium text-sm ${
-                activeTab === 'users'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              ユーザー管理
-            </button>
-            <button
-              onClick={() => handleTabChange('analytics')}
-              className={`py-4 px-6 font-medium text-sm ${
-                activeTab === 'analytics'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              統計・分析
-            </button>
-            <button
-              onClick={() => handleTabChange('promotion')}
-              className={`py-4 px-6 font-medium text-sm ${
-                activeTab === 'promotion'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              掲載枠管理
-            </button>
-          </nav>
+    <AdminContext.Provider value={contextValue}>
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold mb-6">管理者ダッシュボード</h1>
+        
+        {/* 統計概要 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <StatCount
+            title="登録ユーザー数"
+            count={userCount}
+            loading={statsLoading}
+            bgColor="bg-white"
+          />
+          <StatCount
+            title="登録動画数"
+            count={videoCount}
+            loading={statsLoading}
+            bgColor="bg-white"
+          />
+          <StatCount
+            title="レビュー数"
+            count={reviewCount}
+            loading={statsLoading}
+            bgColor="bg-white"
+          />
         </div>
         
-        <div className="p-4">
-          {activeTab === 'users' && (
-            <div>
-              <h2 className="text-xl font-semibold mb-4">ユーザー管理</h2>
-              <p className="text-gray-600 mb-2">
-                ユーザーアカウントの管理、権限設定、アクティビティ監視などの機能を提供します。
-              </p>
-              <UserManagement />
-            </div>
-          )}
+        {/* タブナビゲーション */}
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="border-b border-gray-200">
+            <nav className="flex -mb-px">
+              <button
+                onClick={() => handleTabChange('users')}
+                className={`py-4 px-6 font-medium text-sm ${
+                  activeTab === 'users'
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                ユーザー管理
+              </button>
+              <button
+                onClick={() => handleTabChange('user-stats')}
+                className={`py-4 px-6 font-medium text-sm ${
+                  activeTab === 'user-stats'
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                ユーザー統計
+              </button>
+              <button
+                onClick={() => handleTabChange('analytics')}
+                className={`py-4 px-6 font-medium text-sm ${
+                  activeTab === 'analytics'
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                統計・分析
+              </button>
+              <button
+                onClick={() => handleTabChange('promotion')}
+                className={`py-4 px-6 font-medium text-sm ${
+                  activeTab === 'promotion'
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                掲載枠管理
+              </button>
+            </nav>
+          </div>
           
-          {activeTab === 'analytics' && (
-            <div>
-              <h2 className="text-xl font-semibold mb-4">統計・分析</h2>
-              <p className="text-gray-600 mb-2">
-                サイト利用状況、ユーザー行動、評価傾向などの詳細な分析データを提供します。
-              </p>
-              <div className="bg-gray-50 p-4 rounded border border-dashed border-gray-300 text-center">
-                <p className="text-gray-500">統計・分析機能は開発中です</p>
+          <div className="p-4">
+            {activeTab === 'users' && (
+              <div>
+                <h2 className="text-xl font-semibold mb-4">ユーザー管理</h2>
+                <p className="text-gray-600 mb-2">
+                  ユーザーアカウントの管理、権限設定、アクティビティ監視などの機能を提供します。
+                </p>
+                <UserManagement key={`user-management-${lastUpdate.getTime()}`} />
               </div>
-            </div>
-          )}
-          
-          {activeTab === 'promotion' && (
+            )}
+            
+            {activeTab === 'user-stats' && (
+              <div>
+                <h2 className="text-xl font-semibold mb-4">ユーザー統計</h2>
+                <p className="text-gray-600 mb-2">
+                  ユーザー登録状況の統計データやユーザータイプ別の分布を可視化します。
+                </p>
+                <UserStatistics key={`user-stats-${lastUpdate.getTime()}`} />
+              </div>
+            )}
+            
+            {activeTab === 'analytics' && (
+              <div>
+                <h2 className="text-xl font-semibold mb-4">統計・分析</h2>
+                <p className="text-gray-600 mb-2">
+                  サイト利用状況、ユーザー行動、評価傾向などの詳細な分析データを提供します。
+                </p>
+                <div className="bg-gray-50 p-4 rounded border border-dashed border-gray-300 text-center">
+                  <p className="text-gray-500">統計・分析機能は開発中です</p>
+                </div>
+              </div>
+            )}
+            
+            {activeTab === 'promotion' && (
+              <div>
+                <h2 className="text-xl font-semibold mb-4">掲載枠管理</h2>
+                <p className="text-gray-600 mb-2">
+                  YouTuber向け掲載枠の設定、管理、予約状況の確認などを行います。
+                </p>
+                <AdminDashboard key={`admin-dashboard-${lastUpdate.getTime()}`} />
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* システム情報 */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">システム情報</h2>
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <h2 className="text-xl font-semibold mb-4">掲載枠管理</h2>
-              <p className="text-gray-600 mb-2">
-                YouTuber向け掲載枠の設定、管理、予約状況の確認などを行います。
-              </p>
-              <AdminDashboard />
+              <p className="text-sm text-gray-500">アプリケーションバージョン</p>
+              <p className="font-medium">1.0.0</p>
             </div>
-          )}
+            <div>
+              <p className="text-sm text-gray-500">最終データベース更新</p>
+              <p className="font-medium">{new Date().toLocaleDateString('ja-JP')}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">サーバーステータス</p>
+              <p className="font-medium text-green-500">正常稼働中</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">API状態</p>
+              <p className="font-medium text-green-500">正常</p>
+            </div>
+          </div>
+          <div className="mt-4 text-right">
+            <button 
+              onClick={refreshData}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center ml-auto"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+              </svg>
+              データを更新
+            </button>
+          </div>
         </div>
       </div>
-      
-      {/* システム情報 */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold mb-4">システム情報</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm text-gray-500">アプリケーションバージョン</p>
-            <p className="font-medium">1.0.0</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">最終データベース更新</p>
-            <p className="font-medium">{new Date().toLocaleDateString('ja-JP')}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">サーバーステータス</p>
-            <p className="font-medium text-green-500">正常稼働中</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">API状態</p>
-            <p className="font-medium text-green-500">正常</p>
-          </div>
-        </div>
-      </div>
-    </div>
+    </AdminContext.Provider>
   );
 };
 
