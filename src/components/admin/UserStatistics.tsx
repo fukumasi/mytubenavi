@@ -165,66 +165,65 @@ const UserStatistics: React.FC = () => {
   };
   
   // 統計データ取得関数
-  const fetchUserStats = async () => {
-    if (!validateDateRange()) {
-      return;
+const fetchUserStats = async () => {
+  if (!validateDateRange()) {
+    return;
+  }
+  
+  console.log('UserStatistics: 統計データを取得します...');
+  setLoading(true);
+  setError(null);
+  
+  try {
+    // キャッシュ回避用のタイムスタンプ
+    const timestamp = new Date().getTime();
+    console.log(`UserStatistics: データ取得開始 (${timestamp})`);
+    
+    // 1. 全ユーザー数の取得
+    let totalUsersQuery = supabase.from('profiles').select('count', { head: false, count: 'exact' });
+    if (filterRole !== 'all') {
+      totalUsersQuery = totalUsersQuery.eq('role', filterRole);
+    }
+    const { data: totalUsersData, error: totalUsersError } = await totalUsersQuery;
+    
+    if (totalUsersError) throw totalUsersError;
+    
+    // 2. アクティブユーザー数の取得
+    let activeUsersQuery = supabase.from('profiles').select('count', { head: false, count: 'exact' }).eq('active', true);
+    if (filterRole !== 'all') {
+      activeUsersQuery = activeUsersQuery.eq('role', filterRole);
+    }
+    const { data: activeUsersData, error: activeUsersError } = await activeUsersQuery;
+    
+    if (activeUsersError) throw activeUsersError;
+    
+    // 3. プレミアムユーザー数の取得
+    let premiumUsersQuery = supabase.from('profiles').select('id', { head: false, count: 'exact' }).eq('is_premium', true).order('id', { ascending: true });
+    if (filterRole !== 'all') {
+      premiumUsersQuery = premiumUsersQuery.eq('role', filterRole);
+    }
+    const { data: premiumUsersData, error: premiumUsersError } = await premiumUsersQuery;
+    
+    if (premiumUsersError) throw premiumUsersError;
+    
+    const premiumCount = premiumUsersData?.length || 0;
+    
+    // 4. ロール別分布の取得
+    let roleDistData: RoleDistItem[] = [];
+    
+    // 直接クエリで各ロールのカウントを取得
+    let roleQuery = supabase
+      .from('profiles')
+      .select('role, id, is_premium')
+      .order('id', { ascending: true });
+      
+    if (filterRole !== 'all') {
+      roleQuery = roleQuery.eq('role', filterRole);
     }
     
-    console.log('UserStatistics: 統計データを取得します...');
-    setLoading(true);
-    setError(null);
+    const { data: roleCountsData, error: roleCountsError } = await roleQuery;
     
-    try {
-      // キャッシュ回避用のタイムスタンプ
-      const timestamp = new Date().getTime();
-      console.log(`UserStatistics: データ取得開始 (${timestamp})`);
-      
-      // 1. 全ユーザー数の取得
-      const { data: totalUsersData, error: totalUsersError } = await supabase
-        .from('profiles')
-        .select('count', { head: false, count: 'exact' })
-        .eq(filterRole !== 'all' ? 'role' : 'id', filterRole !== 'all' ? filterRole : 'id');
-      
-      if (totalUsersError) throw totalUsersError;
-      
-      // 2. アクティブユーザー数の取得
-      const { data: activeUsersData, error: activeUsersError } = await supabase
-        .from('profiles')
-        .select('count', { head: false, count: 'exact' })
-        .eq('active', true)
-        .eq(filterRole !== 'all' ? 'role' : 'id', filterRole !== 'all' ? filterRole : 'id');
-      
-      if (activeUsersError) throw activeUsersError;
-      
-      // 3. プレミアムユーザー数の取得
-      const { data: premiumUsersData, error: premiumUsersError } = await supabase
-        .from('profiles')
-        .select('id', { head: false, count: 'exact' })
-        .eq('is_premium', true)
-        .eq(filterRole !== 'all' ? 'role' : 'id', filterRole !== 'all' ? filterRole : 'id')
-        .order('id', { ascending: true });
-      
-      if (premiumUsersError) throw premiumUsersError;
-      
-      const premiumCount = premiumUsersData?.length || 0;
-      
-      // 4. ロール別分布の取得
-      let roleDistData: RoleDistItem[] = [];
-      
-      // 直接クエリで各ロールのカウントを取得
-      const roleQuery = supabase
-        .from('profiles')
-        .select('role, id, is_premium')
-        .order('id', { ascending: true });
-        
-      if (filterRole !== 'all') {
-        roleQuery.eq('role', filterRole);
-      }
-      
-      const { data: roleCountsData, error: roleCountsError } = await roleQuery;
-      
-      if (roleCountsError) throw roleCountsError;
-      
+    if (roleCountsError) throw roleCountsError;
       // 手動集計
       const roleCounts: Record<string, number> = {};
       roleCountsData?.forEach(user => {
