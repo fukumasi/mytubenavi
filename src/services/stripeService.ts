@@ -7,8 +7,42 @@ import { supabase } from '../lib/supabase';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'http://localhost:54321';
 const FUNCTIONS_BASE_URL = `${SUPABASE_URL}/functions/v1`;
 
+// 型定義
+export interface PaymentIntentResponse {
+  clientSecret: string;
+  paymentIntentId: string;
+}
+
+export interface StripeCustomerResponse {
+  customerId: string;
+}
+
+export interface SubscriptionResponse {
+  subscriptionId: string;
+  clientSecret: string;
+}
+
+export interface PaymentStatusResponse {
+  status: string;
+  payment_status: string;
+}
+
+export interface SubscriptionInfo {
+  hasActiveSubscription: boolean;
+  status?: string;
+  currentPeriodEnd?: string;
+  plan?: string;
+  cancelAtPeriodEnd?: boolean;
+}
+
+export interface RefundResponse {
+  success: boolean;
+  refundId?: string;
+  error?: string;
+}
+
 // Supabase認証トークンの取得
-const getAuthToken = async () => {
+const getAuthToken = async (): Promise<string> => {
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token || '';
 };
@@ -42,7 +76,7 @@ const apiRequest = async <T>(
       throw new Error(data.error || `APIリクエストに失敗しました (${response.status})`);
     }
     
-    return data;
+    return data as T;
   } catch (error) {
     console.error(`APIリクエストエラー (${functionName}):`, error);
     throw error;
@@ -52,23 +86,36 @@ const apiRequest = async <T>(
 // 決済インテント作成
 export const createPaymentIntent = async (
   amount: number,
-  slotId: string,
-  duration: number
-) => {
-  return apiRequest<{ clientSecret: string, paymentIntentId: string }>(
-    'create-payment-intent',
-    'POST', 
-    {
-      amount,
-      slotId,
-      duration,
-      type: 'promotion'
-    }
-  );
+  currency: string = 'jpy',
+  slotId?: string | null,
+  duration?: number,
+  options?: {
+    description?: string;
+    metadata?: Record<string, string>;
+  }
+): Promise<PaymentIntentResponse> => {
+  try {
+    return await apiRequest<PaymentIntentResponse>(
+      'create-payment-intent',
+      'POST', 
+      {
+        amount,
+        currency,
+        slotId,
+        duration,
+        type: 'promotion',
+        description: options?.description,
+        metadata: options?.metadata
+      }
+    );
+  } catch (error) {
+    console.error('決済インテント作成エラー:', error);
+    throw error;
+  }
 };
 
 // Stripe顧客IDの作成または取得
-export const getOrCreateStripeCustomer = async () => {
+export const getOrCreateStripeCustomer = async (): Promise<StripeCustomerResponse> => {
   try {
     // プロファイル情報を取得
     const { data: userProfile, error: profileError } = await supabase
@@ -88,7 +135,7 @@ export const getOrCreateStripeCustomer = async () => {
     if (userError || !user) throw userError || new Error('ユーザー情報が取得できません');
 
     // Stripe顧客IDがない場合は作成
-    const { customerId } = await apiRequest<{ customerId: string }>(
+    const { customerId } = await apiRequest<StripeCustomerResponse>(
       'create-payment-intent', 
       'POST',
       {
@@ -112,31 +159,41 @@ export const getOrCreateStripeCustomer = async () => {
 };
 
 // サブスクリプション作成
-export const createSubscription = async (priceId: string) => {
-  // 顧客IDを取得または作成
-  const { customerId } = await getOrCreateStripeCustomer();
-  
-  return apiRequest<{ subscriptionId: string, clientSecret: string }>(
-    'create-payment-intent', 
-    'POST',
-    {
-      customerId,
-      priceId,
-      type: 'premium'
-    }
-  );
+export const createSubscription = async (priceId: string): Promise<SubscriptionResponse> => {
+  try {
+    // 顧客IDを取得または作成
+    const { customerId } = await getOrCreateStripeCustomer();
+    
+    return await apiRequest<SubscriptionResponse>(
+      'create-payment-intent', 
+      'POST',
+      {
+        customerId,
+        priceId,
+        type: 'premium'
+      }
+    );
+  } catch (error) {
+    console.error('サブスクリプション作成エラー:', error);
+    throw error;
+  }
 };
 
 // サブスクリプションキャンセル
-export const cancelSubscription = async (subscriptionId: string) => {
-  return apiRequest<{ status: string }>(
-    'create-payment-intent', 
-    'POST',
-    {
-      subscriptionId,
-      cancel: true
-    }
-  );
+export const cancelSubscription = async (subscriptionId: string): Promise<{ status: string }> => {
+  try {
+    return await apiRequest<{ status: string }>(
+      'create-payment-intent', 
+      'POST',
+      {
+        subscriptionId,
+        cancel: true
+      }
+    );
+  } catch (error) {
+    console.error('サブスクリプションキャンセルエラー:', error);
+    throw error;
+  }
 };
 
 // 有料動画掲載枠支払い作成
@@ -145,31 +202,39 @@ export const createPromotionPayment = async (
   amount: number,
   duration: number,
   videoUrl: string
-) => {
-  // ユーザー情報を取得
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('ユーザー情報が取得できません');
+): Promise<PaymentIntentResponse> => {
+  try {
+    // ユーザー情報を取得
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('ユーザー情報が取得できません');
 
-  // YouTubeのビデオIDを抽出
-  const videoId = extractYouTubeId(videoUrl);
-  if (!videoId) throw new Error('有効なYouTube URLではありません');
+    // YouTubeのビデオIDを抽出
+    const videoId = extractYouTubeId(videoUrl);
+    if (!videoId) throw new Error('有効なYouTube URLではありません');
 
-  return apiRequest<{ clientSecret: string, paymentIntentId: string }>(
-    'create-payment-intent',
-    'POST', 
-    {
-      amount,
-      slotId,
-      duration,
-      type: 'promotion',
-      videoId,
-      userId: user.id
-    }
-  );
+    return await apiRequest<PaymentIntentResponse>(
+      'create-payment-intent',
+      'POST', 
+      {
+        amount,
+        slotId,
+        duration,
+        type: 'promotion',
+        videoId,
+        userId: user.id
+      }
+    );
+  } catch (error) {
+    console.error('プロモーション支払い作成エラー:', error);
+    throw error;
+  }
 };
 
 // 決済状態の確認と更新
-export const updatePaymentStatus = async (paymentIntentId: string, paymentType: 'premium' | 'promotion') => {
+export const updatePaymentStatus = async (
+  paymentIntentId: string, 
+  paymentType: 'premium' | 'promotion'
+): Promise<PaymentStatusResponse> => {
   try {
     const status = await checkPaymentStatus(paymentIntentId);
 
@@ -190,7 +255,7 @@ export const updatePaymentStatus = async (paymentIntentId: string, paymentType: 
 };
 
 // プレミアム会員ステータスの更新
-export const updatePremiumStatus = async (isPremium: boolean) => {
+export const updatePremiumStatus = async (isPremium: boolean): Promise<{ success: boolean }> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('ユーザー情報が取得できません');
@@ -209,7 +274,10 @@ export const updatePremiumStatus = async (isPremium: boolean) => {
 };
 
 // プロモーションスロットステータスの更新
-export const updatePromotionSlotStatus = async (paymentIntentId: string, status: 'pending' | 'completed' | 'cancelled') => {
+export const updatePromotionSlotStatus = async (
+  paymentIntentId: string, 
+  status: 'pending' | 'completed' | 'cancelled'
+): Promise<{ success: boolean }> => {
   try {
     // 関連するスロット予約を取得
     const { data: bookingData, error: fetchError } = await supabase
@@ -241,7 +309,10 @@ export const updatePromotionSlotStatus = async (paymentIntentId: string, status:
 };
 
 // 掲載枠のYouTube IDを更新
-export const updateSlotYoutubeId = async (slotId: string, youtubeId: string) => {
+export const updateSlotYoutubeId = async (
+  slotId: string, 
+  youtubeId: string
+): Promise<{ success: boolean }> => {
   try {
     const { error } = await supabase
       .from('promotion_slots')
@@ -275,19 +346,24 @@ export function extractYouTubeId(url: string): string | null {
 }
 
 // 決済ステータスの確認
-export const checkPaymentStatus = async (paymentIntentId: string) => {
-  return apiRequest<{ status: string, payment_status: string }>(
-    'create-payment-intent',
-    'POST', 
-    {
-      checkStatus: true,
-      paymentIntentId
-    }
-  );
+export const checkPaymentStatus = async (paymentIntentId: string): Promise<PaymentStatusResponse> => {
+  try {
+    return await apiRequest<PaymentStatusResponse>(
+      'create-payment-intent',
+      'POST', 
+      {
+        checkStatus: true,
+        paymentIntentId
+      }
+    );
+  } catch (error) {
+    console.error('決済ステータス確認エラー:', error);
+    throw error;
+  }
 };
 
 // 現在のサブスクリプション情報の取得
-export const getCurrentSubscription = async () => {
+export const getCurrentSubscription = async (): Promise<SubscriptionInfo> => {
   try {
     // プロフィール情報とサブスクリプションIDを取得
     const { data: userProfile, error: profileError } = await supabase
@@ -303,13 +379,7 @@ export const getCurrentSubscription = async () => {
     }
 
     // サブスクリプション情報を取得
-    return apiRequest<{ 
-      hasActiveSubscription: boolean, 
-      status: string, 
-      currentPeriodEnd: string,
-      plan: string,
-      cancelAtPeriodEnd: boolean
-    }>(
+    return await apiRequest<SubscriptionInfo>(
       'create-payment-intent',
       'POST', 
       {
@@ -320,5 +390,43 @@ export const getCurrentSubscription = async () => {
   } catch (error) {
     console.error('サブスクリプション情報取得エラー:', error);
     throw error;
+  }
+};
+
+/**
+ * Stripe 決済の返金処理を行う
+ */
+export const refundPayment = async ({
+  paymentIntentId,
+  amount,
+  reason
+}: {
+  paymentIntentId: string;
+  amount: number;
+  reason: string;
+}): Promise<RefundResponse> => {
+  try {
+    // Supabase Edge Function を呼び出して返金処理を実行
+    const response = await apiRequest<{ refundId: string }>(
+      'create-payment-intent',
+      'POST',
+      {
+        refund: true,
+        paymentIntentId,
+        amount,
+        reason
+      }
+    );
+
+    return {
+      success: true,
+      refundId: response.refundId
+    };
+  } catch (error) {
+    console.error('Stripe返金処理エラー:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '返金処理中にエラーが発生しました'
+    };
   }
 };

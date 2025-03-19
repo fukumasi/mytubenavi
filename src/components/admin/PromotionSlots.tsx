@@ -1,13 +1,14 @@
 // src/components/admin/PromotionSlots.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { supabase } from '../../lib/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEdit, faTrash, faPlus, faSync } from '@fortawesome/free-solid-svg-icons';
+import { faEdit, faTrash, faPlus, faSync, faMoneyBillWave } from '@fortawesome/free-solid-svg-icons';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import CreateSlotModal from './CreateSlotModal';
 import EditSlotModal from './EditSlotModal';
 import { PromotionSlot } from '../../types/promotion';
+import { AdminContext } from './Dashboard';
 
 const PromotionSlots: React.FC = () => {
   const [slots, setSlots] = useState<PromotionSlot[]>([]);
@@ -19,6 +20,9 @@ const PromotionSlots: React.FC = () => {
   const [deleteConfirmSlot, setDeleteConfirmSlot] = useState<string | null>(null);
   const [messageText, setMessageText] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('info');
+  
+  // AdminContextからの状態とメソッドを取得
+  const { refreshData, handleTabChange } = useContext(AdminContext);
 
   useEffect(() => {
     fetchPromotionSlots();
@@ -115,12 +119,27 @@ const PromotionSlots: React.FC = () => {
     window.location.href = window.location.pathname + '?updated=' + Date.now();
   };
 
-  const refreshData = () => {
+  const refreshDataLocal = () => {
     setMessageText('データを再読み込み中...');
     setMessageType('info');
     
     // リフレッシュキーを更新して再読み込み
     setRefreshKey(prev => prev + 1);
+  };
+
+  // 決済管理タブに切り替える関数
+  const goToPaymentManagement = () => {
+    // handleTabChangeがあれば呼び出す
+    if (handleTabChange) {
+      // 決済管理タブのインデックスを指定（必要に応じて調整）
+      handleTabChange(2); // 仮定: 決済管理タブのインデックスが2
+      setMessageText('決済管理タブに切り替えました');
+      setMessageType('success');
+    } else {
+      console.error('handleTabChange関数が提供されていません');
+      setMessageText('決済管理タブへの切り替えに失敗しました');
+      setMessageType('error');
+    }
   };
 
   const getPriceDisplay = (price: number) => {
@@ -156,7 +175,7 @@ const PromotionSlots: React.FC = () => {
         <h2 className="text-xl font-semibold">掲載枠管理</h2>
         <div className="flex space-x-2">
           <button
-            onClick={refreshData}
+            onClick={refreshDataLocal}
             className="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded flex items-center"
             disabled={loading}
           >
@@ -170,6 +189,21 @@ const PromotionSlots: React.FC = () => {
           >
             <FontAwesomeIcon icon={faPlus} className="mr-2" />
             新規作成
+          </button>
+        </div>
+      </div>
+
+      {/* 決済管理セクション（改善済み） */}
+      <div className="bg-blue-50 border border-blue-200 shadow-md rounded-lg p-6 mb-6">
+        <h2 className="text-xl font-bold text-blue-800 mb-4">決済管理</h2>
+        <div className="mb-4">
+          <p className="mb-4 text-gray-700">掲載枠に関連する決済の管理や返金処理を行えます。「決済管理」タブに切り替えて詳細を確認してください。</p>
+          <button
+            onClick={goToPaymentManagement}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200 ease-in-out transform hover:scale-105"
+          >
+            <FontAwesomeIcon icon={faMoneyBillWave} className="mr-2" />
+            決済管理タブに切り替える
           </button>
         </div>
       </div>

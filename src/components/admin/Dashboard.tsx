@@ -4,6 +4,7 @@ import React, { useState, createContext, useCallback } from 'react';
 import PromotionSlots from './PromotionSlots';
 import UserManagement from './UserManagement';
 import UserStatistics from './UserStatistics';
+import PromotionPaymentManagement from './PromotionPaymentManagement';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faFilm, 
@@ -16,23 +17,29 @@ import {
   faExclamationTriangle
 } from '@fortawesome/free-solid-svg-icons';
 
-// AdminContextの型定義
+// DashboardTabの型定義
+type DashboardTab = 'promotions' | 'users' | 'user-stats' | 'analytics' | 'settings' | 'payments';
+
+// AdminContextの型定義を拡張
 export type AdminContextType = {
   lastUpdate: number;
   refreshData: () => void;
   setError: (message: string | null) => void;
   error: string | null;
+  // handleTabChangeを追加
+  handleTabChange: (tab: DashboardTab | number) => void;
+  activeTab: DashboardTab;
 };
 
-// AdminContextの作成
+// AdminContextの作成と初期値設定
 export const AdminContext = createContext<AdminContextType>({
   lastUpdate: 0,
   refreshData: () => {},
   setError: () => {},
-  error: null
+  error: null,
+  handleTabChange: () => {},
+  activeTab: 'promotions'
 });
-
-type DashboardTab = 'promotions' | 'users' | 'user-stats' | 'analytics' | 'settings' | 'payments';
 
 const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<DashboardTab>('promotions');
@@ -46,18 +53,44 @@ const Dashboard: React.FC = () => {
     setLastUpdate(Date.now());
   }, []);
 
+  // タブ変更時にエラーをリセット
+  const handleTabChange = useCallback((tab: DashboardTab | number) => {
+    setError(null);
+    
+    // 数値型の場合はインデックスからタブ名に変換
+    if (typeof tab === 'number') {
+      const tabMap: { [key: number]: DashboardTab } = {
+        0: 'promotions',
+        1: 'users',
+        2: 'payments',
+        3: 'user-stats',
+        4: 'analytics',
+        5: 'settings'
+      };
+      
+      const mappedTab = tabMap[tab];
+      if (mappedTab) {
+        console.log(`数値インデックス ${tab} から ${mappedTab} に変換されました`);
+        setActiveTab(mappedTab);
+      } else {
+        console.error(`無効なタブインデックス: ${tab}`);
+        // デフォルトタブに設定
+        setActiveTab('promotions');
+      }
+    } else {
+      // 文字列の場合はそのまま設定
+      setActiveTab(tab);
+    }
+  }, []);
+
   // コンテキスト値の作成
   const adminContextValue: AdminContextType = {
     lastUpdate,
     refreshData,
     setError,
-    error
-  };
-
-  // タブ変更時にエラーをリセット
-  const handleTabChange = (tab: DashboardTab) => {
-    setError(null);
-    setActiveTab(tab);
+    error,
+    handleTabChange,
+    activeTab
   };
 
   const renderTabContent = () => {
@@ -73,7 +106,7 @@ const Dashboard: React.FC = () => {
       case 'settings':
         return <Settings />;
       case 'payments':
-        return <PaymentManagement />;
+        return <PromotionPaymentManagement />;
       default:
         return <PromotionSlots />;
     }
@@ -101,19 +134,6 @@ const Dashboard: React.FC = () => {
         <li>通知設定</li>
         <li>システム設定</li>
         <li>メール連携設定</li>
-      </ul>
-    </div>
-  );
-
-  const PaymentManagement = () => (
-    <div className="p-6 bg-white rounded shadow">
-      <h2 className="text-xl font-semibold mb-4">決済管理</h2>
-      <p>この機能は現在開発中です。近日中に以下の機能が追加される予定です：</p>
-      <ul className="list-disc ml-6 mt-4">
-        <li>決済履歴の確認</li>
-        <li>返金処理</li>
-        <li>決済レポート</li>
-        <li>課金プラン管理</li>
       </ul>
     </div>
   );
@@ -202,6 +222,7 @@ const Dashboard: React.FC = () => {
                     activeTab === 'payments' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
                   }`}
                   onClick={() => handleTabChange('payments')}
+                  id="payments-tab-button"
                 >
                   <FontAwesomeIcon icon={faMoneyBillWave} className="mr-2" />
                   決済管理

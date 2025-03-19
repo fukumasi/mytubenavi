@@ -7,6 +7,7 @@ import AdminDashboard from '../components/admin/Dashboard';
 import UserManagement from '../components/admin/UserManagement';
 import UserStatistics from '../components/admin/UserStatistics';
 import AnalyticsDashboard from '../components/admin/AnalyticsDashboard';
+import PaymentHistory from '../components/admin/PaymentHistory';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 // 管理者ダッシュボードのコンテキスト
@@ -48,6 +49,7 @@ const AdminDashboardPage: React.FC = () => {
  const [userCount, setUserCount] = useState<number>(0);
  const [videoCount, setVideoCount] = useState<number>(0);
  const [reviewCount, setReviewCount] = useState<number>(0);
+ const [paymentCount, setPaymentCount] = useState<number>(0);
  const [statsLoading, setStatsLoading] = useState<boolean>(true);
  const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
  const [error, setError] = useState<string | null>(null);
@@ -148,10 +150,38 @@ const AdminDashboardPage: React.FC = () => {
      })
      .subscribe();
 
+   // 支払いテーブルの変更を監視
+   const paymentsSubscription = supabase
+     .channel('admin-dashboard-payments')
+     .on('postgres_changes', { 
+       event: '*', 
+       schema: 'public', 
+       table: 'premium_payments' 
+     }, () => {
+       console.log('支払いデータが更新されました。データをリフレッシュします。');
+       refreshData();
+     })
+     .subscribe();
+
+   // スロット予約テーブルの変更を監視
+   const slotBookingsSubscription = supabase
+     .channel('admin-dashboard-slot-bookings')
+     .on('postgres_changes', { 
+       event: '*', 
+       schema: 'public', 
+       table: 'slot_bookings' 
+     }, () => {
+       console.log('スロット予約データが更新されました。データをリフレッシュします。');
+       refreshData();
+     })
+     .subscribe();
+
    return () => {
      supabase.removeChannel(subscription);
      supabase.removeChannel(videosSubscription);
      supabase.removeChannel(ratingsSubscription);
+     supabase.removeChannel(paymentsSubscription);
+     supabase.removeChannel(slotBookingsSubscription);
    };
  }, [isAdmin]);
 
@@ -201,7 +231,24 @@ const AdminDashboardPage: React.FC = () => {
        setReviewCount(reviewCountData || 0);
      }
 
-     console.log(`統計情報取得完了: ユーザー ${userCountData || 0}件, 動画 ${videoCountData || 0}件, レビュー ${reviewCountData || 0}件`);
+     // 支払い数を取得（プレミアム支払いとスロット予約の合計）
+     const [premiumResult, slotResult] = await Promise.all([
+       supabase.from('premium_payments').select('*', { count: 'exact', head: true }),
+       supabase.from('slot_bookings').select('*', { count: 'exact', head: true })
+     ]);
+     
+     if (premiumResult.error) {
+       console.error('プレミアム支払い数の取得に失敗しました:', premiumResult.error);
+     }
+     
+     if (slotResult.error) {
+       console.error('スロット予約数の取得に失敗しました:', slotResult.error);
+     }
+     
+     const totalPayments = (premiumResult.count || 0) + (slotResult.count || 0);
+     setPaymentCount(totalPayments);
+
+     console.log(`統計情報取得完了: ユーザー ${userCountData || 0}件, 動画 ${videoCountData || 0}件, レビュー ${reviewCountData || 0}件, 支払い ${totalPayments}件`);
    } catch (error) {
      console.error('統計情報の取得に失敗しました:', error);
      setError('統計情報の取得に失敗しました。');
@@ -259,7 +306,7 @@ const AdminDashboardPage: React.FC = () => {
        )}
        
        {/* 統計概要 */}
-       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
          <StatCount
            title="登録ユーザー数"
            count={userCount}
@@ -275,6 +322,12 @@ const AdminDashboardPage: React.FC = () => {
          <StatCount
            title="レビュー数"
            count={reviewCount}
+           loading={statsLoading}
+           bgColor="bg-white"
+         />
+         <StatCount
+           title="決済件数"
+           count={paymentCount}
            loading={statsLoading}
            bgColor="bg-white"
          />
@@ -324,6 +377,16 @@ const AdminDashboardPage: React.FC = () => {
              >
                掲載枠管理
              </button>
+             <button
+               onClick={() => handleTabChange('payments')}
+               className={`py-4 px-6 font-medium text-sm ${
+                 activeTab === 'payments'
+                   ? 'border-b-2 border-blue-500 text-blue-600'
+                   : 'text-gray-500 hover:text-gray-700'
+               }`}
+             >
+               決済履歴
+             </button>
            </nav>
          </div>
          
@@ -365,6 +428,16 @@ const AdminDashboardPage: React.FC = () => {
                  YouTuber向け掲載枠の設定、管理、予約状況の確認などを行います。
                </p>
                <AdminDashboard key={`admin-dashboard-${lastUpdate}`} />
+             </div>
+           )}
+
+           {activeTab === 'payments' && (
+             <div>
+               <h2 className="text-xl font-semibold mb-4">決済履歴</h2>
+               <p className="text-gray-600 mb-2">
+                 プレミアム会員と有料掲載枠の支払い履歴の確認、返金処理などを行います。
+               </p>
+               <PaymentHistory key={`payment-history-${lastUpdate}`} />
              </div>
            )}
          </div>
