@@ -1,7 +1,6 @@
 // src/components/home/VideoCard.tsx
-import { Star, Eye, Clock } from 'lucide-react';
+import { Star, MessageSquare, Calendar, Eye } from 'lucide-react';
 import { Video } from '@/types';
-import VideoPlayer from '../video/VideoPlayer';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,9 +11,11 @@ export interface VideoCardProps {
   channelTitle?: string;
   viewCount?: number;
   rating?: number;
+  reviewCount?: number;
+  publishedAt?: string;
   video?: Video;
   viewedAt?: string;
-  onImageError?: () => void; // 追加
+  onImageError?: () => void;
 }
 
 export default function VideoCard({
@@ -24,26 +25,15 @@ export default function VideoCard({
   channelTitle,
   viewCount,
   rating,
+  reviewCount = 0,
+  publishedAt,
   video,
-  viewedAt,
-  onImageError // 追加
+  onImageError
 }: VideoCardProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
   const [imgError, setImgError] = useState(false);
   const navigate = useNavigate();
 
-  const formatViews = (count: number) => {
-    if (count >= 10000) {
-      return `${(count / 10000).toFixed(1)}万回`;
-    }
-    return `${count.toLocaleString()}回`;
-  };
-
   const handleVideoClick = () => {
-    setIsPlaying(prev => !prev);
-  };
-
-  const handleTitleClick = () => {
     navigate(`/video/${video?.youtube_id || videoId}`);
   };
 
@@ -52,80 +42,91 @@ export default function VideoCard({
     target.onerror = null; // 無限ループを防ぐ
     target.src = '/placeholder.jpg';
     setImgError(true);
-    onImageError?.(); // 追加
+    onImageError?.();
+  };
+
+  // 日付をフォーマット（YYYY-MM-DD）
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ja-JP', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit' 
+    }).replace(/\//g, '-');
+  };
+
+  const formatViews = (count?: number) => {
+    if (!count) return '-';
+    if (count >= 10000) {
+      return `${(count / 10000).toFixed(1)}万`;
+    }
+    return count.toLocaleString();
   };
 
   return (
-    <div 
-      className="group cursor-pointer bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow w-full" 
-      data-video-id={videoId}
-      onClick={handleVideoClick}
-    >
-      <div className="relative aspect-video rounded-lg overflow-hidden">
-        {(video?.youtube_id || isPlaying) ? (
-          <VideoPlayer
-            videoId={video?.youtube_id || videoId}
-            width="100%"
-            height="100%"
-            onError={(event) => {
-              console.error('Video player error:', event);
-              setIsPlaying(false);
-            }}
-          />
-        ) : (
+    <div className="w-full bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+      {/* 上段：サムネイルと動画タイトル */}
+      <div className="flex flex-row border-b border-gray-100">
+        {/* サムネイル - 左側に配置 */}
+        <div 
+          className="relative w-32 h-20 cursor-pointer" 
+          onClick={handleVideoClick}
+        >
           <img
             src={imgError ? '/placeholder.jpg' : (thumbnail || '/placeholder.jpg')}
             alt={title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+            className="w-full h-full object-cover"
             onError={handleImageError}
-            loading="lazy" // 画像の遅延読み込み
+            loading="lazy"
           />
-        )}
-        {video?.duration && (
-          <span className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-1.5 py-0.5 rounded">
-            {video.duration}
-          </span>
-        )}
-      </div>
-
-      <div className="p-2 sm:p-4">
+          {video?.duration && (
+            <span className="absolute bottom-1 right-1 bg-black bg-opacity-75 text-white text-xs px-1 py-0.5 rounded">
+              {video.duration}
+            </span>
+          )}
+        </div>
+        
+        {/* タイトル - 右側に配置 */}
         <div 
-          onClick={(e) => {
-            e.stopPropagation();
-            handleTitleClick();
-          }}
-          className="space-y-1 sm:space-y-2"
+          className="flex-1 p-2 cursor-pointer" 
+          onClick={handleVideoClick}
         >
-          <h3 className="font-medium text-xs sm:text-sm line-clamp-2 text-gray-900 hover:text-blue-600">
+          <h3 className="font-medium text-xs line-clamp-3 text-gray-900">
             {title}
           </h3>
-
           {channelTitle && (
-            <div className="text-xs sm:text-sm text-gray-600">
-              <span className="font-medium">{channelTitle}</span>
+            <div className="text-xs text-gray-600 mt-1 line-clamp-1">
+              {channelTitle}
             </div>
           )}
-
-          <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
-            {viewCount !== undefined && (
-              <div className="flex items-center">
-                <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                <span>{formatViews(viewCount)}</span>
-              </div>
-            )}
-            {rating !== undefined && (
-              <div className="flex items-center">
-                <Star className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-400 mr-1" />
-                <span>{rating.toFixed(1)}</span>
-              </div>
-            )}
-            {viewedAt && (
-              <div className="flex items-center">
-                <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                <span>{new Date(viewedAt).toLocaleDateString('ja-JP')}</span>
-              </div>
-            )}
-          </div>
+        </div>
+      </div>
+      
+      {/* 下段：評価、レビュー数、投稿日 */}
+      <div className="flex justify-between px-2 py-1 text-xs text-gray-500 bg-gray-50">
+        {/* 星評価 */}
+        <div className="flex items-center">
+          <Star className="h-3 w-3 text-yellow-400 mr-1" />
+          <span>{rating ? rating.toFixed(1) : '-'}</span>
+        </div>
+        
+        {/* レビュー数 */}
+        <div className="flex items-center">
+          <MessageSquare className="h-3 w-3 mr-1" />
+          <span>{reviewCount}</span>
+        </div>
+        
+        {/* 再生回数 */}
+        <div className="flex items-center">
+          <Eye className="h-3 w-3 mr-1" />
+          <span>{formatViews(viewCount)}</span>
+        </div>
+        
+        {/* 投稿日 */}
+        <div className="flex items-center">
+          <Calendar className="h-3 w-3 mr-1" />
+          <span>{formatDate(publishedAt)}</span>
         </div>
       </div>
     </div>

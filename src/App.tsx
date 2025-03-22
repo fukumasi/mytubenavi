@@ -1,6 +1,6 @@
 // src/App.tsx
 
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
@@ -71,13 +71,21 @@ function YouTuberRoute({ children }: { children: React.ReactNode }) {
      }
 
      try {
-       const { data, error } = await import('./lib/supabase').then(({ supabase }) =>
-         supabase
-           .from('youtuber_profiles')
-           .select('id')
-           .eq('id', user.id) // 「user_id」ではなく「id」を使用
-           .single()
-       );
+       // 遅延インポートではなく、最初からインポートされたsupabaseモジュールを使用
+       const { supabase } = await import('./lib/supabase');
+       
+       if (!supabase) {
+         console.error('Supabase client is not initialized');
+         setIsYoutuber(false);
+         setCheckingStatus(false);
+         return;
+       }
+       
+       const { data, error } = await supabase
+         .from('youtuber_profiles')
+         .select('id')
+         .eq('id', user.id)
+         .single();
 
        if (error) {
          console.error('YouTuber status check error:', error);
@@ -127,13 +135,21 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const { data, error } = await import('./lib/supabase').then(({ supabase }) =>
-          supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-        );
+        // 遅延インポートではなく、最初からインポートされたsupabaseモジュールを使用
+        const { supabase } = await import('./lib/supabase');
+        
+        if (!supabase) {
+          console.error('Supabase client is not initialized');
+          setIsAdmin(false);
+          setCheckingStatus(false);
+          return;
+        }
+        
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
 
         if (error) {
           console.error('Admin status check error:', error);
@@ -175,6 +191,50 @@ function PremiumRoute({ children }: { children: React.ReactNode }) {
 
 const App = () => {
  const { isPremium } = useAuth();
+ const [appReady, setAppReady] = useState(false);
+ 
+ // アプリケーション初期化時にリソースが利用可能かチェック
+ useEffect(() => {
+   const initializeApp = async () => {
+     try {
+       // Supabaseクライアントが利用可能か確認
+       const { supabase } = await import('./lib/supabase');
+       
+       if (!supabase) {
+         console.error('Failed to initialize Supabase client');
+       }
+       
+       // Stripeが利用可能か確認 - getStripeを使用するよう修正
+       const { getStripe } = await import('./lib/stripe');
+       
+       if (!getStripe) {
+         console.error('Stripe initialization function is not defined');
+       } else {
+         // 実際にStripeの初期化が可能かテスト
+         const stripeInstance = getStripe();
+         if (!stripeInstance) {
+           console.warn('Unable to initialize Stripe - public key may be missing');
+         }
+       }
+       
+     } catch (error) {
+       console.error('Error during app initialization:', error);
+     } finally {
+       // 初期化完了を設定
+       setAppReady(true);
+     }
+   };
+   
+   initializeApp();
+ }, []);
+ 
+ if (!appReady) {
+   return (
+     <div className="min-h-screen flex justify-center items-center">
+       <LoadingSpinner />
+     </div>
+   );
+ }
  
  return (
    <NotificationProvider>

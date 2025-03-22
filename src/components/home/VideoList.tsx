@@ -79,10 +79,10 @@ export default function VideoList({
             key={video.id}
             videoId={video.youtube_id || video.id}
             title={video.title}
-            thumbnail={video.thumbnail}
+            thumbnail={video.thumbnail || video.thumbnail_url || ''}
             channelTitle={video.channel_title}
             viewCount={video.view_count}
-            rating={video.rating}
+            rating={video.rating || video.avg_rating}
             video={video}
             onImageError={() => onImageError?.(video)}
           />
@@ -134,7 +134,7 @@ export default function VideoList({
               <td className="p-2">
                 <div className="flex items-center space-x-2">
                   <img
-                    src={video.thumbnail || '/placeholder.jpg'}
+                    src={video.thumbnail || video.thumbnail_url || '/placeholder.jpg'}
                     alt={video.title}
                     className="w-16 sm:w-24 h-auto rounded"
                     onError={(e) => {

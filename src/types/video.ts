@@ -1,4 +1,4 @@
-// src/types/Video.ts
+// src/types/video.ts
 import { AggregatedVideoRating } from './index';
 
 export interface Video {

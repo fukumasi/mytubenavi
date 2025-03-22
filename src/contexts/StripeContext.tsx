@@ -1,8 +1,28 @@
 // src/contexts/StripeContext.tsx
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
+import { stripeService } from '../services/stripeService';
 import StripeProvider from '../components/stripe/StripeProvider';
 import { Appearance } from '@stripe/stripe-js';
+
+// 決済初期化のパラメータ型
+interface PaymentInitParams {
+  amount: number;
+  bookingId: string;
+  description: string;
+  successUrl: string;
+  cancelUrl: string;
+  metadata?: Record<string, string>;
+}
+
+// 決済初期化の結果型
+interface PaymentInitResult {
+  success: boolean;
+  redirectUrl?: string;
+  clientSecret?: string;
+  error?: string;
+}
 
 // コンテキストの型定義
 interface StripeContextType {
@@ -31,19 +51,46 @@ interface StripeContextType {
   
   // 決済UIリセット関数
   resetPaymentState: () => void;
+
+  // 決済処理初期化関数
+  initiatePayment: (params: PaymentInitParams) => Promise<PaymentInitResult>;
 }
 
 // デフォルトの外観設定
 const defaultAppearance: Appearance = {
   theme: 'stripe',
   variables: {
-    colorPrimary: '#6366f1', // Indigo-600のカラーコード
+    colorPrimary: '#3b82f6', // Blue-500のカラーコード
     fontFamily: 'system-ui, sans-serif',
-    borderRadius: '4px'
+    borderRadius: '4px',
+    fontWeightNormal: '400',
+    colorBackground: '#ffffff',
+    colorText: '#1f2937',
+    colorDanger: '#ef4444',
+    spacingUnit: '4px'
   },
   rules: {
     '.Input': {
-      boxShadow: 'none' // 問題のあるboxShadowを明示的に上書き
+      boxShadow: 'none', // 問題のあるboxShadowを明示的に上書き
+      padding: '12px'
+    },
+    '.Label': {
+      fontWeight: '500'
+    },
+    '.Tab': {
+      padding: '10px 16px',
+      border: '1px solid #e5e7eb'
+    },
+    '.Tab:hover': {
+      backgroundColor: '#f9fafb'
+    },
+    '.Tab--selected': {
+      backgroundColor: '#eff6ff',
+      borderColor: '#3b82f6'
+    },
+    '.Error': {
+      fontSize: '14px',
+      marginTop: '8px'
     }
   }
 };
@@ -94,6 +141,99 @@ export const StripeContextProvider: React.FC<{ children: React.ReactNode }> = ({
     setPaymentType(null);
   }, []);
 
+  // 決済初期化関数
+  const initiatePayment = useCallback(async (params: PaymentInitParams): Promise<PaymentInitResult> => {
+    try {
+      setIsProcessing(true);
+      setPaymentError(null);
+      setPaymentSuccess(false);
+      setPaymentType('promotion');
+
+      // 認証チェック
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setPaymentError('認証されていません。再度ログインしてください。');
+        return { 
+          success: false, 
+          error: '認証されていません。再度ログインしてください。' 
+        };
+      }
+
+      // 予約に関連する情報を確認
+      const { data: bookingData, error: bookingError } = await supabase
+        .from('slot_bookings')
+        .select('*')
+        .eq('id', params.bookingId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (bookingError || !bookingData) {
+        const errorMessage = '予約情報の確認に失敗しました。';
+        setPaymentError(errorMessage);
+        return { success: false, error: errorMessage };
+      }
+
+      // 金額の確認（不一致の場合はエラー）
+      if (bookingData.amount !== params.amount) {
+        const errorMessage = '予約金額に不一致があります。管理者にお問い合わせください。';
+        setPaymentError(errorMessage);
+        return { success: false, error: errorMessage };
+      }
+
+      // Stripe決済インテントの作成
+      const paymentResponse = await stripeService.createPaymentIntent({
+        amount: params.amount,
+        bookingId: params.bookingId,
+        description: params.description,
+        metadata: {
+          bookingId: params.bookingId,
+          userId: user.id,
+          ...params.metadata
+        }
+      });
+
+      if (paymentResponse.error) {
+        setPaymentError(paymentResponse.error);
+        return { success: false, error: paymentResponse.error };
+      }
+
+      // クライアントサイドでの処理に必要な情報がある場合
+      if (paymentResponse.clientSecret) {
+        setClientSecret(paymentResponse.clientSecret);
+        return { 
+          success: true, 
+          clientSecret: paymentResponse.clientSecret 
+        };
+      }
+
+      // リダイレクト型の決済フロー
+      if (paymentResponse.redirectUrl) {
+        // 予約ステータスを更新
+        await supabase
+          .from('slot_bookings')
+          .update({ payment_status: 'processing' })
+          .eq('id', params.bookingId);
+          
+        return { 
+          success: true, 
+          redirectUrl: paymentResponse.redirectUrl 
+        };
+      }
+
+      // データはあるがどちらも含まれていない場合
+      const errorMessage = '決済処理の初期化に失敗しました。管理者にお問い合わせください。';
+      setPaymentError(errorMessage);
+      return { success: false, error: errorMessage };
+
+    } catch (error: any) {
+      const errorMessage = `決済の初期化中にエラーが発生しました: ${error.message || '不明なエラー'}`;
+      setPaymentError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setIsProcessing(false);
+    }
+  }, []);
+
   // コンテキスト値
   const value = {
     clientSecret,
@@ -109,7 +249,8 @@ export const StripeContextProvider: React.FC<{ children: React.ReactNode }> = ({
     setPaymentType,
     customAppearance,
     setCustomAppearance,
-    resetPaymentState
+    resetPaymentState,
+    initiatePayment
   };
 
   // Elements用のオプション

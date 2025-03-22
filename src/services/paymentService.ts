@@ -36,6 +36,12 @@ export interface PaymentSummary {
   refundCount?: number;
 }
 
+// スロット情報の型定義
+interface PromotionSlotInfo {
+  name?: string;
+  type?: string;
+}
+
 /**
  * 返金処理を実行する
  */
@@ -933,6 +939,34 @@ export const updatePaymentStatus = async (
 };
 
 /**
+ * プロモーションスロットの情報を安全に取得する
+ */
+const safeGetPromotionSlotInfo = (promotionSlots: any): PromotionSlotInfo => {
+  if (!promotionSlots) {
+    return { name: 'Unknown', type: 'Unknown' };
+  }
+  
+  // オブジェクトの場合
+  if (typeof promotionSlots === 'object' && !Array.isArray(promotionSlots)) {
+    return { 
+      name: promotionSlots.name || 'Unknown', 
+      type: promotionSlots.type || 'Unknown' 
+    };
+  }
+  
+  // 配列の場合
+  if (Array.isArray(promotionSlots) && promotionSlots.length > 0) {
+    const firstSlot = promotionSlots[0];
+    return { 
+      name: firstSlot?.name || 'Unknown', 
+      type: firstSlot?.type || 'Unknown' 
+    };
+  }
+  
+  return { name: 'Unknown', type: 'Unknown' };
+};
+
+/**
  * ステータス変更通知を作成する
  */
 const createStatusChangeNotification = async (
@@ -972,29 +1006,17 @@ const createStatusChangeNotification = async (
     
     if (!userId || !paymentInfo) return;
     
-    // promotion_slotsへの安全なアクセス
-    let slotDescription = 'Unknown';
+    // 支払い説明文の作成
+    let paymentDesc = 'Unknown';
     if (paymentType === 'premium') {
-      slotDescription = `プレミアムプラン (${paymentInfo?.plan || 'Unknown'})`;
+      paymentDesc = `プレミアムプラン (${paymentInfo?.plan || 'Unknown'})`;
     } else {
-      // promotion_slotsのデータ構造をチェック
-      if (paymentInfo?.promotion_slots) {
-        // オブジェクトの場合
-        if (typeof paymentInfo.promotion_slots === 'object' && !Array.isArray(paymentInfo.promotion_slots)) {
-          slotDescription = `広告枠 (${paymentInfo.promotion_slots.name || 'Unknown'})`;
-        } 
-        // 配列の場合
-        else if (Array.isArray(paymentInfo.promotion_slots) && paymentInfo.promotion_slots.length > 0) {
-          slotDescription = `広告枠 (${paymentInfo.promotion_slots[0]?.name || 'Unknown'})`;
-        }
-      } else if (paymentInfo?.slotName) {
-        slotDescription = `広告枠 (${paymentInfo.slotName})`;
-      } else {
-        slotDescription = '広告枠 (Unknown)';
-      }
+      const slotInfo = paymentInfo.slotName ? 
+        { name: paymentInfo.slotName } : 
+        safeGetPromotionSlotInfo(paymentInfo.promotion_slots);
+        
+      paymentDesc = `広告枠 (${slotInfo.name})`;
     }
-    
-    const paymentDesc = slotDescription;
     
     // ステータスに応じたメッセージを作成
     let title = '';
@@ -1160,4 +1182,4 @@ export default {
   exportPaymentsReport,
   updatePaymentStatus,
   createManualPayment
-};
+}; 

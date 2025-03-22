@@ -37,6 +37,7 @@ interface RefundModalProps {
   onRefundComplete?: () => void;
   customerName?: string;
   paymentDate?: string;
+  paymentDescription?: string;
 }
 
 const RefundModal: React.FC<RefundModalProps> = ({
@@ -48,7 +49,8 @@ const RefundModal: React.FC<RefundModalProps> = ({
   stripePaymentIntentId,
   onRefundComplete,
   customerName,
-  paymentDate
+  paymentDate,
+  paymentDescription
 }) => {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,11 +92,17 @@ const RefundModal: React.FC<RefundModalProps> = ({
   }, [show, originalAmount, reset]);
 
   // 入力確認画面へ進む
-  const handleProceedToConfirm = async () => {
-    const isFormValid = await handleSubmit(() => {})();
-    if (isFormValid) {
-      setConfirmStep(true);
-    }
+  const handleProceedToConfirm = () => {
+    handleSubmit(
+      // 成功時のコールバック
+      () => {
+        setConfirmStep(true);
+      },
+      // エラー時のコールバック
+      () => {
+        console.log('フォーム検証エラー');
+      }
+    )();
   };
 
   // 返金処理実行
@@ -109,7 +117,7 @@ const RefundModal: React.FC<RefundModalProps> = ({
   
     try {
       // 実際の返金処理を実行
-      await processRefund({
+      const result = await processRefund({
         paymentId,
         paymentType,
         stripePaymentIntentId,
@@ -117,6 +125,10 @@ const RefundModal: React.FC<RefundModalProps> = ({
         reason: data.reason,
         isFullRefund: data.isFullRefund
       });
+
+      if (!result.success) {
+        throw new Error(result.error || '返金処理に失敗しました');
+      }
       
       toast.success('返金処理が完了しました', {
         position: "top-center",
@@ -154,7 +166,9 @@ const RefundModal: React.FC<RefundModalProps> = ({
     <Form onSubmit={(e) => { e.preventDefault(); handleProceedToConfirm(); }}>
       {customerName && paymentDate && (
         <Alert variant="info" className="mb-3">
-          <strong>{customerName}</strong> 様の {paymentDate} の決済に対する返金処理です。
+          <strong>{customerName}</strong> 様の {paymentDate} の
+          {paymentDescription ? ` ${paymentDescription} ` : ' '}
+          決済に対する返金処理です。
         </Alert>
       )}
 
@@ -167,6 +181,9 @@ const RefundModal: React.FC<RefundModalProps> = ({
           {...register('isFullRefund')}
           className="user-select-none"
         />
+        <Form.Text className="text-muted">
+          チェックすると、自動的に全額が返金額に設定されます
+        </Form.Text>
       </Form.Group>
 
       <Form.Group className="mb-3">
@@ -178,14 +195,16 @@ const RefundModal: React.FC<RefundModalProps> = ({
             disabled={isFullRefund}
             {...register('amount')}
             max={originalAmount}
+            min={1}
+            aria-describedby="amountHelpBlock"
           />
         </InputGroup>
         {errors.amount && (
-          <Form.Text className="text-danger">
+          <Form.Text id="amountError" className="text-danger">
             {errors.amount.message}
           </Form.Text>
         )}
-        <Form.Text className="text-muted">
+        <Form.Text id="amountHelpBlock" className="text-muted">
           元の金額: ¥{originalAmount.toLocaleString()}
         </Form.Text>
       </Form.Group>
@@ -197,14 +216,16 @@ const RefundModal: React.FC<RefundModalProps> = ({
           rows={3}
           placeholder="返金理由を入力してください"
           {...register('reason')}
+          aria-describedby="reasonHelpBlock"
+          aria-invalid={errors.reason ? 'true' : 'false'}
         />
         {errors.reason && (
-          <Form.Text className="text-danger">
+          <Form.Text id="reasonError" className="text-danger">
             {errors.reason.message}
           </Form.Text>
         )}
-        <Form.Text className="text-muted">
-          返金理由はシステム内に記録されます
+        <Form.Text id="reasonHelpBlock" className="text-muted">
+          返金理由はシステム内に記録され、顧客への通知にも使用されます
         </Form.Text>
       </Form.Group>
 
@@ -224,7 +245,7 @@ const RefundModal: React.FC<RefundModalProps> = ({
         <Alert.Heading>返金内容の確認</Alert.Heading>
         <p>以下の内容で返金処理を実行します。内容を確認してください。</p>
         <hr />
-        <p className="mb-0">この操作は取り消せません。</p>
+        <p className="mb-0"><strong>この操作は取り消せません。</strong></p>
       </Alert>
 
       <div className="mb-3">
@@ -249,6 +270,26 @@ const RefundModal: React.FC<RefundModalProps> = ({
         </div>
       )}
 
+      {paymentDescription && (
+        <div className="mb-3">
+          <h6>支払い内容:</h6>
+          <p>{paymentDescription}</p>
+        </div>
+      )}
+
+      {paymentDate && (
+        <div className="mb-3">
+          <h6>支払い日:</h6>
+          <p>{paymentDate}</p>
+        </div>
+      )}
+
+      <Alert variant="info">
+        <p className="mb-0">
+          <strong>注意:</strong> 返金処理が完了すると、顧客に自動的に返金通知が送信されます。
+        </p>
+      </Alert>
+
       {error && (
         <Alert variant="danger" className="mt-3">
           <Alert.Heading>エラー</Alert.Heading>
@@ -261,13 +302,14 @@ const RefundModal: React.FC<RefundModalProps> = ({
   return (
     <Modal 
       show={show} 
-      onHide={onHide} 
+      onHide={processing ? undefined : onHide} 
       centered 
       backdrop="static"
-      size={confirmStep ? 'lg' : 'md'}
+      size={confirmStep ? 'lg' : undefined}
+      aria-labelledby="refund-modal-title"
     >
-      <Modal.Header closeButton>
-        <Modal.Title>
+      <Modal.Header closeButton={!processing}>
+        <Modal.Title id="refund-modal-title">
           {confirmStep ? '返金内容の確認' : '返金処理'}
         </Modal.Title>
       </Modal.Header>
@@ -283,7 +325,7 @@ const RefundModal: React.FC<RefundModalProps> = ({
             <Button 
               variant="primary" 
               onClick={handleProceedToConfirm}
-              disabled={processing}
+              disabled={processing || !isValid}
             >
               次へ
             </Button>

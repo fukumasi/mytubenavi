@@ -1,4 +1,17 @@
+// src/types/index.ts
 import { ReactNode } from 'react';
+import type { 
+  PromotionSlot as PromotionSlotFromPromotion, 
+  PromotionStats as PromotionStatsFromPromotion,
+  SlotBooking
+} from './promotion';
+
+import type {
+  Video as VideoType,
+  VideoRating as VideoRatingType,
+  VideoSearchParams,
+  VideoSearchResult
+} from './video';
 
 export type RatingCategory =
   | 'overall'
@@ -11,23 +24,8 @@ export type RatingCategory =
 
 export type RatingValue = 1 | 2 | 3 | 4 | 5;
 
-export interface VideoRating {
-  id: string;                 
-  video_id: string;          
-  user_id: string;           
-  profiles?: {               
-    username: string;
-    avatar_url: string;
-  };
-  overall: number;
-  clarity: number;
-  entertainment: number;
-  originality: number;
-  quality: number;
-  reliability: number;
-  usefulness: number;
-  comment: string;
-}
+// VideoRatingTypeをvideo.tsからインポートしたものに置き換え
+export type VideoRating = VideoRatingType;
 
 type BaseEntity = {
     id: string;
@@ -74,31 +72,9 @@ export interface AggregatedRating {
   };
 }
 
-export interface Video {
-    id: string;
-    youtube_id: string;
-    title: string;
-    description: string;
-    thumbnail: string;
-    duration: string;
-    view_count: number;
-    rating: number;
-    published_at: string;
-    channel_title: string;
-    genre_id?: string;
-    created_at?: string;
-    updated_at?: string;
-    review_count: number;
-    avg_rating?: number;
-    ratings?: AggregatedVideoRating;
-    channel_id?: string;
-    youtuber?: {
-        channelName: string;
-        channelUrl: string;
-        verificationStatus: 'unknown' | 'pending' | 'verified' | 'rejected';
-        channel_id?: string;
-    };
- }
+// VideoTypeをvideo.tsからインポートしたものに置き換え
+export type Video = VideoType;
+
 export interface Review {
     id: string;
     video_id: string;
@@ -107,7 +83,7 @@ export interface Review {
     comment: string;
     created_at: string;
     updated_at: string;
-    helpful_count?: number;  // 追加
+    helpful_count?: number;
     profiles?: {
         id: string;
         username: string;
@@ -116,58 +92,17 @@ export interface Review {
     videos?: Video;
 }
 
-// PromotionSlot型の修正 - データベーススキーマに合わせる
-export interface PromotionSlot {
-    id: string;
-    name: string;
-    type: 'premium' | 'sidebar' | 'genre' | 'related';
-    price: number;
-    max_videos: number;
-    description?: string;
-    youtube_id?: string; 
-    created_at?: string;
-    updated_at?: string;
-    status: 'available' | 'inactive';
-    video_id?: string; // データベースにあるフィールド
-    // 以下は実際のデータベースにはないが、UIで使用されるフィールド
-    bookings?: Array<{
-        count: number;
-    }>;
-    current_bookings_count?: number;
-    total_earnings?: number;
-}
+// PromotionSlotインターフェースを./promotion.tsからインポートしたものを使用
+export type PromotionSlot = PromotionSlotFromPromotion;
 
-// SlotBookingを削除し、types/promotion.tsで定義したものを使用する
-// export interface SlotBooking { ... }
+// PromotionStatsをpromotion.tsからインポートして使用
+export type PromotionStats = PromotionStatsFromPromotion;
 
-export interface PromotionStats {
-    totalBookings: number;
-    totalRevenue: number;
-    activeBookings: number;
-    averageRating: number;
-    viewsData: Array<{
-        date: string;
-        views: number;
-        clicks: number;
-        revenue: number;
-        ctr: number;
-    }>;
-    averageCTR: number;
-    dailyStats?: Array<{
-        date: string;
-        bookings_count: number;
-        revenue: number;
-        views: number;
-    }>;
-    slotStats?: Array<{
-        slot_id: string;
-        slot_name: string;
-        total_bookings: number;
-        total_revenue: number;
-        average_duration: number;
-    }>;
-}
+// SlotBookingをエクスポート
+export type { SlotBooking };
 
+// video.tsからビデオ関連の型をエクスポート
+export type { VideoSearchParams, VideoSearchResult };
 
 export interface Comment {
     id: string;
@@ -219,7 +154,7 @@ export interface YouTubePlayerVars {
     modestbranding?: 0 | 1;
     rel?: 0 | 1;
     controls?: 0 | 1;
-    enablejsapi?: 0 | 1;  // 追加
+    enablejsapi?: 0 | 1;
     origin?: string;
 }
 
@@ -239,7 +174,7 @@ export interface YouTubePlayerConfig {
 export type Youtuber = {
     channelName: string;
     channelUrl: string;
-    verificationStatus: 'pending' | 'unknown' | 'verified' | 'rejected';  // Video型と合わせる
+    verificationStatus: 'pending' | 'unknown' | 'verified' | 'rejected';
     channel_id?: string;
     avatar_url?: string;
     subscribers?: number;
@@ -281,19 +216,6 @@ export type Event = BaseEntity & {
     status: 'draft' | 'published' | 'cancelled';
     isFeatured: boolean;
 };
-
-// export type Review = BaseEntity & { //削除
-//     video_id: string;
-//     user_id: string;
-//     rating: number;
-//     comment: string;
-//     profiles?: {
-//         id: string;
-//         username: string;
-//         avatar_url: string;
-//     };
-//     helpful_count?: number;
-// }
 
 export interface SupabaseReview extends BaseEntity {
     video_id: string;
@@ -383,17 +305,16 @@ export type SortOption = {
 
 export interface VideoRatingFormProps {
     videoId: string;
-    onSubmit: () => Promise<void>; // asyncに対応する非同期関数に変更
+    onSubmit: () => Promise<void>; // asyncに対応する非同期関数
     initialRatings?: Partial<VideoRating>;
-  }
+}
 
 export interface VideoRatingDisplayProps {
   ratings: AggregatedVideoRating;
   showDetails?: boolean;
-  allRatings?: VideoRating[];   // 追加
-  userRatings?: VideoRating[];  // 追加
+  allRatings?: VideoRating[];
+  userRatings?: VideoRating[];
 }
-
 
 declare global {
     interface Window {

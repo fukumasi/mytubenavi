@@ -2,11 +2,24 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { RatingCategory } from '@/types';
+
+// 詳細評価のインターフェース
+interface DetailedRatings {
+ overall: number;
+ clarity: number;
+ entertainment: number;
+ originality: number;
+ quality: number;
+ reliability: number;
+ usefulness: number;
+}
 
 export const useVideoRating = (videoId?: string) => {
  const [averageRating, setAverageRating] = useState<number | null>(null);
  const [userRating, setUserRating] = useState<number | null>(null);
  const [reviewCount, setReviewCount] = useState<number>(0);
+ const [detailedRatings, setDetailedRatings] = useState<DetailedRatings | null>(null);
  const [isLoading, setIsLoading] = useState<boolean>(true);
  const [error, setError] = useState<string | null>(null);
  const { user } = useAuth();
@@ -25,20 +38,34 @@ export const useVideoRating = (videoId?: string) => {
      setError(null);
      
      try {
-       // 平均評価の取得
+       // 全ての評価を取得して詳細データを計算
        const { data: ratings, error: ratingsError } = await supabase
          .from('video_ratings')
-         .select('overall')
+         .select('overall, clarity, entertainment, originality, quality, reliability, usefulness')
          .eq('video_id', effectiveVideoId);
        
        if (ratingsError) throw ratingsError;
        
        if (ratings && ratings.length > 0) {
-         const sum = ratings.reduce((acc, curr) => acc + curr.overall, 0);
-         const avg = sum / ratings.length;
-         setAverageRating(parseFloat(avg.toFixed(1)));
+         // 平均評価の計算
+         const overall = ratings.reduce((acc, curr) => acc + curr.overall, 0) / ratings.length;
+         setAverageRating(parseFloat(overall.toFixed(1)));
+         
+         // 詳細評価の計算
+         const detailedAvg: DetailedRatings = {
+           overall: parseFloat(overall.toFixed(1)),
+           clarity: parseFloat((ratings.reduce((acc, curr) => acc + curr.clarity, 0) / ratings.length).toFixed(1)),
+           entertainment: parseFloat((ratings.reduce((acc, curr) => acc + curr.entertainment, 0) / ratings.length).toFixed(1)),
+           originality: parseFloat((ratings.reduce((acc, curr) => acc + curr.originality, 0) / ratings.length).toFixed(1)),
+           quality: parseFloat((ratings.reduce((acc, curr) => acc + curr.quality, 0) / ratings.length).toFixed(1)),
+           reliability: parseFloat((ratings.reduce((acc, curr) => acc + curr.reliability, 0) / ratings.length).toFixed(1)),
+           usefulness: parseFloat((ratings.reduce((acc, curr) => acc + curr.usefulness, 0) / ratings.length).toFixed(1))
+         };
+         
+         setDetailedRatings(detailedAvg);
        } else {
          setAverageRating(null);
+         setDetailedRatings(null);
        }
        
        // レビュー数の取得
@@ -149,6 +176,22 @@ export const useVideoRating = (videoId?: string) => {
      }
      
      setUserRating(ratingData.overall);
+     
+     // 詳細評価も更新
+     // Note: 実際のデータが更新されるまでの一時的な表示用
+     if (detailedRatings) {
+       // 既存のデータがある場合は平均を更新
+       // ここでは簡易的に新しい評価をそのまま表示
+       setDetailedRatings({
+         ...ratingData
+       });
+     } else {
+       // 初めての評価の場合
+       setDetailedRatings({
+         ...ratingData
+       });
+     }
+     
      return true;
    } catch (err) {
      console.error('Error submitting rating:', err);
@@ -157,12 +200,20 @@ export const useVideoRating = (videoId?: string) => {
    }
  };
 
+ // カテゴリ別の評価を取得する便利関数
+ const getCategoryRating = (category: RatingCategory): number => {
+   if (!detailedRatings) return 0;
+   return detailedRatings[category] || 0;
+ };
+
  return {
    averageRating,
    userRating,
    reviewCount,
+   detailedRatings,
    isLoading,
    error,
-   submitRating
+   submitRating,
+   getCategoryRating
  };
 };

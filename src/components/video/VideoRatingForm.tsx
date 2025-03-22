@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { VideoRating, RatingCategory, RatingValue } from '@/types';
 import { submitVideoRating, updateVideoReviewCount } from '@/lib/supabase';
 import { StarRating } from '../search/review/StarRating';
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, AlertCircle } from 'lucide-react';
 
 const RATING_CATEGORY_LABELS: Record<RatingCategory, string> = {
  reliability: '信頼性',
@@ -33,12 +33,16 @@ interface VideoRatingFormProps {
  videoId: string;
  onSubmit: () => Promise<void>;
  initialRatings?: Partial<VideoRating>;
+ className?: string;
+ showReset?: boolean;
 }
 
 export default function VideoRatingForm({
  videoId,
  onSubmit,
- initialRatings = {}
+ initialRatings = {},
+ className = "",
+ showReset = true
 }: VideoRatingFormProps) {
  const defaultRatings = useMemo<Record<RatingCategory, RatingValue>>(() => ({
    reliability: 1 as RatingValue,
@@ -62,8 +66,32 @@ export default function VideoRatingForm({
  const [comment, setComment] = useState(initialRatings?.comment || '');
  const [isSubmitting, setIsSubmitting] = useState(false);
  const [tooltipCategory, setTooltipCategory] = useState<RatingCategory | null>(null);
+ const [error, setError] = useState<string | null>(null);
+ const [success, setSuccess] = useState<boolean>(false);
 
- // Add useEffect to log state changes
+ // オブジェクト比較用の文字列化
+ const initialRatingsString = useMemo(() => 
+   JSON.stringify(initialRatings),
+ [initialRatings]);
+
+ // 初期値が変更された場合、フォームをリセット
+ useEffect(() => {
+   const newInitialRatings = {
+     ...defaultRatings,
+     ...Object.fromEntries(
+       Object.entries(initialRatings).map(([key, value]) => 
+         [key, (value as RatingValue | undefined) ?? defaultRatings[key as RatingCategory]]
+       )
+     )
+   };
+   
+   setRatings(newInitialRatings);
+   setComment(initialRatings?.comment || '');
+   setError(null);
+   setSuccess(false);
+ }, [initialRatingsString, defaultRatings]);
+
+ // デバッグ用
  useEffect(() => {
    console.log('Ratings state changed:', ratings);
    console.log('Comment state changed:', comment);
@@ -89,12 +117,17 @@ export default function VideoRatingForm({
      
      return newRatings;
    });
+   
+   // エラーが表示されていた場合はクリア
+   if (error) setError(null);
  };
 
  const resetForm = () => {
    console.log('Resetting form...'); // Debug log
    setRatings({...defaultRatings});
    setComment('');
+   setError(null);
+   setSuccess(false);
  };
 
  const handleSubmit = async (e: React.FormEvent) => {
@@ -103,6 +136,7 @@ export default function VideoRatingForm({
 
    try {
      setIsSubmitting(true);
+     setError(null);
      
      console.log('Submitting ratings:', ratings);
      console.log('Submitting comment:', comment);
@@ -121,12 +155,19 @@ export default function VideoRatingForm({
 
      await updateVideoReviewCount(videoId);
      
+     setSuccess(true);
+     
+     // 成功メッセージを3秒後に消す
+     setTimeout(() => {
+       setSuccess(false);
+     }, 3000);
+     
      resetForm();
      console.log('Form reset, calling onSubmit');
      await onSubmit();
    } catch (error) {
      console.error('Rating submission failed:', error);
-     alert('評価の送信に失敗しました');
+     setError('評価の送信に失敗しました。後でもう一度お試しください。');
    } finally {
      setIsSubmitting(false);
    }
@@ -149,6 +190,7 @@ export default function VideoRatingForm({
            onMouseEnter={() => setTooltipCategory(category)}
            onMouseLeave={() => setTooltipCategory(null)}
            className="relative"
+           aria-label={`${RATING_CATEGORY_LABELS[category]}の説明`}
          >
            <HelpCircle className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" />
            {tooltipCategory === category && (
@@ -163,6 +205,7 @@ export default function VideoRatingForm({
          onRatingChange={(value) => handleRatingChange(category, value)}
          size={isOverall ? "md" : "sm"}
          showNumber
+         aria-label={`${RATING_CATEGORY_LABELS[category]}の評価`}
        />
      </div>
    );
@@ -173,9 +216,22 @@ export default function VideoRatingForm({
  const rightColumns = mainCategories.slice(Math.ceil(mainCategories.length / 2));
 
  return (
-   <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200">
+   <form onSubmit={handleSubmit} className={`bg-white rounded-lg border border-gray-200 ${className}`}>
      <div className="p-4">
-       <div className="grid grid-cols-2 gap-4">
+       {error && (
+         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-start">
+           <AlertCircle className="w-5 h-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
+           <p className="text-sm text-red-600">{error}</p>
+         </div>
+       )}
+       
+       {success && (
+         <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+           <p className="text-sm text-green-600">評価を送信しました。ありがとうございます！</p>
+         </div>
+       )}
+       
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
          <div>
            {leftColumns.map(category => renderRatingItem(category))}
          </div>
@@ -197,16 +253,28 @@ export default function VideoRatingForm({
            onChange={(e) => setComment(e.target.value)}
            placeholder="この動画について詳しく教えてください（任意）"
            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+           aria-label="口コミコメント（任意）"
          />
        </div>
      </div>
      
-     <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 rounded-b-lg">
+     <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 rounded-b-lg flex justify-between">
+       {showReset && (
+         <button
+           type="button"
+           onClick={resetForm}
+           disabled={isSubmitting}
+           className="text-gray-600 hover:text-gray-800 font-medium py-2 px-4 rounded-md transition-colors text-sm"
+         >
+           リセット
+         </button>
+       )}
+       
        <button
          type="submit"
          disabled={isSubmitting}
-         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md 
-           disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+         className={`${showReset ? '' : 'w-full'} bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md 
+           disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm`}
        >
          {isSubmitting ? '送信中...' : '評価を送信'}
        </button>

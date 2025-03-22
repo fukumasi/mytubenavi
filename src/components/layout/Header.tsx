@@ -12,7 +12,7 @@ import MobileMenu from '../ui/MobileMenu';
 
 export default function Header() {
  const { user, signOut, loading: authLoading, isPremium } = useAuth();
- const { unreadCount, hasNewNotifications } = useNotifications();
+ const { unreadCount } = useNotifications();
  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
  const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -20,7 +20,7 @@ export default function Header() {
  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
  const [username, setUsername] = useState<string | null>(null);
  const userMenuRef = useRef<HTMLDivElement>(null);
-
+ 
  useEffect(() => {
    const fetchUserProfile = async () => {
      if (user) {
@@ -89,16 +89,16 @@ export default function Header() {
            </Link>
          </div>
 
-         {/* デスクトップ用検索バー */}
+         {/* デスクトップ用検索バー - 常に表示 */}
          <div className="hidden md:flex flex-1 justify-center max-w-2xl mx-8">
            <SearchBar />
          </div>
 
-         {/* モバイル用検索アイコン */}
+         {/* モバイル用検索アイコン - 常に表示 */}
          <div className="md:hidden flex items-center mr-2">
            <button
              onClick={toggleSearch}
-             className="p-2 rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+             className={`p-2 rounded-full ${isSearchOpen ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
              aria-label="検索"
            >
              <Search className="h-5 w-5" />
@@ -113,7 +113,7 @@ export default function Header() {
            ) : user ? (
              <>
                <div className="hidden sm:block">
-                 <NotificationBell hasNewNotifications={hasNewNotifications} />
+                 <NotificationBell />
                </div>
                <NotificationSound />
                <div className="relative" ref={userMenuRef}>

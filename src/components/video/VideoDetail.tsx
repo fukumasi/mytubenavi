@@ -7,6 +7,7 @@ import VideoPlayer from './VideoPlayer';
 import FavoriteButton from '../video/FavoriteButton';
 import VideoRatingForm from './VideoRatingForm';
 
+
 const defaultRatings: AggregatedVideoRating = {
     reliability: { averageRating: 0, totalRatings: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } },
     entertainment: { averageRating: 0, totalRatings: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } },
@@ -70,21 +71,21 @@ const autoLinkText = (text: string): React.ReactNode => {
     const result: React.ReactNode[] = [];
 
     // パーツとマッチを組み合わせる
-    parts.forEach((part, index) => {
+    parts.forEach((part, p_index) => {
         if (part) {
-            result.push(<span key={`text-${index}`}>{part}</span>);
+            result.push(<span key={`text-${p_index}`}>{part}</span>);
         }
-        if (matches[index]) {
+        if (matches[p_index]) {
             result.push(
                 <a
-                    key={`link-${index}`}
-                    href={matches[index]}
+                    key={`link-${p_index}`}
+                    href={matches[p_index]}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-indigo-600 hover:text-indigo-800 hover:underline"
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(event) => event.stopPropagation()}
                 >
-                    {matches[index]}
+                    {matches[p_index]}
                 </a>
             );
         }
@@ -94,7 +95,7 @@ const autoLinkText = (text: string): React.ReactNode => {
 };
 
 export default function VideoDetail() {
-    const { videoId } = useParams();
+    const { videoId } = useParams<{ videoId: string }>();
     const [video, setVideo] = useState<Video | null>(null);
     const [userRating, setUserRating] = useState<VideoRating | null>(null);
     const [allRatings, setAllRatings] = useState<VideoRating[]>([]);
@@ -334,7 +335,7 @@ export default function VideoDetail() {
 
             videoData.ratings = updatedRatings;
             setVideo(videoData);
-            setUserRating(userRatingData);
+            setUserRating(userRatingData ?? null);
             setAllRatings(convertedRatings); // 変換後の VideoRating[] をセット
 
         } catch (err) {
@@ -398,7 +399,6 @@ export default function VideoDetail() {
         return initialRatings;
     }
 
-
     if (loading) {
         return (
             <div className="flex justify-center items-center min-h-screen">
@@ -456,56 +456,60 @@ export default function VideoDetail() {
                 {/* レスポンシブ対応のアスペクト比を保持するラッパー */}
                 <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
                     <div className="absolute inset-0">
-                        <VideoPlayer
+                        {video && <VideoPlayer
                             videoId={video.youtube_id}
                             width="100%"
                             height="100%"
-                        />
+                        />}
                     </div>
                 </div>
 
                 {/* 動画情報ヘッダー - レスポンシブパディング */}
                 <div className="p-2 sm:p-4">
-                    <h1 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2">{video.title}</h1>
+                    <h1 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2">{video?.title}</h1>
 
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-2">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm sm:text-base text-gray-600">
-                            <span>{video.view_count?.toLocaleString() || 0} 回視聴</span>
+                            <span>{video?.view_count?.toLocaleString() || 0} 回視聴</span>
                             <span className="hidden sm:inline">•</span>
-                            <span>投稿日: {new Date(video.published_at).toLocaleDateString()}</span>
+                            <span>投稿日: {video && new Date(video.published_at).toLocaleDateString()}</span>
                         </div>
                         {/* ボタンを別の要素として配置 */}
                         <div className="flex justify-end">
-                            <FavoriteButton videoId={video.id} />
+                           {video && <FavoriteButton videoId={video.id} />}
                         </div>
                     </div>
 
-                    {/* チャンネル情報とジャンル */}
-                    <div className="flex items-center mb-2">
-                        <a
-                            href={`https://www.youtube.com/channel/${video.channel_id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2 sm:gap-3 hover:text-indigo-600"
-                        >
-                            <img
-                                src={`https://www.youtube.com/channel/${video.channel_id}/picture`}
-                                alt={video.channel_title}
-                                className="w-8 h-8 sm:w-12 sm:h-12 rounded-full"
-                                onError={(e) => {
-                                    e.currentTarget.src = '/default-avatar.jpg';
-                                }}
-                            />
-                            <div>
-                                <h2 className="text-sm sm:text-base font-medium">{video.channel_title}</h2>
-                                <span className="text-xs sm:text-sm text-gray-600">{video.genre_id}</span>
-                            </div>
-                        </a>
-                    </div>
+                   {/* チャンネル情報とジャンル */}
+<div className="flex items-center mb-2">
+  {video && (
+    <a
+      href={`https://www.youtube.com/channel/${video.channel_id}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 sm:gap-3 hover:text-indigo-600"
+    >
+      <img
+        src={`https://www.youtube.com/channel/${video.channel_id}/picture`}
+        alt={video.channel_title}
+        className="w-8 h-8 sm:w-12 sm:h-12 rounded-full" 
+        onError={(e) => {
+          if(e.currentTarget instanceof HTMLImageElement){
+            e.currentTarget.src = '/default-avatar.jpg';
+          }
+        }}
+      />
+      <div>
+        <h2 className="text-sm sm:text-base font-medium">{video.channel_title}</h2>
+        <span className="text-xs sm:text-sm text-gray-600">{video.genre_id}</span>
+      </div>
+    </a>
+  )}
+</div>
 
                     {/* 動画説明 */}
                     <div className="mt-1">
-                        <div>
+                        {video && <div>
                             <div className={`text-xs sm:text-sm text-gray-700 whitespace-pre-wrap ${
                                 !isDescriptionExpanded ? 'line-clamp-2 sm:line-clamp-3' : ''
                                 }`}>
@@ -521,7 +525,7 @@ export default function VideoDetail() {
                                     {isDescriptionExpanded ? '閉じる' : '続きを見る'}
                                 </button>
                             )}
-                        </div>
+                        </div>}
                     </div>
                 </div>
             </div>
@@ -539,7 +543,7 @@ export default function VideoDetail() {
                             {/* 左列 */}
                             <div>
                                 {leftColumns.map(key => {
-                                    const ratings = getSafeRatings(video.ratings);
+                                    const ratings = getSafeRatings(video?.ratings);
                                     const rating = getRatingValue(ratings, key);
                                     return (
                                         <div key={key} className="flex items-center justify-between mb-2">
@@ -560,7 +564,7 @@ export default function VideoDetail() {
                             {/* 右列 */}
                             <div>
                                 {rightColumns.map(key => {
-                                    const ratings = getSafeRatings(video.ratings);
+                                    const ratings = getSafeRatings(video?.ratings);
                                     const rating = getRatingValue(ratings, key);
                                     return (
                                         <div key={key} className="flex items-center justify-between mb-2">
@@ -585,10 +589,10 @@ export default function VideoDetail() {
                                 <span className="font-semibold">総合評価</span>
                                 <div className="flex items-center">
                                     <div className="flex mr-2">
-                                        {renderStars(Math.round(getSafeRatings(video.ratings).overall.averageRating || 0))}
+                                        {renderStars(Math.round(getSafeRatings(video?.ratings).overall.averageRating || 0))}
                                     </div>
                                     <span className="text-xs sm:text-sm text-gray-500">
-                                        {(getSafeRatings(video.ratings).overall.averageRating || 0).toFixed(1)} ({getSafeRatings(video.ratings).overall.totalRatings || 0}件)
+                                        {(getSafeRatings(video?.ratings).overall.averageRating || 0).toFixed(1)} ({getSafeRatings(video?.ratings).overall.totalRatings || 0}件)
                                     </span>
                                 </div>
                             </div>
@@ -684,10 +688,10 @@ export default function VideoDetail() {
                 {/* 右側カラム */}
                 <div>
                     {/* 評価フォーム - ログインしている場合のみ表示 */}
-                    {isLoggedIn && (
+                    {isLoggedIn && video && (
                         <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
                             <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">評価を投稿</h2>
-                            <VideoRatingForm
+                           <VideoRatingForm
                                 videoId={video.id}
                                 onSubmit={async () => {
                                     await refreshData();

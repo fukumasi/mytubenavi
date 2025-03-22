@@ -7,10 +7,15 @@ import { supabase } from '../lib/supabase';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'http://localhost:54321';
 const FUNCTIONS_BASE_URL = `${SUPABASE_URL}/functions/v1`;
 
+// API リクエストのタイムアウト時間（ミリ秒）
+const API_TIMEOUT = 30000; // 30秒
+
 // 型定義
 export interface PaymentIntentResponse {
-  clientSecret: string;
-  paymentIntentId: string;
+  clientSecret?: string;
+  paymentIntentId?: string;
+  redirectUrl?: string;
+  error?: string;
 }
 
 export interface StripeCustomerResponse {
@@ -41,6 +46,32 @@ export interface RefundResponse {
   error?: string;
 }
 
+// 決済インテント作成パラメータ
+export interface CreatePaymentIntentParams {
+  amount: number;
+  bookingId: string;
+  description?: string;
+  metadata?: Record<string, string>;
+  currency?: string;
+}
+
+// APIエラー型定義
+export interface ApiError {
+  status: number;
+  message: string;
+  code?: string;
+}
+
+// タイムアウト付きフェッチ関数
+const fetchWithTimeout = async (url: string, options: RequestInit, timeout: number): Promise<Response> => {
+  return Promise.race([
+    fetch(url, options),
+    new Promise<Response>((_, reject) => 
+      setTimeout(() => reject(new Error(`リクエストがタイムアウトしました (${timeout}ms)`)), timeout)
+    ) as Promise<Response>
+  ]);
+};
+
 // Supabase認証トークンの取得
 const getAuthToken = async (): Promise<string> => {
   const { data } = await supabase.auth.getSession();
@@ -52,7 +83,8 @@ const apiRequest = async <T>(
   functionName: string, 
   method: string, 
   body?: any,
-  customHeaders?: Record<string, string>
+  customHeaders?: Record<string, string>,
+  timeout: number = API_TIMEOUT
 ): Promise<T> => {
   const token = await getAuthToken();
   
@@ -64,27 +96,168 @@ const apiRequest = async <T>(
   };
 
   try {
-    const response = await fetch(url, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    const response = await fetchWithTimeout(
+      url, 
+      {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+      },
+      timeout
+    );
+    
+    const contentType = response.headers.get('content-type');
+    
+    // レスポンスがJSONでない場合のハンドリング
+    if (!contentType || !contentType.includes('application/json')) {
+      if (!response.ok) {
+        throw new Error(`APIリクエストに失敗しました (${response.status}): JSONではないレスポンス`);
+      }
+      
+      // 空のレスポンスをJSONとして扱う（成功ケース）
+      return {} as T;
+    }
     
     const data = await response.json();
     
     if (!response.ok) {
-      throw new Error(data.error || `APIリクエストに失敗しました (${response.status})`);
+      const errorMessage = data.error || `APIリクエストに失敗しました (${response.status})`;
+      const error: ApiError = {
+        status: response.status,
+        message: errorMessage,
+        code: data.code
+      };
+      
+      console.error(`APIエラー (${functionName}):`, error);
+      throw new Error(errorMessage);
     }
     
     return data as T;
   } catch (error) {
-    console.error(`APIリクエストエラー (${functionName}):`, error);
-    throw error;
+    if (error instanceof Error) {
+      console.error(`APIリクエストエラー (${functionName}):`, error.message);
+      throw error;
+    }
+    
+    // 未知のエラーケース
+    console.error(`APIリクエスト未知のエラー (${functionName}):`, error);
+    throw new Error('APIリクエスト中に予期しないエラーが発生しました');
   }
 };
 
-// 決済インテント作成
-export const createPaymentIntent = async (
+// 決済インテント作成（更新したインターフェースに対応）
+export const createPaymentIntent = async (params: CreatePaymentIntentParams): Promise<PaymentIntentResponse> => {
+  try {
+    // 必須パラメータのチェック
+    if (!params.amount || !params.bookingId) {
+      throw new Error('決済インテント作成には金額と予約IDが必要です');
+    }
+
+    // 予約情報の取得（存在確認）
+    const { data: bookingData, error: bookingError } = await supabase
+      .from('slot_bookings')
+      .select('*')
+      .eq('id', params.bookingId)
+      .single();
+
+    if (bookingError || !bookingData) {
+      console.error('予約情報の取得エラー:', bookingError);
+      throw new Error('指定された予約が見つかりません');
+    }
+
+    // 金額の整合性チェック
+    if (bookingData.amount !== params.amount) {
+      throw new Error('予約金額と支払い金額が一致しません');
+    }
+
+    // ユーザー情報の取得
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('ユーザー情報の取得に失敗しました');
+    }
+
+    // 予約に関連するスロット情報の取得
+    const { data: slotData, error: slotError } = await supabase
+      .from('promotion_slots')
+      .select('*')
+      .eq('id', bookingData.slot_id)
+      .single();
+
+    if (slotError || !slotData) {
+      console.error('スロット情報の取得エラー:', slotError);
+      throw new Error('関連する掲載枠が見つかりません');
+    }
+
+    // 動画情報の取得
+    const { data: videoData, error: videoError } = await supabase
+      .from('videos')
+      .select('*')
+      .eq('id', bookingData.video_id)
+      .single();
+
+    if (videoError || !videoData) {
+      console.error('動画情報の取得エラー:', videoError);
+      throw new Error('関連する動画が見つかりません');
+    }
+
+    // メタデータの構築
+    const metadata = {
+      booking_id: params.bookingId,
+      user_id: user.id,
+      slot_id: bookingData.slot_id,
+      video_id: bookingData.video_id,
+      video_title: videoData.title || '不明な動画',
+      slot_name: slotData.name || '不明な掲載枠',
+      slot_type: slotData.type || 'unknown',
+      duration: bookingData.duration.toString(),
+      ...params.metadata || {}
+    };
+
+    // 決済説明の構築
+    const description = params.description || 
+      `掲載枠予約: ${slotData.name} (${slotData.type}) - ${bookingData.duration}日間`;
+
+    // エッジ関数へのリクエスト
+    const response = await apiRequest<PaymentIntentResponse>(
+      'create-payment-intent',
+      'POST', 
+      {
+        amount: params.amount,
+        currency: params.currency || 'jpy',
+        type: 'promotion',
+        bookingId: params.bookingId,
+        description,
+        metadata
+      }
+    );
+
+    // 支払いインテントIDの保存
+    if (response.paymentIntentId) {
+      await supabase
+        .from('slot_bookings')
+        .update({ 
+          payment_intent_id: response.paymentIntentId,
+          payment_status: 'processing'
+        })
+        .eq('id', params.bookingId);
+    }
+
+    return response;
+  } catch (error) {
+    console.error('決済インテント作成エラー:', error);
+    if (error instanceof Error) {
+      return {
+        error: `決済インテント作成エラー: ${error.message}`
+      };
+    }
+    return {
+      error: '決済インテント作成中に予期しないエラーが発生しました'
+    };
+  }
+};
+
+// 元のcreatePaymentIntent関数をレガシーとして残す（既存コードとの互換性のため）
+export const createPaymentIntentLegacy = async (
   amount: number,
   currency: string = 'jpy',
   slotId?: string | null,
@@ -110,7 +283,14 @@ export const createPaymentIntent = async (
     );
   } catch (error) {
     console.error('決済インテント作成エラー:', error);
-    throw error;
+    if (error instanceof Error) {
+      return {
+        error: `決済インテント作成エラー: ${error.message}`
+      };
+    }
+    return {
+      error: '決済インテント作成中に予期しないエラーが発生しました'
+    };
   }
 };
 
@@ -146,15 +326,22 @@ export const getOrCreateStripeCustomer = async (): Promise<StripeCustomerRespons
     );
 
     // プロフィールにStripe顧客IDを保存
-    await supabase
+    const { error: updateError } = await supabase
       .from('profiles')
       .update({ stripe_customer_id: customerId })
       .eq('id', user.id);
 
+    if (updateError) {
+      console.warn('顧客IDの保存に失敗しましたが、処理を続行します:', updateError.message);
+    }
+
     return { customerId };
   } catch (error) {
     console.error('Stripe顧客ID取得エラー:', error);
-    throw error;
+    if (error instanceof Error) {
+      throw new Error(`Stripe顧客ID取得エラー: ${error.message}`);
+    }
+    throw new Error('Stripe顧客ID取得中に予期しないエラーが発生しました');
   }
 };
 
@@ -175,7 +362,10 @@ export const createSubscription = async (priceId: string): Promise<SubscriptionR
     );
   } catch (error) {
     console.error('サブスクリプション作成エラー:', error);
-    throw error;
+    if (error instanceof Error) {
+      throw new Error(`サブスクリプション作成エラー: ${error.message}`);
+    }
+    throw new Error('サブスクリプション作成中に予期しないエラーが発生しました');
   }
 };
 
@@ -192,7 +382,10 @@ export const cancelSubscription = async (subscriptionId: string): Promise<{ stat
     );
   } catch (error) {
     console.error('サブスクリプションキャンセルエラー:', error);
-    throw error;
+    if (error instanceof Error) {
+      throw new Error(`サブスクリプションキャンセルエラー: ${error.message}`);
+    }
+    throw new Error('サブスクリプションキャンセル中に予期しないエラーが発生しました');
   }
 };
 
@@ -201,32 +394,73 @@ export const createPromotionPayment = async (
   slotId: string,
   amount: number,
   duration: number,
-  videoUrl: string
+  videoId: string
 ): Promise<PaymentIntentResponse> => {
   try {
     // ユーザー情報を取得
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('ユーザー情報が取得できません');
 
-    // YouTubeのビデオIDを抽出
-    const videoId = extractYouTubeId(videoUrl);
-    if (!videoId) throw new Error('有効なYouTube URLではありません');
+    // 動画情報を取得
+    const { data: videoData, error: videoError } = await supabase
+      .from('videos')
+      .select('*')
+      .eq('id', videoId)
+      .single();
 
-    return await apiRequest<PaymentIntentResponse>(
-      'create-payment-intent',
-      'POST', 
-      {
-        amount,
-        slotId,
-        duration,
-        type: 'promotion',
-        videoId,
-        userId: user.id
+    if (videoError || !videoData) {
+      throw new Error('動画情報の取得に失敗しました');
+    }
+
+    // 予約データを作成
+    const start = new Date();
+    start.setDate(start.getDate() + 1); // 翌日から開始
+
+    const end = new Date(start);
+    end.setDate(end.getDate() + duration);
+
+    // 予約データを挿入
+    const { data: bookingData, error: bookingError } = await supabase
+      .from('slot_bookings')
+      .insert([{
+        user_id: user.id,
+        youtuber_id: user.id,
+        slot_id: slotId,
+        video_id: videoId,
+        start_date: start.toISOString(),
+        end_date: end.toISOString(),
+        duration: duration,
+        amount: amount,
+        status: 'pending',
+        payment_status: 'pending',
+        created_at: new Date().toISOString()
+      }])
+      .select();
+
+    if (bookingError || !bookingData || bookingData.length === 0) {
+      throw new Error('予約データの作成に失敗しました: ' + (bookingError?.message || ''));
+    }
+
+    // 作成された予約IDを使って決済インテントを作成
+    return await createPaymentIntent({
+      amount,
+      bookingId: bookingData[0].id,
+      description: `掲載枠予約: ${duration}日間 - ${videoData.title}`,
+      metadata: {
+        video_title: videoData.title,
+        youtuber_id: user.id
       }
-    );
+    });
   } catch (error) {
     console.error('プロモーション支払い作成エラー:', error);
-    throw error;
+    if (error instanceof Error) {
+      return {
+        error: `プロモーション支払い作成エラー: ${error.message}`
+      };
+    }
+    return {
+      error: 'プロモーション支払い作成中に予期しないエラーが発生しました'
+    };
   }
 };
 
@@ -250,7 +484,10 @@ export const updatePaymentStatus = async (
     return status;
   } catch (error) {
     console.error('決済状態更新エラー:', error);
-    throw error;
+    if (error instanceof Error) {
+      throw new Error(`決済状態更新エラー: ${error.message}`);
+    }
+    throw new Error('決済状態更新中に予期しないエラーが発生しました');
   }
 };
 
@@ -269,7 +506,10 @@ export const updatePremiumStatus = async (isPremium: boolean): Promise<{ success
     return { success: true };
   } catch (error) {
     console.error('プレミアム状態更新エラー:', error);
-    throw error;
+    if (error instanceof Error) {
+      throw new Error(`プレミアム状態更新エラー: ${error.message}`);
+    }
+    throw new Error('プレミアム状態更新中に予期しないエラーが発生しました');
   }
 };
 
@@ -291,39 +531,64 @@ export const updatePromotionSlotStatus = async (
     // 予約ステータスを更新
     const { error: updateError } = await supabase
       .from('slot_bookings')
-      .update({ status })
+      .update({ 
+        status, 
+        payment_status: status === 'completed' ? 'succeeded' : 
+                      status === 'cancelled' ? 'cancelled' : 'pending'
+      })
       .eq('payment_intent_id', paymentIntentId);
 
     if (updateError) throw updateError;
     
-    // completed状態の場合、YouTubeIDを掲載枠に設定
-    if (status === 'completed' && bookingData?.youtube_id) {
-      await updateSlotYoutubeId(bookingData.slot_id, bookingData.youtube_id);
+    // completed状態の場合、動画情報を掲載枠に連携
+    if (status === 'completed' && bookingData) {
+      await updateSlotVideoInfo(bookingData.slot_id, bookingData.video_id);
     }
     
     return { success: true };
   } catch (error) {
     console.error('プロモーションスロット更新エラー:', error);
-    throw error;
+    if (error instanceof Error) {
+      throw new Error(`プロモーションスロット更新エラー: ${error.message}`);
+    }
+    throw new Error('プロモーションスロット更新中に予期しないエラーが発生しました');
   }
 };
 
-// 掲載枠のYouTube IDを更新
-export const updateSlotYoutubeId = async (
+// 掲載枠の動画情報を更新
+export const updateSlotVideoInfo = async (
   slotId: string, 
-  youtubeId: string
+  videoId: string
 ): Promise<{ success: boolean }> => {
   try {
+    // 動画情報を取得
+    const { data: videoData, error: videoError } = await supabase
+      .from('videos')
+      .select('youtube_id, title, thumbnail_url')
+      .eq('id', videoId)
+      .single();
+      
+    if (videoError || !videoData) throw videoError || new Error('動画情報が見つかりません');
+    
+    // 掲載枠を更新
     const { error } = await supabase
       .from('promotion_slots')
-      .update({ youtube_id: youtubeId })
+      .update({ 
+        video_id: videoId,
+        youtube_id: videoData.youtube_id,
+        video_title: videoData.title,
+        thumbnail_url: videoData.thumbnail_url
+      })
       .eq('id', slotId);
       
     if (error) throw error;
     return { success: true };
   } catch (error) {
-    console.error('YouTube ID更新エラー:', error);
-    throw error;
+    console.error('掲載枠の動画情報更新エラー:', error);
+    if (error instanceof Error) {
+      throw new Error(`掲載枠の動画情報更新エラー: ${error.message}`);
+    }
+    throw new Error('掲載枠の動画情報更新中に予期しないエラーが発生しました');
   }
 };
 
@@ -358,7 +623,10 @@ export const checkPaymentStatus = async (paymentIntentId: string): Promise<Payme
     );
   } catch (error) {
     console.error('決済ステータス確認エラー:', error);
-    throw error;
+    if (error instanceof Error) {
+      throw new Error(`決済ステータス確認エラー: ${error.message}`);
+    }
+    throw new Error('決済ステータス確認中に予期しないエラーが発生しました');
   }
 };
 
@@ -389,7 +657,10 @@ export const getCurrentSubscription = async (): Promise<SubscriptionInfo> => {
     );
   } catch (error) {
     console.error('サブスクリプション情報取得エラー:', error);
-    throw error;
+    if (error instanceof Error) {
+      throw new Error(`サブスクリプション情報取得エラー: ${error.message}`);
+    }
+    throw new Error('サブスクリプション情報取得中に予期しないエラーが発生しました');
   }
 };
 
@@ -406,7 +677,7 @@ export const refundPayment = async ({
   reason: string;
 }): Promise<RefundResponse> => {
   try {
-    // Supabase Edge Function を呼び出して返金処理を実行
+    // リクエストが重要なため、タイムアウトを長めに設定
     const response = await apiRequest<{ refundId: string }>(
       'create-payment-intent',
       'POST',
@@ -415,7 +686,9 @@ export const refundPayment = async ({
         paymentIntentId,
         amount,
         reason
-      }
+      },
+      undefined,
+      60000 // 60秒
     );
 
     return {
@@ -430,3 +703,22 @@ export const refundPayment = async ({
     };
   }
 };
+
+// すべての主要関数をまとめたオブジェクト
+export const stripeService = {
+  createPaymentIntent,
+  getOrCreateStripeCustomer,
+  createSubscription,
+  cancelSubscription,
+  createPromotionPayment,
+  updatePaymentStatus,
+  updatePremiumStatus,
+  updatePromotionSlotStatus,
+  updateSlotVideoInfo,
+  checkPaymentStatus,
+  getCurrentSubscription,
+  refundPayment,
+  extractYouTubeId
+};
+
+export default stripeService;

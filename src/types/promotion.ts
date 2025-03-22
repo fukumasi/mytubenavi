@@ -1,6 +1,23 @@
 // src/types/promotion.ts
 import { Video } from './index';
-import type { PromotionSlot } from './index';  // 型としてインポート
+
+// インデックスファイルからのインポートを一旦やめて直接定義する
+export interface PromotionSlot {
+  id: string;
+  name: string;
+  type: 'premium' | 'sidebar' | 'genre' | 'related';
+  price: number;
+  description?: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  max_videos?: number;
+  max_duration?: number;
+  video_id?: string;
+  youtube_id?: string;
+  video_title?: string;
+  thumbnail_url?: string;
+}
 
 export interface SlotBooking {
   id: string;
@@ -15,7 +32,7 @@ export interface SlotBooking {
   amount: number;           // 決済金額
   created_at: string;
   updated_at: string;
-  payment_status?: 'pending' | 'paid' | 'refunded';
+  payment_status?: 'pending' | 'processing' | 'succeeded' | 'cancelled' | 'paid' | 'refunded';
   payment_intent_id?: string;  // Stripe決済ID
   slot?: PromotionSlot;     // 関連する掲載枠
   video?: Video;            // 関連する動画
@@ -54,7 +71,39 @@ export interface PromotionStats {
   revenue: number;
 }
 
-export type TimeRange = 'day' | 'week' | 'month' | 'year' | 'all';
+export interface BookingAnalytics {
+  id: string;
+  booking_id: string;
+  date: string;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  created_at: string;
+}
 
-// 型としてエクスポート
-export type { PromotionSlot };
+export interface BookingPayment {
+  id: string;
+  booking_id: string;
+  payment_intent_id: string;
+  amount: number;
+  status: 'succeeded' | 'pending' | 'failed' | 'refunded';
+  created_at: string;
+}
+
+export interface PromotionPlan {
+  id: string;
+  name: string;
+  type: 'premium' | 'sidebar' | 'genre' | 'related';
+  price: number;
+  max_duration: number;
+  max_videos: number;
+  is_active: boolean;
+  description?: string;
+  features?: string[];
+  position?: string;
+  visibility?: number;
+  discount_percentage?: number;
+}
+
+export type TimeRange = 'day' | 'week' | 'month' | 'year' | 'all';
+export type PromotionSlotType = 'premium' | 'sidebar' | 'genre' | 'related';
