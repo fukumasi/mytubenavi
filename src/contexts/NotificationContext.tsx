@@ -37,6 +37,9 @@ interface NotificationContextType {
   getNotificationStats: () => { total: number, unread: number, highPriority: number };
   getPremiumNotifications: () => EnhancedNotification[];
   getImportantNotifications: (limit?: number) => EnhancedNotification[];
+  createNotification: (userId: string, type: NotificationType, title: string, message: string, metadata?: any, priority?: NotificationPriority) => Promise<void>;
+  getMatchingNotifications: () => EnhancedNotification[];
+  getMessageNotifications: () => EnhancedNotification[];
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -87,7 +90,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
       // 非プレミアム会員の場合は重要度の高い通知と特定の種類の通知のみを取得
       if (!isPremium) {
-        query = query.or('priority.eq.high,type.eq.system,type.eq.achievement');
+        query = query.or('priority.eq.high,type.eq.system,type.eq.achievement,type.eq.message,type.eq.matching');
       }
 
       const { data, error: fetchError } = await query.order('created_at', { ascending: false });
@@ -334,6 +337,47 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     return limit ? sorted.slice(0, limit) : sorted;
   };
 
+  // マッチング関連の通知を取得
+  const getMatchingNotifications = () => {
+    return notifications.filter(n => n.type === 'matching');
+  };
+
+  // メッセージ関連の通知を取得
+  const getMessageNotifications = () => {
+    return notifications.filter(n => n.type === 'message');
+  };
+
+  // 新しい通知を作成する関数
+  const createNotification = async (
+    userId: string,
+    type: NotificationType,
+    title: string,
+    message: string,
+    metadata?: any,
+    priority: NotificationPriority = 'medium'
+  ) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: userId,
+          type,
+          title,
+          message,
+          is_read: false,
+          metadata,
+          priority,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+    } catch (err) {
+      console.error('通知の作成に失敗:', err);
+      throw err;
+    }
+  };
+
   const updateNotificationPreferences = async (newPreferences: Partial<NotificationPreference>) => {
     if (!user) return;
 
@@ -376,6 +420,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           milestones: true,
           subscriptions: true,
           premium_features: isPremium, // プレミアム関連通知の設定
+          matching_notifications: true, // マッチング通知を追加
+          message_notifications: true, // メッセージ通知を追加
           email_notifications: false,
           push_notifications: true,
           in_app_notifications: true,
@@ -499,7 +545,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     groupNotifications,
     getNotificationStats,
     getPremiumNotifications,
-    getImportantNotifications
+    getImportantNotifications,
+    createNotification,
+    getMatchingNotifications,
+    getMessageNotifications
   };
 
   if (loading && !notifications.length) {

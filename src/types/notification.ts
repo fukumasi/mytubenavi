@@ -14,7 +14,9 @@ export type NotificationType =
   | 'achievement'
   | 'recommendation'
   | 'milestone'
-  | 'subscription';
+  | 'subscription'
+  | 'matching'    // マッチング関連の通知を追加
+  | 'message';    // メッセージ関連の通知を追加
 
 export interface Notification {
   id: string;
@@ -50,6 +52,20 @@ export interface NotificationMetadata {
     source: string;
     confidence_score: number;
   };
+  matching_data?: {            // マッチング関連のメタデータを追加
+    match_id?: string;
+    match_score?: number;
+    match_type?: 'like' | 'super_like' | 'mutual';
+    matched_user_id?: string;
+    matched_username?: string;
+  };
+  message_data?: {             // メッセージ関連のメタデータを追加
+    conversation_id?: string;
+    sender_id?: string;
+    sender_username?: string;
+    message_preview?: string;
+    is_highlighted?: boolean;
+  };
   interaction_history?: {
     last_interaction: string;
     interaction_count: number;
@@ -74,6 +90,8 @@ export interface NotificationPreference {
   recommendations: boolean; // おすすめ通知
   milestones: boolean; // マイルストーン通知
   subscriptions: boolean; // 購読通知
+  matching_notifications: boolean; // マッチング通知を追加
+  message_notifications: boolean; // メッセージ通知を追加
   
   // 通知方法設定
   email_notifications: boolean; // メール通知を受け取るか
