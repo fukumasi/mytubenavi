@@ -8,10 +8,176 @@ import {
   Message, 
   Conversation,
   VideoDetails,
-  SkippedUser 
+  SkippedUser,
+  OnlineStatus,
+  ActivityLevel,
+  ConnectionStatus,
+  GenderPreference,
+  LocationPreference
 } from '../types/matching';
+import { notificationService } from '../services/notificationService';
+// ポイント関連のユーティリティ関数をインポート
+import { 
+  getPoints, 
+  consumePoints, 
+  addPoints, 
+  hasEnoughPoints 
+} from '../utils/pointsUtils';
 
-// マッチングスコアを計算するための関数
+// 戻り値の型定義
+export interface SendLikeResult {
+  success: boolean;
+  isMatch: boolean;
+  conversationId?: string;
+  error?: string;
+}
+
+export interface SkipResult {
+  success: boolean;
+  error?: string;
+}
+
+export interface ConnectionResult {
+  success: boolean;
+  status: ConnectionStatus;
+  connectionId?: string;
+  error?: string;
+}
+
+export interface ResetConnectionResult {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * テーブルが存在するか確認する関数
+ * @param tableName - テーブル名
+ * @returns テーブルが存在するかどうか
+ */
+export const checkTableExists = async (tableName: string): Promise<boolean> => {
+  try {
+    if (!tableName) {
+      console.error('テーブル名が指定されていません');
+      return false;
+    }
+
+    // キャッシュの実装（同じセッション内での重複チェック回避）
+    const sessionCache = window.sessionStorage?.getItem(`table_exists_${tableName}`);
+    if (sessionCache) {
+      return sessionCache === 'true';
+    }
+
+    // 特定のテーブルに対する例外処理
+    // アプリで使用されていないオプショナルテーブルのリスト
+    const optionalTables = ['user_verification', 'profile_views', 'user_filter_usage'];
+    if (optionalTables.includes(tableName)) {
+      console.warn(`オプショナルテーブル ${tableName} はスキップされます`);
+      // キャッシュに保存
+      window.sessionStorage?.setItem(`table_exists_${tableName}`, 'false');
+      return false;
+    }
+
+    try {
+      // 直接テーブルにクエリを実行して存在確認
+      const response = await supabase
+        .from(tableName)
+        .select('*', { count: 'exact', head: true })
+        .limit(0);
+
+      // 成功した場合、テーブルは存在する
+      if (!response.error) {
+        // キャッシュに保存
+        window.sessionStorage?.setItem(`table_exists_${tableName}`, 'true');
+        return true;
+      }
+
+      // エラーコードから判断
+      if (response.error) {
+        // 404/400エラーはテーブルが存在しない
+        if (response.status === 404 || response.status === 400) {
+          console.warn(`テーブル ${tableName} が存在しません (HTTP ${response.status})`);
+          // キャッシュに保存
+          window.sessionStorage?.setItem(`table_exists_${tableName}`, 'false');
+          return false;
+        }
+
+        // PostgreSQLのテーブル存在しないエラー
+        if (response.error.code === '42P01') {
+          console.warn(`テーブル ${tableName} が存在しません (PostgreSQL 42P01)`);
+          // キャッシュに保存
+          window.sessionStorage?.setItem(`table_exists_${tableName}`, 'false');
+          return false;
+        }
+
+        // PGRST116はテーブルは存在するがレコードがないケース
+        if (response.error.code === 'PGRST116') {
+          // キャッシュに保存
+          window.sessionStorage?.setItem(`table_exists_${tableName}`, 'true');
+          return true;
+        }
+      }
+
+      // デフォルトではテーブルは存在しないと判断
+      console.warn(`テーブル ${tableName} へのアクセスでエラー: ${response.error?.message || '不明なエラー'}`);
+      // キャッシュに保存
+      window.sessionStorage?.setItem(`table_exists_${tableName}`, 'false');
+      return false;
+    } catch (queryError) {
+      console.error(`テーブルクエリエラー (${tableName}):`, queryError);
+      // キャッシュに保存
+      window.sessionStorage?.setItem(`table_exists_${tableName}`, 'false');
+      return false;
+    }
+  } catch (error) {
+    console.error(`テーブル存在確認例外 (${tableName}):`, error);
+    return false;
+  }
+};
+
+/**
+ * テーブルが存在しない場合に作成する関数
+ * @param tableName - テーブル名
+ * @returns 作成に成功したかどうか
+ */
+export const createTableIfNotExists = async (tableName: string): Promise<boolean> => {
+  try {
+    if (!tableName) {
+      console.error('テーブル名が指定されていません');
+      return false;
+    }
+    
+    // テーブルが存在するか確認
+    const tableExists = await checkTableExists(tableName);
+    
+    if (tableExists) {
+      return true; // 既に存在する場合は成功とみなす
+    }
+    
+    // Supabaseではテーブル作成はRPC関数やSQL実行ではなく
+    // ダッシュボードやマイグレーションを通じて行うので、
+    // テーブルが存在しない場合はfalseを返す
+    console.warn(`テーブル ${tableName} が存在しません。Supabaseダッシュボードから作成してください。`);
+    return false;
+  } catch (error) {
+    console.error(`テーブル作成エラー (${tableName}):`, error);
+    return false;
+  }
+};
+
+/**
+ * マッチングスコアを計算する関数
+ * @param userInterests - ユーザーの興味リスト
+ * @param otherUserInterests - 相手ユーザーの興味リスト
+ * @param userGenres - ユーザーの好きなジャンルリスト
+ * @param otherUserGenres - 相手ユーザーの好きなジャンルリスト
+ * @param userVideos - ユーザーが視聴した動画IDリスト
+ * @param otherUserVideos - 相手ユーザーが視聴した動画IDリスト
+ * @param userActivity - ユーザーの活動レベル (1-10)
+ * @param otherUserActivity - 相手ユーザーの活動レベル (1-10)
+ * @param isPremium - ユーザーがプレミアム会員か
+ * @param otherIsPremium - 相手ユーザーがプレミアム会員か
+ * @returns マッチングスコア (0-100)
+ */
 export const calculateMatchingScore = (
   userInterests: string[],
   otherUserInterests: string[],
@@ -24,36 +190,44 @@ export const calculateMatchingScore = (
   isPremium: boolean,
   otherIsPremium: boolean
 ): number => {
+  // nullやundefinedのチェックとデフォルト値の設定
+  const safeUserInterests = userInterests || [];
+  const safeOtherUserInterests = otherUserInterests || [];
+  const safeUserGenres = userGenres || [];
+  const safeOtherUserGenres = otherUserGenres || [];
+  const safeUserVideos = userVideos || [];
+  const safeOtherUserVideos = otherUserVideos || [];
+  
   // 共通の興味を計算
-  const commonInterests = userInterests.filter(interest => 
-    otherUserInterests.includes(interest)
+  const commonInterests = safeUserInterests.filter(interest => 
+    safeOtherUserInterests.includes(interest)
   );
   
   // 共通のジャンルを計算
-  const commonGenres = userGenres.filter(genre => 
-    otherUserGenres.includes(genre)
+  const commonGenres = safeUserGenres.filter(genre => 
+    safeOtherUserGenres.includes(genre)
   );
   
   // 共通の視聴動画を計算
-  const commonVideos = userVideos.filter(video =>
-    otherUserVideos.includes(video)
+  const commonVideos = safeUserVideos.filter(video =>
+    safeOtherUserVideos.includes(video)
   );
   
   // 興味のスコア (最大30点)
   const interestScore = Math.min(
-    (commonInterests.length / Math.max(userInterests.length, 1)) * 30,
+    (commonInterests.length / Math.max(safeUserInterests.length, 1)) * 30,
     30
   );
   
   // ジャンルのスコア (最大25点)
   const genreScore = Math.min(
-    (commonGenres.length / Math.max(userGenres.length, 1)) * 25,
+    (commonGenres.length / Math.max(safeUserGenres.length, 1)) * 25,
     25
   );
   
   // 視聴動画の共通性スコア (最大20点)
   const videoScore = Math.min(
-    (commonVideos.length / Math.min(10, Math.max(userVideos.length, 1))) * 20,
+    (commonVideos.length / Math.min(10, Math.max(safeUserVideos.length, 1))) * 20,
     20
   );
   
@@ -69,66 +243,120 @@ export const calculateMatchingScore = (
   return Math.round(interestScore + genreScore + videoScore + activityScore + premiumBonus);
 };
 
-// ユーザーの活動レベルを計算する関数
+/**
+ * ユーザーの活動レベルを計算する関数
+ * @param userId - ユーザーID
+ * @returns 活動レベル (1-10)
+ */
 export const calculateActivityLevel = async (userId: string): Promise<number> => {
   try {
+    if (!userId) {
+      throw new Error('ユーザーIDが指定されていません');
+    }
+
     // 過去30日間のログイン回数を取得
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
-    const { count: loginCount, error: loginError } = await supabase
-      .from('user_logins')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .gte('login_time', thirtyDaysAgo.toISOString());
-      
-    if (loginError) throw loginError;
+    // テーブル存在チェックと該当テーブルからのデータ取得を並列実行
+    const [
+      userLoginsExists,
+      commentsExists,
+      videoRatingsExists,
+      messagesExists
+    ] = await Promise.all([
+      checkTableExists('user_logins'),
+      checkTableExists('comments'),
+      checkTableExists('video_ratings'),
+      checkTableExists('messages')
+    ]);
     
-    // コメント数を取得
-    const { count: commentCount, error: commentError } = await supabase
-      .from('comments')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .gte('created_at', thirtyDaysAgo.toISOString());
-      
-    if (commentError) throw commentError;
+    // 各テーブルからの取得処理
+    const loginCountPromise = userLoginsExists ? 
+      supabase
+        .from('user_logins')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .gte('login_time', thirtyDaysAgo.toISOString()) : 
+      Promise.resolve({ count: 0, error: null });
+        
+    const commentCountPromise = commentsExists ?
+      supabase
+        .from('comments')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .gte('created_at', thirtyDaysAgo.toISOString()) :
+      Promise.resolve({ count: 0, error: null });
+        
+    const ratingCountPromise = videoRatingsExists ?
+      supabase
+        .from('video_ratings')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .gte('created_at', thirtyDaysAgo.toISOString()) :
+      Promise.resolve({ count: 0, error: null });
+        
+    const messageCountPromise = messagesExists ?
+      supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('sender_id', userId)
+        .gte('created_at', thirtyDaysAgo.toISOString()) :
+      Promise.resolve({ count: 0, error: null });
+
+    // 並列にデータを取得
+    const [
+      loginCountResult,
+      commentCountResult,
+      ratingCountResult,
+      messageCountResult
+    ] = await Promise.all([
+      loginCountPromise,
+      commentCountPromise,
+      ratingCountPromise,
+      messageCountPromise
+    ]);
     
-    // 評価数を取得
-    const { count: ratingCount, error: ratingError } = await supabase
-      .from('video_ratings')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .gte('created_at', thirtyDaysAgo.toISOString());
-      
-    if (ratingError) throw ratingError;
-    
-    // メッセージ数を取得
-    const { count: messageCount, error: messageError } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('sender_id', userId)
-      .gte('created_at', thirtyDaysAgo.toISOString());
-      
-    if (messageError) throw messageError;
+    // カウント結果を安全に取得
+    const loginCount = loginCountResult.count || 0;
+    const commentCount = commentCountResult.count || 0;
+    const ratingCount = ratingCountResult.count || 0;
+    const messageCount = messageCountResult.count || 0;
     
     // 活動レベルを計算 (1-10のスケール)
     // ログイン: 最大3点、コメント: 最大2点、評価: 最大2点、メッセージ: 最大3点
-    const loginScore = Math.min((loginCount || 0) / 10, 1) * 3;
-    const commentScore = Math.min((commentCount || 0) / 5, 1) * 2;
-    const ratingScore = Math.min((ratingCount || 0) / 5, 1) * 2;
-    const messageScore = Math.min((messageCount || 0) / 10, 1) * 3;
+    const loginScore = Math.min((loginCount) / 10, 1) * 3;
+    const commentScore = Math.min((commentCount) / 5, 1) * 2;
+    const ratingScore = Math.min((ratingCount) / 5, 1) * 2;
+    const messageScore = Math.min((messageCount) / 10, 1) * 3;
     
     return Math.round(loginScore + commentScore + ratingScore + messageScore);
-    
   } catch (error) {
     console.error('活動レベル計算エラー:', error);
     return 5; // エラー時はデフォルト値を返す
   }
 };
 
-// ユーザーの視聴履歴を取得する関数
+/**
+ * ユーザーの視聴履歴を取得する関数
+ * @param userId - ユーザーID
+ * @param limit - 取得する履歴の最大数
+ * @returns 視聴済み動画IDの配列
+ */
 export const getUserWatchHistory = async (userId: string, limit: number = 20): Promise<string[]> => {
   try {
+    if (!userId) {
+      throw new Error('ユーザーIDが指定されていません');
+    }
+    
+    // view_historyテーブルが存在するか確認
+    const viewHistoryExists = await checkTableExists('view_history');
+    
+    if (!viewHistoryExists) {
+      console.warn('view_historyテーブルが存在しません');
+      return [];
+    }
+
     const { data, error } = await supabase
       .from('view_history')
       .select('video_id')
@@ -136,19 +364,55 @@ export const getUserWatchHistory = async (userId: string, limit: number = 20): P
       .order('viewed_at', { ascending: false })
       .limit(limit);
       
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     
     return data?.map(item => item.video_id) || [];
-    
   } catch (error) {
     console.error('視聴履歴取得エラー:', error);
     return [];
   }
 };
 
-// マッチング候補を取得する関数
-export const fetchMatchCandidates = async (userId: string, preferences: MatchingPreferences) => {
+// 他のすべての関数について、checkTableExistsを呼び出す部分はそのままにして、
+// createTableIfNotExistsを呼び出す部分では、テーブルが存在しない場合は
+// 警告を表示してから処理を続行するように修正します。
+
+/**
+ * マッチング候補を取得する関数
+ * @param userId - ユーザーID
+ * @param preferences - マッチング設定
+ * @returns マッチング候補のリスト
+ */
+export const fetchMatchCandidates = async (userId: string, preferences: MatchingPreferences): Promise<MatchingUser[]> => {
   try {
+    if (!userId) {
+      throw new Error('ユーザーIDが指定されていません');
+    }
+
+    if (!preferences) {
+      throw new Error('マッチング設定が指定されていません');
+    }
+    
+    // 必要なテーブルの存在を確認
+    const [
+      profilesExists,
+      userSkipsExists,
+      userLikesExists,
+      connectionsExists
+    ] = await Promise.all([
+      checkTableExists('profiles'),
+      checkTableExists('user_skips'),
+      checkTableExists('user_likes'),
+      checkTableExists('connections')
+    ]);
+    
+    if (!profilesExists) {
+      console.error('profilesテーブルが存在しません');
+      return [];
+    }
+
     // 現在のユーザーの情報を取得
     const { data: userData, error: userError } = await supabase
       .from('profiles')
@@ -156,64 +420,100 @@ export const fetchMatchCandidates = async (userId: string, preferences: Matching
       .eq('id', userId)
       .single();
       
-    if (userError) throw userError;
-    
+    if (userError) {
+      console.error('プロフィール取得エラー:', userError);
+      return [];
+    }
+
     // 現在のユーザーの活動レベルを取得
     const userActivityLevel = await calculateActivityLevel(userId);
-    
+
     // 現在のユーザーの視聴履歴を取得
     const userWatchHistory = await getUserWatchHistory(userId, 50);
+
+    // スキップデータとライクデータを並列に取得
+    let skippedData: any[] = [];
+    let likedData: any[] = [];
     
-    // 既にスキップまたはいいねしたユーザーを取得
-    const { data: skippedData } = await supabase
-      .from('user_skips')
-      .select('skipped_user_id')
-      .eq('user_id', userId);
-      
-    const { data: likedData } = await supabase
-      .from('user_likes')
-      .select('liked_user_id')
-      .eq('user_id', userId);
+    // 並列に実行する処理
+    const fetchPromises = [];
+    
+    if (userSkipsExists) {
+      fetchPromises.push(
+        supabase
+          .from('user_skips')
+          .select('skipped_user_id')
+          .eq('user_id', userId)
+          .then(result => {
+            if (!result.error) {
+              skippedData = result.data || [];
+            } else {
+              console.error('スキップデータ取得エラー:', result.error);
+            }
+          })
+      );
+    }
+    
+    if (userLikesExists) {
+      fetchPromises.push(
+        supabase
+          .from('user_likes')
+          .select('liked_user_id')
+          .eq('user_id', userId)
+          .then(result => {
+            if (!result.error) {
+              likedData = result.data || [];
+            } else {
+              console.error('いいねデータ取得エラー:', result.error);
+            }
+          })
+      );
+    }
+    
+    // すべてのPromiseを待機
+    await Promise.all(fetchPromises);
       
     // 除外するユーザーIDのリスト
     const skippedIds = skippedData?.map(s => s.skipped_user_id) || [];
     const likedIds = likedData?.map(l => l.liked_user_id) || [];
-    
-    let excludedIds = [userId]; // 自分自身は必ず除外
-    
-    // スキップしたユーザーを除外するフラグがオンの場合のみスキップユーザーを除外
-    if (preferences.filter_skipped) {
-      excludedIds = [...excludedIds, ...skippedIds];
-    }
-    
-    // いいねしたユーザーは常に除外
-    excludedIds = [...excludedIds, ...likedIds];
-    
-    // 除外リストが空でない場合のクエリ構築
-    let excludeCondition = '';
-    if (excludedIds.length > 0) {
-      excludeCondition = `(${excludedIds.join(',')})`;
-    } else {
-      excludeCondition = `(${userId})`;  // 少なくとも自分自身は除外
-    }
-    
+
     // マッチング候補を取得するクエリを構築
     let query = supabase
       .from('profiles')
-      .select('id, username, avatar_url, bio, interests, genre_preference, is_premium, gender, birth_date, location, online_status, last_active')
-      .not('id', 'in', excludeCondition)
-      .eq('matching_enabled', true)  // マッチングが有効なユーザーのみ
-      .limit(20);
-      
-    // フィルタリング条件を追加
-    if (preferences.gender_preference && preferences.gender_preference !== 'any') {
+      .select('id, username, avatar_url, bio, interests, genre_preference, is_premium, gender, birth_date, location, online_status, last_active, matching_enabled');
+
+    // 自分自身は明示的にIDで除外
+    query = query.neq('id', userId);
+
+    // スキップしたユーザーを除外するフラグがオンの場合のみスキップユーザーを除外
+    const excludeIds = [];
+    if (preferences.filter_skipped && skippedIds.length > 0) {
+      excludeIds.push(...skippedIds);
+    }
+
+    // いいねしたユーザーは常に除外
+    if (likedIds.length > 0) {
+      excludeIds.push(...likedIds);
+    }
+
+    // 除外IDがある場合は、not in演算子で一括除外に最適化
+    if (excludeIds.length > 0) {
+      // 高速化のためにnot inを使用して一括除外
+      query = query.not('id', 'in', excludeIds);
+    }
+
+    // マッチングが有効なユーザーのみに限定
+    query = query.eq('matching_enabled', true);
+
+    // 他の条件を追加
+    if (preferences.gender_preference && preferences.gender_preference !== GenderPreference.ANY) {
       query = query.eq('gender', preferences.gender_preference);
     }
-    
+
     if (preferences.location_preference && preferences.location_preference.prefecture) {
       query = query.contains('location', { prefecture: preferences.location_preference.prefecture });
     }
-    
+
     // 年齢範囲でフィルタリング
     if (preferences.age_range_min && preferences.age_range_max) {
       const maxBirthDate = new Date();
@@ -225,33 +525,44 @@ export const fetchMatchCandidates = async (userId: string, preferences: Matching
       query = query.lte('birth_date', maxBirthDate.toISOString());
       query = query.gte('birth_date', minBirthDate.toISOString());
     }
-    
+
     // オンラインユーザーのみ表示設定
     if (preferences.online_only) {
-      query = query.eq('online_status', 'online');
+      query = query.eq('online_status', OnlineStatus.ONLINE);
     }
-    
+
     // プレミアムユーザーのみ表示設定
     if (preferences.premium_only) {
       query = query.eq('is_premium', true);
     }
-    
-    // 視聴履歴があるユーザーのみフィルタリング（新機能）
+
+    // 視聴履歴があるユーザーのみフィルタリング（パフォーマンス向上のため条件付きで実行）
     if (preferences.has_video_history) {
-      // 視聴履歴が1件以上あるユーザーを取得するサブクエリ
-      const { data: usersWithHistory } = await supabase
-        .from('view_history')
-        .select('user_id')
-        .gt('view_count', 0)
-        .limit(1000);
+      const viewHistoryExists = await checkTableExists('view_history');
       
-      if (usersWithHistory && usersWithHistory.length > 0) {
-        const userIdsWithHistory = usersWithHistory.map(u => u.user_id);
-        query = query.in('id', userIdsWithHistory);
+      if (viewHistoryExists) {
+        try {
+          // 視聴履歴テーブルから重複なしでユーザーIDを取得
+          const { data: usersWithHistory, error: historyError } = await supabase
+            .from('view_history')
+            .select('user_id')
+            .limit(1000);
+          
+          if (historyError) {
+            console.error('視聴履歴ユーザー取得エラー:', historyError);
+          } else if (usersWithHistory && usersWithHistory.length > 0) {
+            // 重複を取り除いてユニークなユーザーIDのみにする
+            const uniqueUserIds = [...new Set(usersWithHistory.map((u: any) => u.user_id))];
+            query = query.in('id', uniqueUserIds);
+          }
+        } catch (e) {
+          console.error('視聴履歴フィルタリングエラー:', e);
+          // エラーでも続行
+        }
       }
     }
-    
-    // 最近活動したユーザーのみフィルタリング（新機能）
+
+    // 最近活動したユーザーのみフィルタリング
     if (preferences.recent_activity) {
       // 一週間以内にログインしたユーザーのみ
       const oneWeekAgo = new Date();
@@ -259,25 +570,36 @@ export const fetchMatchCandidates = async (userId: string, preferences: Matching
       
       query = query.gte('last_active', oneWeekAgo.toISOString());
     }
-    
+
     // 活動レベルでフィルタリング（プレミアムユーザーのみ）
     if (userData?.is_premium && preferences.activity_level) {
-      // この処理は後で実装する（活動レベルごとにスコアでフィルタリング）
+      // この処理は後で実装（活動レベルごとにスコアでフィルタリング）
+      // 現時点では条件を追加しない
     }
-    
+
+    // 最終的に取得件数を制限
+    query = query.limit(20);
+
+    // クエリ実行
     const { data, error } = await query;
-    
-    if (error) throw error;
-    
+
+    if (error) {
+      console.error('マッチング候補取得エラー:', error);
+      return [];
+    }
+
     if (!data || data.length === 0) {
       return [];
     }
-    
+
     // 各ユーザーの活動レベルと視聴履歴を取得
     const candidatesWithDetails = await Promise.all(data.map(async (candidate) => {
       try {
-        const activityLevel = await calculateActivityLevel(candidate.id);
-        const watchHistory = await getUserWatchHistory(candidate.id, 50);
+        // 活動レベルと視聴履歴を並列に取得
+        const [activityLevel, watchHistory] = await Promise.all([
+          calculateActivityLevel(candidate.id),
+          getUserWatchHistory(candidate.id, 50)
+        ]);
         
         return {
           ...candidate,
@@ -293,7 +615,7 @@ export const fetchMatchCandidates = async (userId: string, preferences: Matching
         };
       }
     }));
-    
+
     // マッチングスコアを計算して候補を整形
     const candidates = candidatesWithDetails.map(candidate => {
       const candidateInterests = candidate.interests || [];
@@ -342,9 +664,15 @@ export const fetchMatchCandidates = async (userId: string, preferences: Matching
         (candidate.watch_history || []).includes(v)
       );
       
+      // 列挙型を使用してオンラインステータスを設定
+      const onlineStatus = 
+        (candidate.online_status && Object.values(OnlineStatus).includes(candidate.online_status as OnlineStatus))
+          ? candidate.online_status as OnlineStatus
+          : OnlineStatus.OFFLINE;
+          
       return {
         id: candidate.id,
-        username: candidate.username,
+        username: candidate.username || 'ユーザー',
         avatar_url: candidate.avatar_url,
         bio: candidate.bio || '',
         interests: candidateInterests,
@@ -357,52 +685,91 @@ export const fetchMatchCandidates = async (userId: string, preferences: Matching
         age,
         location: candidate.location || null,
         activity_level: candidate.activity_level || 5,
-        online_status: candidate.online_status || 'offline',
+        online_status: onlineStatus,
         last_active: candidate.last_active || null,
-        connection_status: 'none'
+        connection_status: ConnectionStatus.NONE
       } as MatchingUser;
     });
     
     // マッチングスコアでソート
-    return candidates.sort((a, b) => b.matching_score - a.matching_score);
+    const sortedCandidates = candidates.sort((a, b) => b.matching_score - a.matching_score);
     
-  } catch (error) {
-    console.error('マッチング候補の取得エラー:', error);
-    throw error;
-  }
-};
-
-// ユーザーのポイント残高を取得
-export const getUserPoints = async (userId: string): Promise<UserPoints> => {
-  try {
-    const { data, error } = await supabase
-      .from('user_points')
-      .select('balance, lifetime_earned, last_updated')
-      .eq('user_id', userId)
-      .single();
+    // 各ユーザーの接続状態を確認（効率化のため一括取得）
+    if (connectionsExists) {
+      const userIds = sortedCandidates.map(candidate => candidate.id);
       
-    if (error) {
-      if (error.code === 'PGRST116') {
-        // レコードが存在しない場合は新規作成
-        const { data: newData, error: insertError } = await supabase
-          .from('user_points')
-          .insert({
-            user_id: userId,
-            balance: 10, // 初期ポイント
-            lifetime_earned: 10
-          })
-          .select()
-          .single();
+      try {
+        // 自分が送信した接続リクエスト
+        const { data: sentConnections, error: sentError } = await supabase
+          .from('connections')
+          .select('connected_user_id, status')
+          .eq('user_id', userId)
+          .in('connected_user_id', userIds);
+        
+        // 自分が受信した接続リクエスト
+        const { data: receivedConnections, error: receivedError } = await supabase
+          .from('connections')
+          .select('user_id, status')
+          .eq('connected_user_id', userId)
+          .in('user_id', userIds);
+        
+        if (!sentError && !receivedError) {
+          // 接続状態をマップに保存
+          const connectionMap = new Map<string, ConnectionStatus>();
           
-        if (insertError) throw insertError;
-        return newData as UserPoints;
-      } else {
-        throw error;
+          sentConnections?.forEach(conn => {
+            connectionMap.set(conn.connected_user_id, conn.status as ConnectionStatus);
+          });
+          
+          receivedConnections?.forEach(conn => {
+            connectionMap.set(conn.user_id, conn.status as ConnectionStatus);
+          });
+          
+          // マッチングユーザーに接続状態を追加
+          return sortedCandidates.map(candidate => ({
+            ...candidate,
+            connection_status: connectionMap.get(candidate.id) || ConnectionStatus.NONE
+          }));
+        }
+      } catch (error) {
+        console.error('接続状態取得エラー:', error);
       }
     }
     
-    return data as UserPoints;
+    return sortedCandidates;
+  } catch (error) {
+    console.error('マッチング候補の取得エラー:', error);
     
+    // エラー時には空の配列を返す
+    return [];
+  }
+};
+
+/**
+ * ユーザーのポイント残高を取得する関数
+ * @param userId - ユーザーID
+ * @returns ポイント情報
+ */
+export const getUserPoints = async (userId: string): Promise<UserPoints> => {
+  try {
+    if (!userId) {
+      throw new Error('ユーザーIDが指定されていません');
+    }
+    
+    // user_pointsテーブルが存在するか確認
+    const userPointsExists = await checkTableExists('user_points');
+    
+    if (!userPointsExists) {
+      console.warn('user_pointsテーブルが存在しません');
+      return {
+        balance: 0,
+        lifetime_earned: 0,
+        last_updated: new Date().toISOString()
+      };
+    }
+    
+    // pointsUtils.tsのgetPoints関数を使用
+    return await getPoints(userId);
   } catch (error) {
     console.error('ポイント取得エラー:', error);
     // デフォルト値を返す
@@ -414,111 +781,99 @@ export const getUserPoints = async (userId: string): Promise<UserPoints> => {
   }
 };
 
-// ポイントを消費する
-export const consumePoints = async (
-  userId: string,
-  amount: number,
-  transactionType: string,
-  referenceId?: string
-): Promise<boolean> => {
-  try {
-    // ポイント残高を確認
-    const userPoints = await getUserPoints(userId);
-    
-    if (userPoints.balance < amount) {
-      throw new Error('ポイント残高が不足しています');
-    }
-    
-    // トランザクション開始
-    const { error } = await supabase.rpc('consume_points', {
-      p_user_id: userId,
-      p_amount: amount
-    });
-    
-    if (error) throw error;
-    
-    // トランザクション記録
-    const { error: transactionError } = await supabase
-      .from('point_transactions')
-      .insert({
-        user_id: userId,
-        amount: -amount,
-        transaction_type: transactionType,
-        reference_id: referenceId,
-        description: `${transactionType}のためのポイント消費`
-      });
-      
-    if (transactionError) throw transactionError;
-    
-    return true;
-    
-  } catch (error) {
-    console.error('ポイント消費エラー:', error);
-    return false;
-  }
-};
-
-// ポイントを加算する
-export const addPoints = async (
-  userId: string,
-  amount: number,
-  transactionType: string,
-  referenceId?: string,
-  description?: string
-): Promise<boolean> => {
-  try {
-    // トランザクション開始
-    const { error } = await supabase.rpc('add_points', {
-      p_user_id: userId,
-      p_amount: amount
-    });
-    
-    if (error) throw error;
-    
-    // トランザクション記録
-    const { error: transactionError } = await supabase
-      .from('point_transactions')
-      .insert({
-        user_id: userId,
-        amount: amount,
-        transaction_type: transactionType,
-        reference_id: referenceId,
-        description: description || `${transactionType}からのポイント追加`
-      });
-      
-    if (transactionError) throw transactionError;
-    
-    return true;
-    
-  } catch (error) {
-    console.error('ポイント加算エラー:', error);
-    return false;
-  }
-};
-
-// いいねを送信する
+/**
+* いいねを送信する関数
+* @param userId - ユーザーID
+* @param targetUserId - いいね対象のユーザーID
+* @param isPremium - 送信者がプレミアム会員か
+* @returns 処理結果
+*/
 export const sendLike = async (
   userId: string,
   targetUserId: string,
   isPremium: boolean
-): Promise<{ success: boolean; isMatch: boolean; conversationId?: string; error?: string }> => {
+ ): Promise<SendLikeResult> => {
   try {
+    if (!userId || !targetUserId) {
+      return {
+        success: false,
+        isMatch: false,
+        error: 'ユーザーIDまたは対象ユーザーIDが指定されていません'
+      };
+    }
+ 
+    if (userId === targetUserId) {
+      return {
+        success: false,
+        isMatch: false,
+        error: '自分自身にいいねすることはできません'
+      };
+    }
+    
+    // 必要なテーブル存在チェック
+    const [userLikesExists, userMatchesExists, conversationsExists] = await Promise.all([
+      checkTableExists('user_likes'),
+      checkTableExists('user_matches'),
+      checkTableExists('conversations')
+    ]);
+    
+    // テーブルが存在しない場合は作成
+    if (!userLikesExists) {
+      const created = await createTableIfNotExists('user_likes');
+      if (!created) {
+        return {
+          success: false,
+          isMatch: false,
+          error: 'user_likesテーブルの作成に失敗しました'
+        };
+      }
+    }
+ 
+    if (!userMatchesExists) {
+      await createTableIfNotExists('user_matches');
+    }
+ 
+    if (!conversationsExists) {
+      await createTableIfNotExists('conversations');
+    }
+ 
     // 既にいいねしているか確認
     const { data: existingLike, error: checkError } = await supabase
       .from('user_likes')
       .select()
       .eq('user_id', userId)
+      .eq('user_id', userId)
       .eq('liked_user_id', targetUserId)
       .limit(1);
       
-    if (checkError) throw checkError;
-    
+    if (checkError) {
+      console.error('いいね確認エラー:', checkError);
+      return {
+        success: false,
+        isMatch: false,
+        error: 'いいね確認中にエラーが発生しました'
+      };
+    }
+      
     if (existingLike && existingLike.length > 0) {
       return {
         success: true,
         isMatch: false,
         error: '既にいいねしています'
       };
+    }
+    
+    // プレミアムでない場合はポイントを消費
+    if (!isPremium) {
+      // ポイント消費に十分なポイントがあるか確認
+      const hasPoints = await hasEnoughPoints(userId, 5);
+      if (!hasPoints) {
+        return {
+          success: false,
+          isMatch: false,
+          error: 'ポイントが不足しています'
+        };
+      }
     }
     
     // いいねを記録
@@ -530,10 +885,18 @@ export const sendLike = async (
         created_at: new Date().toISOString()
       });
       
-    if (error) throw error;
-    
+    if (error) {
+      console.error('いいね記録エラー:', error);
+      return {
+        success: false,
+        isMatch: false,
+        error: 'いいねの記録に失敗しました'
+      };
+    }
+      
     // プレミアムでない場合はポイントを消費
     if (!isPremium) {
+      // ポイントを消費
       const pointsConsumed = await consumePoints(userId, 5, 'like', targetUserId);
       if (!pointsConsumed) {
         // いいねの記録を削除（ロールバック）
@@ -546,11 +909,11 @@ export const sendLike = async (
         return {
           success: false,
           isMatch: false,
-          error: 'ポイントが不足しています'
+          error: 'ポイント消費に失敗しました'
         };
       }
     }
-    
+      
     // 相手からのいいねがあるか確認（マッチング判定）
     const { data: matchData, error: matchError } = await supabase
       .from('user_likes')
@@ -558,9 +921,16 @@ export const sendLike = async (
       .eq('user_id', targetUserId)
       .eq('liked_user_id', userId)
       .limit(1);
-      
-    if (matchError) throw matchError;
     
+    if (matchError) {
+      console.error('マッチング確認エラー:', matchError);
+      return {
+        success: true,
+        isMatch: false,
+        error: 'マッチング確認中にエラーが発生しました'
+      };
+    }
+ 
     // マッチングが成立した場合
     if (matchData && matchData.length > 0) {
       // マッチングテーブルに記録
@@ -572,19 +942,33 @@ export const sendLike = async (
           created_at: new Date().toISOString()
         });
         
-      if (matchInsertError) throw matchInsertError;
-      
+      if (matchInsertError) {
+        console.error('マッチング記録エラー:', matchInsertError);
+        return {
+          success: true,
+          isMatch: true,
+          error: 'マッチングの記録に失敗しました'
+        };
+      }
+          
       // 既存の会話を確認
       const { data: existingConv, error: existingConvError } = await supabase
         .from('conversations')
         .select('id')
         .or(`and(user1_id.eq.${userId},user2_id.eq.${targetUserId}),and(user1_id.eq.${targetUserId},user2_id.eq.${userId})`)
         .limit(1);
-        
-      if (existingConvError) throw existingConvError;
       
+      if (existingConvError && existingConvError.code !== '42P01') {
+        console.error('会話確認エラー:', existingConvError);
+        return {
+          success: true,
+          isMatch: true,
+          error: '会話確認中にエラーが発生しました'
+        };
+      }
+    
       let conversationId;
-      
+    
       if (existingConv && existingConv.length > 0) {
         // 既存の会話がある場合は再アクティブ化
         conversationId = existingConv[0].id;
@@ -610,68 +994,96 @@ export const sendLike = async (
           .select()
           .single();
           
-        if (convError) throw convError;
+        if (convError) {
+          console.error('会話作成エラー:', convError);
+          return {
+            success: true,
+            isMatch: true,
+            error: '会話の作成に失敗しました'
+          };
+        }
         conversationId = convData.id;
       }
+    
+      // 双方に通知を送信
+      try {
+        const matchScore = 85; // 本番環境でのマッチングスコア
+        
+        // 自分用のマッチング通知
+        await notificationService.createMatchingNotification(
+          targetUserId, // 相手のID
+          userId, // 自分のID
+          matchScore,
+          'match'
+        );
+        
+        // 相手用のマッチング通知
+        await notificationService.createMatchingNotification(
+          userId, // 自分のID
+          targetUserId, // 相手のID  
+          matchScore,
+          'match'
+        );
+      } catch (notificationError) {
+        console.error('マッチング通知エラー:', notificationError);
+        // 通知失敗してもマッチング自体は成功させる
+      }
       
-      // 通知を送信
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: targetUserId,
-          type: 'match',
-          title: 'マッチングが成立しました',
-          message: 'あなたと相手がお互いにいいねしました。メッセージを送ってみましょう！',
-          is_read: false,
-          created_at: new Date().toISOString(),
-          link: `/messages/${conversationId}`,
-          priority: 'high',
-          sender_id: userId,
-          notification_group: 'matching'
-        });
-        
-      // マッチしたことを通知する（ログイン報酬的な）ポイントを加算
-      await addPoints(userId, 2, 'match_bonus', targetUserId, 'マッチング成立ボーナス');
-      await addPoints(targetUserId, 2, 'match_bonus', userId, 'マッチング成立ボーナス');
-        
+      // マッチングボーナスポイントを加算
+      try {
+        // マッチング成立時のボーナスポイント付与 (両方のユーザーに)
+        await addPoints(userId, 2, 'match_bonus', targetUserId, 'マッチング成立ボーナス');
+        await addPoints(targetUserId, 2, 'match_bonus', userId, 'マッチング成立ボーナス');
+      } catch (pointsError) {
+        console.error('ポイント加算エラー:', pointsError);
+        // ポイントエラーは処理続行
+      }
+       
       return { 
         success: true, 
         isMatch: true, 
         conversationId: conversationId 
       };
-      
     } else {
       // マッチングが成立しなかった場合
-      // 通知を送信（プレミアムユーザーのみ受信可能）
-      const { data: targetUserData } = await supabase
-        .from('profiles')
-        .select('is_premium')
-        .eq('id', targetUserId)
-        .single();
+      // 相手がプレミアム会員の場合のみ通知を送信
+      try {
+        const { data: targetUserData, error: targetUserError } = await supabase
+          .from('profiles')
+          .select('is_premium, username')
+          .eq('id', targetUserId)
+          .single();
+ 
+        if (targetUserError) {
+          console.error('ユーザープロフィール取得エラー:', targetUserError);
+          return {
+            success: true,
+            isMatch: false,
+            error: 'ユーザープロフィール取得時にエラーが発生しました'
+          };
+        }
         
-      if (targetUserData?.is_premium) {
-        await supabase
-          .from('notifications')
-          .insert({
-            user_id: targetUserId,
-            type: 'like',
-            title: '新しいいいねがあります',
-            message: '誰かがあなたにいいねしました。プロフィールをチェックしてみましょう！',
-            is_read: false,
-            created_at: new Date().toISOString(),
-            link: '/matching',
-            priority: 'medium',
-            sender_id: userId,
-            notification_group: 'matching'
-          });
+        // プレミアム会員への通知送信
+        if (targetUserData?.is_premium) {
+          // いいね通知を送信
+          const matchScore = 75; // 本番環境でのスコア
+          await notificationService.createMatchingNotification(
+            userId, // 自分のID
+            targetUserId, // 相手のID
+            matchScore,
+            'like'
+          );
+        }
+      } catch (error) {
+        console.error('プレミアム確認エラー:', error);
+        // エラーは処理続行
       }
-      
+ 
       return { 
         success: true, 
         isMatch: false 
       };
     }
-    
   } catch (error) {
     console.error('いいね送信エラー:', error);
     return { 
@@ -680,11 +1092,35 @@ export const sendLike = async (
       error: error instanceof Error ? error.message : 'いいねの送信に失敗しました'
     };
   }
-};
-
-// ユーザーをスキップする
-export const skipUser = async (userId: string, targetUserId: string): Promise<boolean> => {
+ };
+ 
+ /**
+ * ユーザーをスキップする関数
+ * @param userId - ユーザーID
+ * @param targetUserId - スキップするユーザーID
+ * @returns 成功したかどうか
+ */
+ export const skipUser = async (userId: string, targetUserId: string): Promise<SkipResult> => {
   try {
+    if (!userId || !targetUserId) {
+      return { success: false, error: 'ユーザーIDまたはスキップ対象のユーザーIDが指定されていません' };
+    }
+ 
+    if (userId === targetUserId) {
+      return { success: false, error: '自分自身をスキップすることはできません' };
+    }
+    
+    // user_skipsテーブルが存在するか確認
+    const userSkipsExists = await checkTableExists('user_skips');
+    
+    if (!userSkipsExists) {
+      // テーブルが存在しない場合は作成を試みる
+      const created = await createTableIfNotExists('user_skips');
+      if (!created) {
+        return { success: false, error: 'user_skipsテーブルの作成に失敗しました' };
+      }
+    }
+ 
     // 既にスキップしているか確認
     const { data: existingSkip, error: checkError } = await supabase
       .from('user_skips')
@@ -692,13 +1128,16 @@ export const skipUser = async (userId: string, targetUserId: string): Promise<bo
       .eq('user_id', userId)
       .eq('skipped_user_id', targetUserId)
       .limit(1);
-      
-    if (checkError) throw checkError;
-    
-    if (existingSkip && existingSkip.length > 0) {
-      return true; // 既にスキップ済み
+ 
+    if (checkError) {
+      console.error('スキップ確認エラー:', checkError);
+      return { success: false, error: 'スキップ確認中にエラーが発生しました' };
     }
-    
+ 
+    if (existingSkip && existingSkip.length > 0) {
+      return { success: true }; // 既にスキップ済み
+    }
+ 
     const { error } = await supabase
       .from('user_skips')
       .insert({
@@ -706,39 +1145,88 @@ export const skipUser = async (userId: string, targetUserId: string): Promise<bo
         skipped_user_id: targetUserId,
         created_at: new Date().toISOString()
       });
-      
-    if (error) throw error;
-    
-    return true;
-    
+ 
+    if (error) {
+      console.error('スキップ登録エラー:', error);
+      return { success: false, error: 'スキップの登録に失敗しました' };
+    }
+ 
+    return { success: true };
+ 
   } catch (error) {
     console.error('スキップエラー:', error);
-    return false;
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'スキップ処理に失敗しました' 
+    };
   }
-};
-
-// スキップを取り消す
-export const undoSkip = async (userId: string, targetUserId: string): Promise<boolean> => {
+ };
+ 
+ /**
+ * スキップを取り消す関数
+ * @param userId - ユーザーID
+ * @param targetUserId - スキップを取り消すユーザーID
+ * @returns 成功したかどうか
+ */
+ export const undoSkip = async (userId: string, targetUserId: string): Promise<SkipResult> => {
   try {
+    if (!userId || !targetUserId) {
+      return { success: false, error: 'ユーザーIDまたはスキップ取り消し対象のユーザーIDが指定されていません' };
+    }
+    
+    // user_skipsテーブルが存在するか確認
+    const userSkipsExists = await checkTableExists('user_skips');
+    
+    if (!userSkipsExists) {
+      // テーブルが存在しない場合は作成
+      await createTableIfNotExists('user_skips');
+      return { success: true }; // テーブルが存在しない場合は既に削除されているとみなす
+    }
+ 
     const { error } = await supabase
       .from('user_skips')
       .delete()
       .eq('user_id', userId)
       .eq('skipped_user_id', targetUserId);
-      
-    if (error) throw error;
-    
-    return true;
-    
+ 
+    if (error) {
+      console.error('スキップ取り消しエラー:', error);
+      return { success: false, error: 'スキップの取り消しに失敗しました' };
+    }
+ 
+    return { success: true };
+ 
   } catch (error) {
     console.error('スキップ取り消しエラー:', error);
-    return false;
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'スキップ取り消し処理に失敗しました' 
+    };
   }
-};
-
-// スキップしたユーザーの一覧を取得する
-export const getSkippedUsers = async (userId: string, limit: number = 10): Promise<SkippedUser[]> => {
+ };
+ 
+ /**
+ * スキップしたユーザーの一覧を取得する関数
+ * @param userId - ユーザーID
+ * @param limit - 取得する最大数
+ * @returns スキップしたユーザーリスト
+ */
+ export const getSkippedUsers = async (userId: string, limit: number = 10): Promise<SkippedUser[]> => {
   try {
+    if (!userId) {
+      throw new Error('ユーザーIDが指定されていません');
+    }
+    
+    // user_skipsテーブルが存在するか確認
+    const userSkipsExists = await checkTableExists('user_skips');
+    
+    if (!userSkipsExists) {
+      // テーブルが存在しない場合は作成
+      await createTableIfNotExists('user_skips');
+      console.warn('user_skipsテーブルが存在しないため新規作成しました');
+      return [];
+    }
+ 
     // スキップしたユーザーIDを取得
     const { data: skipData, error: skipError } = await supabase
       .from('user_skips')
@@ -746,28 +1234,34 @@ export const getSkippedUsers = async (userId: string, limit: number = 10): Promi
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit);
-      
-    if (skipError) throw skipError;
-    
+ 
+    if (skipError) {
+      if (skipError.code === '42P01') { // テーブルが存在しない場合
+        console.warn('user_skipsテーブルが存在しません');
+        return [];
+      }
+      throw skipError;
+    }
+ 
     if (!skipData || skipData.length === 0) {
       return [];
     }
-    
+ 
     // スキップしたユーザーのIDリスト
     const skippedUserIds = skipData.map(skip => skip.skipped_user_id);
-    
+ 
     // ユーザープロフィールの取得
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('id, username, avatar_url, bio, interests, genre_preference, is_premium, gender, birth_date, location, online_status, last_active')
       .in('id', skippedUserIds);
-      
+ 
     if (profileError) throw profileError;
-    
+ 
     if (!profileData) {
       return [];
     }
-    
+ 
     // スキップ日時とプロフィール情報を結合
     const skippedUsers = profileData.map(profile => {
       const skipInfo = skipData.find(skip => skip.skipped_user_id === profile.id);
@@ -784,6 +1278,12 @@ export const getSkippedUsers = async (userId: string, limit: number = 10): Promi
         }
       }
       
+      // オンラインステータスの列挙型を使用
+      const onlineStatus = 
+        (profile.online_status && Object.values(OnlineStatus).includes(profile.online_status as OnlineStatus))
+          ? profile.online_status as OnlineStatus
+          : OnlineStatus.OFFLINE;
+      
       return {
         ...profile,
         age,
@@ -794,110 +1294,212 @@ export const getSkippedUsers = async (userId: string, limit: number = 10): Promi
         is_premium: profile.is_premium || false,
         gender: profile.gender || '',
         location: profile.location || null,
-        connection_status: 'none',
+        connection_status: ConnectionStatus.NONE,
+        online_status: onlineStatus
       } as SkippedUser;
     });
-    
+ 
     // スキップ日時の新しい順にソート
     return skippedUsers.sort((a, b) => {
       return new Date(b.skipped_at).getTime() - new Date(a.skipped_at).getTime();
     });
-    
+ 
   } catch (error) {
     console.error('スキップユーザー取得エラー:', error);
     return [];
   }
-};
-
-// 会話を取得する
-export const getConversation = async (
+ };
+ 
+ /**
+ * 会話を取得する関数
+ * @param conversationId - 会話ID
+ * @param userId - ユーザーID
+ * @returns 会話情報と相手ユーザー情報
+ */
+ export const getConversation = async (
   conversationId: string,
   userId: string
-): Promise<{ conversation: Conversation; otherUser: any } | null> => {
+ ): Promise<{ conversation: Conversation; otherUser: any } | null> => {
   try {
+    if (!conversationId || !userId) {
+      throw new Error('会話IDまたはユーザーIDが指定されていません');
+    }
+    
+    // conversationsテーブルが存在するか確認
+    const conversationsExists = await checkTableExists('conversations');
+    
+    if (!conversationsExists) {
+      // テーブルが存在しない場合は作成
+      await createTableIfNotExists('conversations');
+      console.warn('conversationsテーブルが存在しないため新規作成しました');
+      return null;
+    }
+ 
     const { data, error } = await supabase
       .from('conversations')
       .select('*')
       .eq('id', conversationId)
       .single();
-      
-    if (error) throw error;
-    
+ 
+    if (error) {
+      if (error.code === '42P01') { // テーブルが存在しない場合
+        console.warn('conversationsテーブルが存在しません');
+        return null;
+      }
+      throw error;
+    }
+ 
     if (!data) return null;
-    
+ 
     // 自分が参加していない会話の場合はnullを返す
     if (data.user1_id !== userId && data.user2_id !== userId) {
       return null;
     }
-    
+ 
     // 相手のユーザーIDを特定
     const otherUserId = data.user1_id === userId ? data.user2_id : data.user1_id;
-    
+ 
     // 相手のプロフィール情報を取得
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('id, username, avatar_url, is_premium, last_active, online_status')
       .eq('id', otherUserId)
       .single();
-      
+ 
     if (profileError) throw profileError;
-    
+ 
+    // オンラインステータスを列挙型に変換
+    const onlineStatus = 
+      (profileData.online_status && Object.values(OnlineStatus).includes(profileData.online_status as OnlineStatus))
+        ? profileData.online_status as OnlineStatus
+        : OnlineStatus.OFFLINE;
+ 
+    // プロフィールデータの更新
+    const updatedProfileData = {
+      ...profileData,
+      online_status: onlineStatus
+    };
+ 
     // 既読状態を更新
     const unreadField = data.user1_id === userId ? 'user1_unread_count' : 'user2_unread_count';
-    await supabase
+    const { error: updateError } = await supabase
       .from('conversations')
       .update({ [unreadField]: 0 })
       .eq('id', conversationId);
-      
-    // メッセージの既読状態を更新
-    await supabase
-      .from('messages')
-      .update({ is_read: true })
-      .eq('conversation_id', conversationId)
-      .eq('receiver_id', userId)
-      .eq('is_read', false);
-      
+ 
+    if (updateError) {
+      console.error('会話既読状態更新エラー:', updateError);
+    }
+    
+    // messagesテーブルが存在するか確認
+    const messagesExists = await checkTableExists('messages');
+    
+    if (messagesExists) {
+      // メッセージの既読状態を更新
+      const { error: messageUpdateError } = await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .eq('conversation_id', conversationId)
+        .eq('receiver_id', userId)
+        .eq('is_read', false);
+ 
+      if (messageUpdateError && messageUpdateError.code !== '42P01') {
+        console.error('メッセージ既読状態更新エラー:', messageUpdateError);
+      }
+    } else {
+      // テーブルが存在しない場合は作成
+      await createTableIfNotExists('messages');
+    }
+ 
     return {
       conversation: data as Conversation,
-      otherUser: profileData
+      otherUser: updatedProfileData
     };
-    
+ 
   } catch (error) {
     console.error('会話取得エラー:', error);
     return null;
   }
-};
-
-// メッセージを取得する
-export const getMessages = async (conversationId: string, limit: number = 50, offset: number = 0): Promise<Message[]> => {
+ };
+ 
+ /**
+ * メッセージを取得する関数
+ * @param conversationId - 会話ID
+ * @param limit - 取得する最大メッセージ数
+ * @param offset - 取得開始位置
+ * @returns メッセージリスト
+ */
+ export const getMessages = async (conversationId: string, limit: number = 50, offset: number = 0): Promise<Message[]> => {
   try {
+    if (!conversationId) {
+      throw new Error('会話IDが指定されていません');
+    }
+ 
+    if (limit <= 0) {
+      throw new Error('limit は0より大きい値を指定してください');
+    }
+ 
+    if (offset < 0) {
+      throw new Error('offset は0以上の値を指定してください');
+    }
+    
+    // messagesテーブルが存在するか確認
+    const messagesExists = await checkTableExists('messages');
+    
+    if (!messagesExists) {
+      // テーブルが存在しない場合は作成
+      await createTableIfNotExists('messages');
+      console.warn('messagesテーブルが存在しないため新規作成しました');
+      return [];
+    }
+ 
     const { data, error } = await supabase
       .from('messages')
       .select('*')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
-      
-    if (error) throw error;
-    
+ 
+    if (error) {
+      if (error.code === '42P01') { // テーブルが存在しない場合
+        console.warn('messagesテーブルが存在しません');
+        return [];
+      }
+      throw error;
+    }
+ 
     return (data || []).reverse() as Message[];
-    
+ 
   } catch (error) {
     console.error('メッセージ取得エラー:', error);
     return [];
   }
-};
-
-// メッセージを送信する
-export const sendMessage = async (
+ };
+ 
+ /**
+ * メッセージを送信する関数
+ * @param userId - 送信者ID
+ * @param receiverId - 受信者ID
+ * @param conversationId - 会話ID
+ * @param content - メッセージ内容
+ * @param isHighlighted - ハイライトメッセージかどうか
+ * @param isPremium - 送信者がプレミアム会員か
+ * @returns 処理結果
+ */
+ export const sendMessage = async (
   userId: string,
   receiverId: string,
   conversationId: string,
   content: string,
   isHighlighted: boolean = false,
   isPremium: boolean = false
-): Promise<{ success: boolean; message?: Message; error?: string }> => {
+ ): Promise<{ success: boolean; message?: Message; error?: string }> => {
   try {
+    // 入力バリデーション
+    if (!userId || !receiverId || !conversationId) {
+      throw new Error('必須パラメータが不足しています');
+    }
+ 
     // 内容が空でないか確認
     if (!content.trim()) {
       return {
@@ -905,13 +1507,13 @@ export const sendMessage = async (
         error: 'メッセージを入力してください'
       };
     }
-    
+ 
     // 不適切な内容のフィルタリング（簡易版）
     const inappropriateWords = ['バカ', '死ね', 'クソ', '殺す']; // 実際はもっと広範囲で詳細なフィルターが必要
     const containsInappropriate = inappropriateWords.some(word => 
       content.toLowerCase().includes(word.toLowerCase())
     );
-    
+ 
     if (containsInappropriate) {
       return {
         success: false,
@@ -919,19 +1521,49 @@ export const sendMessage = async (
       };
     }
     
+    // 必要なテーブルの存在確認と作成
+    const [messagesExists, conversationsExists] = await Promise.all([
+      checkTableExists('messages'),
+      checkTableExists('conversations')
+    ]);
+    
+    if (!messagesExists) {
+      const created = await createTableIfNotExists('messages');
+      if (!created) {
+        return {
+          success: false,
+          error: 'messagesテーブルの作成に失敗しました'
+        };
+      }
+    }
+ 
+    if (!conversationsExists) {
+      await createTableIfNotExists('conversations');
+    }
+ 
     // プレミアムでない場合はポイントを消費
     if (!isPremium) {
       const pointAmount = isHighlighted ? 10 : 1;
-      const pointsConsumed = await consumePoints(userId, pointAmount, 'message', conversationId);
       
-      if (!pointsConsumed) {
+      // ポイント残高を確認
+      const hasPoints = await hasEnoughPoints(userId, pointAmount);
+      if (!hasPoints) {
         return {
           success: false,
           error: 'ポイントが不足しています'
         };
       }
+      
+      // ポイントを消費
+      const pointsConsumed = await consumePoints(userId, pointAmount, 'message', receiverId);
+      if (!pointsConsumed) {
+        return {
+          success: false,
+          error: 'ポイント消費に失敗しました'
+        };
+      }
     }
-    
+ 
     // メッセージを挿入
     const { data, error } = await supabase
       .from('messages')
@@ -947,107 +1579,157 @@ export const sendMessage = async (
       })
       .select()
       .single();
-    
+ 
     if (error) throw error;
     
     // 会話の最終メッセージ時間とunread_countを更新
-    const { data: convData, error: convError } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('id', conversationId)
-      .single();
-    
-    if (convError) throw convError;
-    
-    const unreadField = convData.user1_id === userId ? 'user2_unread_count' : 'user1_unread_count';
-    await supabase
-      .from('conversations')
-      .update({ 
-        last_message_time: new Date().toISOString(),
-        [unreadField]: supabase.rpc('increment', { row_id: 1 }),
-        is_active: true  // 会話を常にアクティブに
-      })
-      .eq('id', conversationId);
-    
+    if (conversationsExists) {
+      const { data: convData, error: convError } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('id', conversationId)
+        .single();
+ 
+      if (!convError) {
+        const unreadField = convData.user1_id === userId ? 'user2_unread_count' : 'user1_unread_count';
+        const { error: updateError } = await supabase
+          .from('conversations')
+          .update({ 
+            last_message_time: new Date().toISOString(),
+            [unreadField]: supabase.rpc('increment', { row_id: 1 }),
+            is_active: true  // 会話を常にアクティブに
+          })
+          .eq('id', conversationId);
+ 
+        if (updateError) {
+          console.error('会話更新エラー:', updateError);
+        }
+      }
+    }
+ 
     // 相手のオンライン状態を確認
-    const { data: receiverData } = await supabase
+    const { data: receiverData, error: receiverError } = await supabase
       .from('profiles')
       .select('online_status, is_premium')
       .eq('id', receiverId)
       .single();
-    
-    // オフラインまたはオンライン状態が不明の場合は通知を送信
-    if (!receiverData || receiverData.online_status !== 'online') {
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: receiverId,
-          type: 'message',
-          title: 'メッセージが届きました',
-          message: `${content.substring(0, 30)}${content.length > 30 ? '...' : ''}`,
-          is_read: false,
-          created_at: new Date().toISOString(),
-          link: `/messages/${conversationId}`,
-          priority: isHighlighted ? 'high' : 'medium',
-          sender_id: userId,
-          notification_group: 'messages'
-        });
+ 
+    if (receiverError) {
+      console.error('受信者プロフィール取得エラー:', receiverError);
     }
-    
-    // メッセージ送信アクティビティでポイント付与 (プレミアム会員じゃない場合は5メッセージごとに1ポイント)
-    if (!isPremium) {
-      const { count } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('sender_id', userId);
-        
-      if (count && count % 5 === 0) {
-        await addPoints(userId, 1, 'message_activity', conversationId, 'メッセージ活動ボーナス');
+ 
+    // オフラインまたはオンライン状態が不明の場合は通知を送信
+    if (!receiverData || receiverData.online_status !== OnlineStatus.ONLINE) {
+      try {
+        const { error: notificationError } = await supabase
+         .from('notifications')
+         .insert({
+           user_id: receiverId,
+           type: 'message',
+           title: 'メッセージが届きました',
+           message: `${content.substring(0, 30)}${content.length > 30 ? '...' : ''}`,
+           is_read: false,
+           created_at: new Date().toISOString(),
+           link: `/messages/${conversationId}`,
+           priority: isHighlighted ? 'high' : 'medium',
+           sender_id: userId,
+           notification_group: 'messages'
+         });
+       
+       if (notificationError) {
+         console.error('通知送信エラー:', notificationError);
+       }
+     } catch (notifyError) {
+       console.error('通知作成中のエラー:', notifyError);
+       // 通知エラーは処理続行
+     }
+   }
+
+   // メッセージ送信アクティビティでポイント付与 (プレミアム会員じゃない場合は5メッセージごとに1ポイント)
+   if (!isPremium) {
+     try {
+       const { count, error: countError } = await supabase
+         .from('messages')
+         .select('*', { count: 'exact', head: true })
+         .eq('sender_id', userId);if (countError) {
+          console.error('メッセージ数取得エラー:', countError);
+        } else if (count && count % 5 === 0) {
+          // 5メッセージごとにボーナスポイント付与
+          await addPoints(userId, 1, 'message_activity', receiverId, 'メッセージ活動ボーナス');
+        }
+      } catch (pointsError) {
+        console.error('活動ポイント加算エラー:', pointsError);
+        // ポイントエラーは処理続行
       }
     }
-    
+ 
     return {
       success: true,
       message: data as Message
     };
-    
-  } catch (error) {
-    console.error('メッセージ送信エラー:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'メッセージの送信に失敗しました'
-    };
-  }
-};
-
-// 会話リストを取得する
-export const getConversations = async (userId: string, searchTerm?: string): Promise<any[]> => {
+   } catch (error) {
+     console.error('メッセージ送信エラー:', error);
+     return {
+       success: false,
+       error: error instanceof Error ? error.message : 'メッセージの送信に失敗しました'
+     };
+   }
+ };
+ 
+ /**
+ * 会話リストを取得する関数
+ * @param userId - ユーザーID
+ * @param searchTerm - 検索キーワード（オプション）
+ * @returns 会話リスト
+ */
+ export const getConversations = async (userId: string, searchTerm?: string): Promise<any[]> => {
   try {
+    if (!userId) {
+      throw new Error('ユーザーIDが指定されていません');
+    }
+    
+    // 必要なテーブルの存在確認
+    const [conversationsExists, messagesExists] = await Promise.all([
+      checkTableExists('conversations'),
+      checkTableExists('messages')
+    ]);
+    
+    if (!conversationsExists) {
+      // テーブルが存在しない場合は作成
+      await createTableIfNotExists('conversations');
+      console.warn('conversationsテーブルが存在しないため新規作成しました');
+      return [];
+    }
+    
+    if (!messagesExists) {
+      // テーブルが存在しない場合は作成
+      await createTableIfNotExists('messages');
+    }
+    
+    // 基本クエリ - 関連テーブルを外部結合せずに会話情報のみ取得
     let query = supabase
       .from('conversations')
-      .select(`
-        *,
-        last_message:messages(
-          content, 
-          created_at,
-          sender_id,
-          is_read
-        )
-      `)
+      .select('*')
       .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
       .eq('is_active', true)  // アクティブな会話のみ
       .order('last_message_time', { ascending: false });
     
     const { data, error } = await query;
     
-    if (error) throw error;
+    if (error) {
+      if (error.code === '42P01') { // テーブルが存在しない場合
+        console.warn('conversationsテーブルが存在しません');
+        return [];
+      }
+      throw error;
+    }
     
     if (!data || data.length === 0) {
       return [];
     }
     
     // 会話ごとに相手のユーザー情報を取得して結合
-    const conversationsWithProfiles = await Promise.all(data.map(async (conv) => {
+    const conversationsWithProfiles = await Promise.all(data.map(async (conv: any) => {
       const otherUserId = conv.user1_id === userId ? conv.user2_id : conv.user1_id;
       
       // 相手のプロフィール情報を取得
@@ -1056,30 +1738,39 @@ export const getConversations = async (userId: string, searchTerm?: string): Pro
         .select('id, username, avatar_url, is_premium, online_status, last_active')
         .eq('id', otherUserId)
         .single();
-        
+      
       if (profileError) {
         console.error('プロフィール取得エラー:', profileError);
         return null;
       }
       
+      // オンラインステータスを列挙型に変換
+      const onlineStatus = 
+        (profileData.online_status && Object.values(OnlineStatus).includes(profileData.online_status as OnlineStatus))
+          ? profileData.online_status as OnlineStatus
+          : OnlineStatus.OFFLINE;
+      
+      // プロフィールデータの更新
+      const updatedProfileData = {
+        ...profileData,
+        online_status: onlineStatus
+      };
+      
       // 検索条件に一致するか確認
-      if (searchTerm && profileData.username.toLowerCase().indexOf(searchTerm.toLowerCase()) === -1) {
+      if (searchTerm && updatedProfileData.username.toLowerCase().indexOf(searchTerm.toLowerCase()) === -1) {
         return null;
       }
       
-      // 最新のメッセージを取得
+      // 最新のメッセージを取得 - 会話ごとに個別にクエリ
       let lastMessage = null;
-      if (conv.last_message && conv.last_message.length > 0) {
-        lastMessage = conv.last_message[0];
-      } else {
-        // 外部結合で最新メッセージを取得できなかった場合は別途取得
+      if (messagesExists) {
         const { data: messageData, error: messageError } = await supabase
           .from('messages')
           .select('content, created_at, sender_id, is_read')
           .eq('conversation_id', conv.id)
           .order('created_at', { ascending: false })
           .limit(1);
-          
+        
         if (!messageError && messageData && messageData.length > 0) {
           lastMessage = messageData[0];
         }
@@ -1106,7 +1797,7 @@ export const getConversations = async (userId: string, searchTerm?: string): Pro
       
       return {
         ...conv,
-        otherUser: profileData,
+        otherUser: updatedProfileData,
         last_message: lastMessage,
         unread_count: unreadCount || 0
       };
@@ -1114,8 +1805,8 @@ export const getConversations = async (userId: string, searchTerm?: string): Pro
     
     // nullを除外し、最新のメッセージ順にソート
     return conversationsWithProfiles
-      .filter(conv => conv !== null)
-      .sort((a, b) => {
+      .filter((conv): conv is any => conv !== null)
+      .sort((a: any, b: any) => {
         const aTime = new Date(a.last_message_time).getTime();
         const bTime = new Date(b.last_message_time).getTime();
         return bTime - aTime;
@@ -1125,11 +1816,30 @@ export const getConversations = async (userId: string, searchTerm?: string): Pro
     console.error('会話リスト取得エラー:', error);
     return [];
   }
-};
-
-// 会話を非アクティブ化する（削除に相当）
-export const deactivateConversation = async (conversationId: string, userId: string): Promise<boolean> => {
+ };
+ 
+ /**
+ * 会話を非アクティブ化する関数（削除に相当）
+ * @param conversationId - 会話ID
+ * @param userId - ユーザーID
+ * @returns 成功したかどうか
+ */
+ export const deactivateConversation = async (conversationId: string, userId: string): Promise<boolean> => {
   try {
+    if (!conversationId || !userId) {
+      throw new Error('会話IDまたはユーザーIDが指定されていません');
+    }
+    
+    // conversationsテーブルが存在するか確認
+    const conversationsExists = await checkTableExists('conversations');
+    
+    if (!conversationsExists) {
+      // テーブルが存在しない場合は作成
+      await createTableIfNotExists('conversations');
+      console.warn('conversationsテーブルが存在しないため新規作成しました');
+      return false;
+    }
+    
     // 自分が参加者かどうか確認
     const { data, error } = await supabase
       .from('conversations')
@@ -1137,7 +1847,13 @@ export const deactivateConversation = async (conversationId: string, userId: str
       .eq('id', conversationId)
       .single();
     
-    if (error) throw error;
+    if (error) {
+      if (error.code === '42P01') { // テーブルが存在しない場合
+        console.warn('conversationsテーブルが存在しません');
+        return false;
+      }
+      throw error;
+    }
     
     if (!data || (data.user1_id !== userId && data.user2_id !== userId)) {
       throw new Error('この会話を削除する権限がありません');
@@ -1157,11 +1873,28 @@ export const deactivateConversation = async (conversationId: string, userId: str
     console.error('会話削除エラー:', error);
     return false;
   }
-};
-
-// マッチングプロフィールを取得する
-export const getMatchingProfile = async (userId: string, targetUserId: string): Promise<{ profile: any; commonInterests: string[]; commonVideos: any[] } | null> => {
+ };
+ 
+ /**
+ * マッチングプロフィールを取得する関数
+ * @param userId - ユーザーID
+ * @param targetUserId - 対象ユーザーID
+ * @returns プロフィール情報、共通の興味、共通の視聴動画
+ */
+ export const getMatchingProfile = async (userId: string, targetUserId: string): Promise<{ profile: any; commonInterests: string[]; commonVideos: VideoDetails[] } | null> => {
   try {
+    if (!userId || !targetUserId) {
+      throw new Error('ユーザーIDまたは対象ユーザーIDが指定されていません');
+    }
+    
+    // profilesテーブルが存在するか確認
+    const profilesExists = await checkTableExists('profiles');
+    
+    if (!profilesExists) {
+      console.error('profilesテーブルが存在しません');
+      return null;
+    }
+    
     // 自分のプロフィール情報を取得
     const { data: userData, error: userError } = await supabase
       .from('profiles')
@@ -1169,7 +1902,13 @@ export const getMatchingProfile = async (userId: string, targetUserId: string): 
       .eq('id', userId)
       .single();
     
-    if (userError) throw userError;
+    if (userError) {
+      if (userError.code === '42P01') { // テーブルが存在しない場合
+        console.error('profilesテーブルが存在しません');
+        return null;
+      }
+      throw userError;
+    }
     
     // 相手のプロフィール情報を取得
     const { data: targetUserData, error: targetUserError } = await supabase
@@ -1191,15 +1930,44 @@ export const getMatchingProfile = async (userId: string, targetUserId: string): 
       .eq('id', targetUserId)
       .single();
     
-    if (targetUserError) throw targetUserError;
+    if (targetUserError) {
+      if (targetUserError.code === '42P01') { // テーブルが存在しない場合
+        console.error('profilesテーブルが存在しません');
+        return null;
+      }
+      throw targetUserError;
+    }
     
     if (!targetUserData) return null;
     
-    // 自分の視聴履歴を取得
-    const userWatchHistory = await getUserWatchHistory(userId, 50);
+    // user_pointsテーブルが存在するか確認
+    const userPointsExists = await checkTableExists('user_points');
     
-    // 相手の視聴履歴を取得
-    const targetUserWatchHistory = await getUserWatchHistory(targetUserId, 50);
+    if (userPointsExists) {
+      // プレミアムユーザーでない場合はポイントを消費
+      if (!userData?.is_premium) {
+        // ポイント消費に十分なポイントがあるか確認
+        const hasPoints = await hasEnoughPoints(userId, 5);
+        if (!hasPoints) {
+          throw new Error('ポイントが不足しています');
+        }
+        
+        // ポイントを消費
+        const pointsConsumed = await consumePoints(userId, 5, 'profile_view', targetUserId);
+        if (!pointsConsumed) {
+          throw new Error('ポイント消費に失敗しました');
+        }
+      }
+    } else {
+      // テーブルが存在しない場合は作成
+      await createTableIfNotExists('user_points');
+    }
+    
+    // 自分と相手の視聴履歴を並列に取得
+    const [userWatchHistory, targetUserWatchHistory] = await Promise.all([
+      getUserWatchHistory(userId, 50),
+      getUserWatchHistory(targetUserId, 50)
+    ]);
     
     // 共通の興味を計算
     const userInterests = userData?.interests || [];
@@ -1209,7 +1977,7 @@ export const getMatchingProfile = async (userId: string, targetUserId: string): 
     );
     
     // 共通の視聴動画を計算
-    const commonVideos = userWatchHistory.filter(video => 
+    const commonVideoIds = userWatchHistory.filter(video => 
       targetUserWatchHistory.includes(video)
     );
     
@@ -1230,8 +1998,10 @@ export const getMatchingProfile = async (userId: string, targetUserId: string): 
     const targetUserGenres = targetUserData.genre_preference || [];
     
     // 活動レベルを取得
-    const userActivityLevel = await calculateActivityLevel(userId);
-    const targetUserActivityLevel = await calculateActivityLevel(targetUserId);
+    const [userActivityLevel, targetUserActivityLevel] = await Promise.all([
+      calculateActivityLevel(userId),
+      calculateActivityLevel(targetUserId)
+    ]);
     
     const score = calculateMatchingScore(
       userInterests,
@@ -1246,15 +2016,22 @@ export const getMatchingProfile = async (userId: string, targetUserId: string): 
       targetUserData.is_premium
     );
     
+    // オンラインステータスを列挙型に変換
+    const onlineStatus = 
+      (targetUserData.online_status && Object.values(OnlineStatus).includes(targetUserData.online_status as OnlineStatus))
+        ? targetUserData.online_status as OnlineStatus
+        : OnlineStatus.OFFLINE;
+    
     // 共通の視聴動画の詳細情報を取得
-    const commonVideoDetails = await getVideoDetailsByIds(commonVideos.slice(0, 5));
+    const commonVideoDetails = await getVideoDetailsByIds(commonVideoIds.slice(0, 5));
     
     return {
       profile: {
         ...targetUserData,
         age,
         matching_score: score,
-        activity_level: targetUserActivityLevel
+        activity_level: targetUserActivityLevel,
+        online_status: onlineStatus
       },
       commonInterests,
       commonVideos: commonVideoDetails
@@ -1264,27 +2041,52 @@ export const getMatchingProfile = async (userId: string, targetUserId: string): 
     console.error('マッチングプロフィール取得エラー:', error);
     return null;
   }
-};
-
-// 動画IDから詳細情報を取得
-export const getVideoDetailsByIds = async (videoIds: string[]): Promise<any[]> => {
+ };
+ 
+ /**
+ * 動画IDから詳細情報を取得する関数
+ * @param videoIds - 動画IDの配列
+ * @returns 動画詳細情報の配列
+ */
+ export const getVideoDetailsByIds = async (videoIds: string[]): Promise<VideoDetails[]> => {
   if (!videoIds.length) return [];
   
   try {
+    // videosテーブルが存在するか確認
+    const videosExists = await checkTableExists('videos');
+    
+    if (!videosExists) {
+      // テーブルが存在しない場合は作成
+      await createTableIfNotExists('videos');
+      console.warn('videosテーブルが存在しないため新規作成しました');
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from('videos')
-      .select('id, youtube_id, title, thumbnail_url, channel_title')
+      .select('id, youtube_id, title, thumbnail, channel_title')
       .in('id', videoIds)
       .limit(10);
     
-    if (error) throw error;
+    if (error) {
+      if (error.code === '42P01') { // テーブルが存在しない場合
+        console.warn('videosテーブルが存在しません');
+        return [];
+      }
+      console.error('動画詳細取得エラー:', error);
+      throw error;
+    }
+    
+    if (!data || data.length === 0) {
+      return [];
+    }
     
     // チャンネル名のフォールバック
-    return (data || []).map(video => ({
+    return data.map(video => ({
       id: video.id,
       youtube_id: video.youtube_id,
-      title: video.title,
-      thumbnail_url: video.thumbnail_url,
+      title: video.title || 'タイトルなし',
+      thumbnail_url: video.thumbnail || `https://i.ytimg.com/vi/${video.youtube_id}/hqdefault.jpg`,
       channel_name: video.channel_title || 'チャンネル名不明'
     })) as VideoDetails[];
     
@@ -1292,16 +2094,35 @@ export const getVideoDetailsByIds = async (videoIds: string[]): Promise<any[]> =
     console.error('動画詳細取得エラー:', error);
     return [];
   }
-};
-
-// 共通の視聴動画を取得する（追加機能）
-export const getCommonVideos = async (userId: string, targetUserId: string): Promise<VideoDetails[]> => {
+ };
+ 
+ /**
+ * 共通の視聴動画を取得する関数
+ * @param userId - ユーザーID
+ * @param targetUserId - 対象ユーザーID
+ * @returns 共通の視聴動画リスト
+ */
+ export const getCommonVideos = async (userId: string, targetUserId: string): Promise<VideoDetails[]> => {
   try {
-    // 自分の視聴履歴を取得
-    const userWatchHistory = await getUserWatchHistory(userId, 100);
+    if (!userId || !targetUserId) {
+      throw new Error('ユーザーIDまたは対象ユーザーIDが指定されていません');
+    }
     
-    // 相手の視聴履歴を取得
-    const targetUserWatchHistory = await getUserWatchHistory(targetUserId, 100);
+    // view_historyテーブルが存在するか確認
+    const viewHistoryExists = await checkTableExists('view_history');
+    
+    if (!viewHistoryExists) {
+      // テーブルが存在しない場合は作成
+      await createTableIfNotExists('view_history');
+      console.warn('view_historyテーブルが存在しないため新規作成しました');
+      return [];
+    }
+    
+    // 自分と相手の視聴履歴を並列に取得
+    const [userWatchHistory, targetUserWatchHistory] = await Promise.all([
+      getUserWatchHistory(userId, 100),
+      getUserWatchHistory(targetUserId, 100)
+    ]);
     
     // 共通の視聴動画IDを見つける
     const commonVideoIds = userWatchHistory.filter(videoId => 
@@ -1313,49 +2134,139 @@ export const getCommonVideos = async (userId: string, targetUserId: string): Pro
     }
     
     // 共通の視聴動画の詳細情報を取得
-    const { data, error } = await supabase
-      .from('videos')
-      .select('id, youtube_id, title, thumbnail_url, channel_title')
-      .in('id', commonVideoIds)
-      .limit(20);
-
-    if (error) throw error;
-
-    // チャンネル名のフォールバック
-    return (data || []).map(video => ({
-      id: video.id,
-      youtube_id: video.youtube_id,
-      title: video.title,
-      thumbnail_url: video.thumbnail_url,
-      channel_name: video.channel_title || 'チャンネル名不明'
-    })) as VideoDetails[];
+    return await getVideoDetailsByIds(commonVideoIds);
     
   } catch (error) {
     console.error('共通視聴動画取得エラー:', error);
     return [];
   }
-};
-
-// マッチング設定を保存
-export const saveMatchingPreferences = async (
+ };
+ 
+ /**
+ * マッチング設定を保存する関数
+ * @param userId - ユーザーID
+ * @param preferences - マッチング設定
+ * @param isPremium - プレミアムユーザーかどうか
+ * @returns 成功したかどうか
+ */
+ export const saveMatchingPreferences = async (
   userId: string, 
-  preferences: MatchingPreferences
-): Promise<boolean> => {
+  preferences: MatchingPreferences,
+  isPremium: boolean = false
+ ): Promise<boolean> => {
   try {
+    if (!userId) {
+      throw new Error('ユーザーIDが指定されていません');
+    }
+    
+    if (!preferences) {
+      throw new Error('マッチング設定が指定されていません');
+    }
+    
+    // 必要なテーブルの存在確認
+    const [userMatchingPreferencesExists, userPointsExists, userFilterUsageExists] = await Promise.all([
+      checkTableExists('user_matching_preferences'),
+      checkTableExists('user_points'),
+      checkTableExists('user_filter_usage')
+    ]);
+    
+    if (!userMatchingPreferencesExists) {
+      // テーブルが存在しない場合は作成
+      const created = await createTableIfNotExists('user_matching_preferences');
+      if (!created) {
+        console.error('user_matching_preferencesテーブルの作成に失敗しました');
+        return false;
+      }
+    }
+    
+    // パラメータのバリデーション
+    if (preferences.age_range_min && (preferences.age_range_min < 18 || preferences.age_range_min > 99)) {
+      throw new Error('最小年齢は18〜99の間で指定してください');
+    }
+    
+    if (preferences.age_range_max && (preferences.age_range_max < 18 || preferences.age_range_max > 99)) {
+      throw new Error('最大年齢は18〜99の間で指定してください');
+    }
+    
+    if (preferences.age_range_min && preferences.age_range_max && preferences.age_range_min > preferences.age_range_max) {
+      throw new Error('最小年齢は最大年齢以下である必要があります');
+    }
+    
+    // 詳細フィルター設定の使用条件チェック
+    const isUsingDetailedFilters = 
+      preferences.online_only || 
+      preferences.premium_only || 
+      preferences.has_video_history || 
+      preferences.recent_activity || 
+      (preferences.min_common_interests !== undefined && preferences.min_common_interests > 0) || 
+      (preferences.max_distance !== undefined && preferences.max_distance > 0);
+    
+    // プレミアムでない場合は詳細設定を使用時のみポイントを消費
+    if (!isPremium && isUsingDetailedFilters) {
+      if (!userPointsExists) {
+        // テーブルが存在しない場合は作成
+        await createTableIfNotExists('user_points');
+      } else {
+        // ポイント消費に十分なポイントがあるか確認
+        const hasPoints = await hasEnoughPoints(userId, 3);
+        if (!hasPoints) {
+          return false;
+        }
+        
+        // ポイントを消費
+        const pointsConsumed = await consumePoints(userId, 3, 'filter_usage', undefined);
+        if (!pointsConsumed) {
+          return false;
+        }
+      }
+      
+      // フィルター使用記録を残す
+      if (!userFilterUsageExists) {
+        // テーブルが存在しない場合は作成
+        await createTableIfNotExists('user_filter_usage');
+      }
+      
+      try {
+        await supabase
+          .from('user_filter_usage')
+          .insert({
+            user_id: userId,
+            points_used: 3,
+            applied_at: new Date().toISOString(),
+            filter_settings: preferences
+          });
+      } catch (filterError) {
+        console.error('フィルター使用記録エラー:', filterError);
+        // 処理は続行
+      }
+    }
+    
     // location_preferenceがnullの場合は空オブジェクトを設定
-    const locationPreference = preferences.location_preference || { prefecture: undefined, region: undefined };
+    const locationPreference: LocationPreference = preferences.location_preference || { 
+      prefecture: undefined,
+      region: undefined 
+    };
+    
+    // GenderPreferenceの列挙型を使用
+    const genderPref = preferences.gender_preference || GenderPreference.ANY;
+    
+    // ActivityLevelの列挙型を使用
+    const activityLevel = 
+      (preferences.activity_level && Object.values(ActivityLevel).includes(preferences.activity_level as ActivityLevel))
+        ? preferences.activity_level
+        : ActivityLevel.MODERATE;
     
     const { error } = await supabase
       .from('user_matching_preferences')
       .upsert({
         user_id: userId,
-        gender_preference: preferences.gender_preference,
-        age_range_min: preferences.age_range_min,
-        age_range_max: preferences.age_range_max,
+        gender_preference: genderPref,
+        age_range_min: preferences.age_range_min || 18,
+        age_range_max: preferences.age_range_max || 99,
         location_preference: locationPreference,
-        interest_tags: preferences.interest_tags,
-        genre_preference: preferences.genre_preference,
-        activity_level: preferences.activity_level,
+        interest_tags: preferences.interest_tags || [],
+        genre_preference: preferences.genre_preference || [],
+        activity_level: activityLevel,
         online_only: preferences.online_only || false,
         premium_only: preferences.premium_only || false,
         has_video_history: preferences.has_video_history || false,
@@ -1366,7 +2277,10 @@ export const saveMatchingPreferences = async (
         updated_at: new Date().toISOString()
       });
     
-    if (error) throw error;
+    if (error) {
+      console.error('マッチング設定保存エラー:', error);
+      throw error;
+    }
     
     return true;
     
@@ -1374,234 +2288,530 @@ export const saveMatchingPreferences = async (
     console.error('マッチング設定保存エラー:', error);
     return false;
   }
-};
-
-// マッチング設定を取得
-export const getMatchingPreferences = async (userId: string): Promise<MatchingPreferences> => {
+ };
+ 
+ /**
+ * マッチング設定を取得する関数
+ * @param userId - ユーザーID
+ * @returns マッチング設定
+ */
+ export const getMatchingPreferences = async (userId: string): Promise<MatchingPreferences> => {
   try {
+    if (!userId) {
+      throw new Error('ユーザーIDが指定されていません');
+    }
+    
+    // user_matching_preferencesテーブルが存在するか確認
+    const userMatchingPreferencesExists = await checkTableExists('user_matching_preferences');
+    
+    if (!userMatchingPreferencesExists) {
+      // テーブルが存在しない場合は作成
+      const created = await createTableIfNotExists('user_matching_preferences');
+      if (!created) {
+        console.error('user_matching_preferencesテーブルの作成に失敗しました');
+        // デフォルト値を返す
+        return getDefaultMatchingPreferences();
+      }
+    }
+    
+    // .single()を使わずに、limitで1件だけ取得するように修正
     const { data, error } = await supabase
       .from('user_matching_preferences')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .limit(1);
     
     if (error) {
-      if (error.code === 'PGRST116') {
-        // レコードが存在しない場合はデフォルト値を返す
-        return {
-          gender_preference: 'any',
-          age_range_min: 18,
-          age_range_max: 99,
-          location_preference: { prefecture: undefined, region: undefined },
-          interest_tags: [],
-          genre_preference: [],
-          activity_level: 'moderate',
-          online_only: false,
-          premium_only: false,
-          has_video_history: false,
-          recent_activity: false,
-          filter_skipped: true,
-          min_common_interests: 0,
-          max_distance: 0
-        };
-      } else {
-        throw error;
+      if (error.code === '42P01') { // テーブルが存在しない場合
+        console.warn('user_matching_preferencesテーブルが存在しません');
+        return getDefaultMatchingPreferences();
       }
-    }
-    
-    // location_preferenceがnullの場合は空オブジェクトを設定
-    const locationPreference = data.location_preference || { prefecture: undefined, region: undefined };
-    
-    return {
-      ...data,
-      location_preference: locationPreference,
-      online_only: data.online_only || false,
-      premium_only: data.premium_only || false,
-      has_video_history: data.has_video_history || false,
-      recent_activity: data.recent_activity || false,
-      filter_skipped: data.filter_skipped !== undefined ? data.filter_skipped : true
-    } as MatchingPreferences;
-    
-  } catch (error) {
-    console.error('マッチング設定取得エラー:', error);
-    // デフォルト値を返す
-    return {
-      gender_preference: 'any',
-      age_range_min: 18,
-      age_range_max: 99,
-      location_preference: { prefecture: undefined, region: undefined },
-      interest_tags: [],
-      genre_preference: [],
-      activity_level: 'moderate',
-      online_only: false,
-      premium_only: false,
-      has_video_history: false,
-      recent_activity: false,
-      filter_skipped: true,
-      min_common_interests: 0,
-      max_distance: 0
-    };
- 
-  }
-};
-// ユーザーの視聴傾向を取得する関数
-export const getViewingTrends = async (userId: string): Promise<Record<string, number>> => {
-  try {
-    // 過去90日間の視聴履歴を取得
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-    
-    const { data, error } = await supabase
-      .from('view_history')
-      .select('video_id')
-      .eq('user_id', userId)
-      .gte('viewed_at', ninetyDaysAgo.toISOString());
-      
-    if (error) throw error;
-    
-    if (!data || data.length === 0) {
-      return {};
-    }
-    
-    // 視聴したビデオIDを取得
-    const videoIds = data.map(item => item.video_id);
-    
-    // ビデオのジャンル情報を取得
-    const { data: videoData, error: videoError } = await supabase
-      .from('videos')
-      .select('id, genres')
-      .in('id', videoIds);
-      
-    if (videoError) throw videoError;
-    
-    // ジャンルごとの視聴回数をカウント
-    const genreCounts: Record<string, number> = {};
-    
-    videoData?.forEach(video => {
-      if (video.genres && Array.isArray(video.genres)) {
-        video.genres.forEach((genre: string) => {
-          if (genreCounts[genre]) {
-            genreCounts[genre]++;
-          } else {
-            genreCounts[genre] = 1;
-          }
-        });
-      }
-    });
-    
-    // 総視聴数を計算
-    const totalCount = Object.values(genreCounts).reduce((sum, count) => sum + count, 0);
-    
-    // パーセンテージに変換
-    const trendPercentages: Record<string, number> = {};
-    
-    if (totalCount > 0) {
-      Object.keys(genreCounts).forEach(genre => {
-        trendPercentages[genre] = Math.round((genreCounts[genre] / totalCount) * 100);
-      });
-    }
-    
-    // 値が大きい順にソートして上位8つのジャンルのみ返す
-    const sortedGenres = Object.entries(trendPercentages)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
-      .reduce((obj, [key, value]) => {
-        obj[key] = value;
-        return obj;
-      }, {} as Record<string, number>);
-    
-    return sortedGenres;
-    
-  } catch (error) {
-    console.error('視聴傾向取得エラー:', error);
-    return {};
-  }
-};
-
-// 共通の友達を取得する関数
-export const getCommonFriends = async (userId: string, targetUserId: string): Promise<any[]> => {
-  try {
-    // 自分のフォロー/フレンド一覧を取得
-    const { data: userFriends, error: userFriendsError } = await supabase
-      .from('user_connections')
-      .select('connected_user_id')
-      .eq('user_id', userId)
-      .eq('status', 'connected');
-      
-    if (userFriendsError) throw userFriendsError;
-    
-    // 相手のフォロー/フレンド一覧を取得
-    const { data: targetFriends, error: targetFriendsError } = await supabase
-      .from('user_connections')
-      .select('connected_user_id')
-      .eq('user_id', targetUserId)
-      .eq('status', 'connected');
-      
-    if (targetFriendsError) throw targetFriendsError;
-    
-    // 友達のIDのみを抽出
-    const userFriendIds = userFriends?.map(f => f.connected_user_id) || [];
-    const targetFriendIds = targetFriends?.map(f => f.connected_user_id) || [];
-    
-    // 共通の友達を抽出
-    const commonFriendIds = userFriendIds.filter(id => targetFriendIds.includes(id));
-    
-    if (commonFriendIds.length === 0) {
-      return [];
-    }
-    
-    // 共通の友達のプロフィール情報を取得
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url')
-      .in('id', commonFriendIds);
-      
-    if (profileError) throw profileError;
-    
-    return profileData || [];
-    
-  } catch (error) {
-    console.error('共通の友達取得エラー:', error);
-    return [];
-  }
-};
-
-// YouTubeチャンネル情報を取得する関数
-export const getYouTubeChannelData = async (userId: string): Promise<{ channel_url?: string } | null> => {
-  try {
-    // ユーザーのYouTuberプロファイルを取得
-    const { data, error } = await supabase
-      .from('youtuber_profiles')
-      .select('channel_url, channel_id')
-      .eq('user_id', userId)
-      .single();
-      
-    if (error) {
-      // ユーザーがYouTuberとして登録されていなくてもエラーとして扱わない
-      if (error.code === 'PGRST116') {
-        return { channel_url: undefined };
-      }
+      console.error('マッチング設定取得エラー:', error);
       throw error;
     }
     
-    if (!data) {
-      return { channel_url: undefined };
+    // データが見つからない場合はデフォルト値を返す
+    if (!data || data.length === 0) {
+      return getDefaultMatchingPreferences();
     }
     
-    // チャンネルURLが存在する場合はそのまま返す
-    if (data.channel_url) {
-      return { channel_url: data.channel_url };
-    }
+    // 配列の最初の要素を使用
+    const preferences = data[0];
     
-    // チャンネルIDがある場合はURLを構築
-    if (data.channel_id) {
-      return { channel_url: `https://www.youtube.com/channel/${data.channel_id}` };
-    }
+    // location_preferenceがnullの場合は空オブジェクトを設定
+    const locationPreference: LocationPreference = preferences.location_preference || { 
+      prefecture: undefined,
+      region: undefined 
+    };
     
-    return { channel_url: undefined };
+    // GenderPreferenceの列挙型を使用
+    const genderPref = 
+      (preferences.gender_preference && Object.values(GenderPreference).includes(preferences.gender_preference as GenderPreference))
+        ? preferences.gender_preference as GenderPreference
+        : GenderPreference.ANY;
     
+    // ActivityLevelの列挙型を使用
+    const activityLevel = 
+      (preferences.activity_level && Object.values(ActivityLevel).includes(preferences.activity_level as ActivityLevel))
+        ? preferences.activity_level as ActivityLevel
+        : ActivityLevel.MODERATE;
+    
+    return {
+      ...preferences,
+      gender_preference: genderPref,
+      activity_level: activityLevel,
+      location_preference: locationPreference,
+      online_only: preferences.online_only || false,
+      premium_only: preferences.premium_only || false,
+      has_video_history: preferences.has_video_history || false,
+      recent_activity: preferences.recent_activity || false,
+      filter_skipped: preferences.filter_skipped !== undefined ? preferences.filter_skipped : true,
+      interest_tags: preferences.interest_tags || [],
+      genre_preference: preferences.genre_preference || [],
+      min_common_interests: preferences.min_common_interests || 0,
+      max_distance: preferences.max_distance || 0
+    } as MatchingPreferences;
   } catch (error) {
-    console.error('YouTubeチャンネル情報取得エラー:', error);
-    return null;
+    console.error('マッチング設定取得エラー:', error);
+    // デフォルト値を返す
+    return getDefaultMatchingPreferences();
   }
-};
+ };
+ 
+ /**
+ * デフォルトのマッチング設定を取得する関数
+ * @returns デフォルトのマッチング設定
+ */
+ export const getDefaultMatchingPreferences = (): MatchingPreferences => {
+  return {
+    gender_preference: GenderPreference.ANY,
+    age_range_min: 18,
+    age_range_max: 99,
+    location_preference: { prefecture: undefined, region: undefined },
+    interest_tags: [],
+    genre_preference: [],
+    activity_level: ActivityLevel.MODERATE,
+    online_only: false,
+    premium_only: false,
+    has_video_history: false,
+    recent_activity: false,
+    filter_skipped: true,
+    min_common_interests: 0,
+    max_distance: 0
+  };
+ };
+ 
+ /**
+ * ユーザーの視聴傾向を取得する関数
+ * @param userId - ユーザーID
+ * @returns ジャンルごとの視聴割合
+ */
+ export const getViewingTrends = async (userId: string): Promise<Record<string, number>> => {
+   try {
+     if (!userId) {
+       throw new Error('ユーザーIDが指定されていません');
+     }
+     
+     // 必要なテーブルの存在確認
+     const [viewHistoryExists, videosExists] = await Promise.all([
+       checkTableExists('view_history'), 
+       checkTableExists('videos')
+     ]);
+     
+     if (!viewHistoryExists || !videosExists) {
+       // 不足しているテーブルの作成
+       const createPromises = [];
+       if (!viewHistoryExists) createPromises.push(createTableIfNotExists('view_history'));
+       if (!videosExists) createPromises.push(createTableIfNotExists('videos'));
+       
+       await Promise.all(createPromises);
+       console.warn('view_historyテーブルまたはvideosテーブルが存在しないため新規作成しました');
+       return {};
+     }
+     
+     // 過去90日間の視聴履歴を取得
+     const ninetyDaysAgo = new Date();
+     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+     
+     const { data, error } = await supabase
+       .from('view_history')
+       .select('video_id')
+       .eq('user_id', userId)
+       .gte('viewed_at', ninetyDaysAgo.toISOString());
+    
+       if (error) {
+         if (error.code === '42P01') { // テーブルが存在しない場合
+           console.warn('view_historyテーブルが存在しません');
+           return {};
+         }
+         throw error;
+       }
+       
+       if (!data || data.length === 0) {
+         return {};
+       }
+       
+       // 視聴したビデオIDを取得
+       const videoIds = data.map(item => item.video_id);
+       
+       // ビデオのジャンル情報を取得
+       const { data: videoData, error: videoError } = await supabase
+         .from('videos')
+         .select('id, genre_id')
+         .in('id', videoIds);
+       
+       if (videoError) {
+         if (videoError.code === '42P01') { // テーブルが存在しない場合
+           console.warn('videosテーブルが存在しません');
+           return {};
+         }
+         throw videoError;
+       }
+       
+       // ジャンルごとの視聴回数をカウント
+       const genreCounts: Record<string, number> = {};
+       
+       videoData?.forEach(video => {
+         if (video.genre_id) {
+           if (genreCounts[video.genre_id]) {
+             genreCounts[video.genre_id]++;
+           } else {
+             genreCounts[video.genre_id] = 1;
+           }
+         }
+       });
+       
+       // 総視聴数を計算
+       const totalCount = Object.values(genreCounts).reduce((sum, count) => sum + count, 0);
+       
+       // パーセンテージに変換
+       const trendPercentages: Record<string, number> = {};
+       
+       if (totalCount > 0) {
+         Object.keys(genreCounts).forEach(genre => {
+           trendPercentages[genre] = Math.round((genreCounts[genre] / totalCount) * 100);
+         });
+       }
+       
+       // 値が大きい順にソートして上位8つのジャンルのみ返す
+       const sortedGenres = Object.entries(trendPercentages)
+         .sort((a, b) => b[1] - a[1])
+         .slice(0, 8)
+         .reduce((obj, [key, value]) => {
+           obj[key] = value;
+           return obj;
+         }, {} as Record<string, number>);
+       
+       return sortedGenres;
+       
+     } catch (error) {
+       console.error('視聴傾向取得エラー:', error);
+       return {};
+     }
+    };
+    
+    /**
+    * 共通の友達を取得する関数
+    * @param userId - ユーザーID
+    * @param targetUserId - 対象ユーザーID
+    * @returns 共通の友達リスト
+    */
+    export const getCommonFriends = async (userId: string, targetUserId: string): Promise<any[]> => {
+     try {
+       if (!userId || !targetUserId) {
+         throw new Error('ユーザーIDまたは対象ユーザーIDが指定されていません');
+       }
+       
+       // connectionsテーブルが存在するか確認
+       const connectionsExists = await checkTableExists('connections');
+       
+       if (!connectionsExists) {
+         // テーブルが存在しない場合は作成
+         await createTableIfNotExists('connections');
+         console.warn('connectionsテーブルが存在しないため新規作成しました');
+         return [];
+       }
+       
+       // 自分のフォロー/フレンド一覧と相手のフォロー/フレンド一覧を並列に取得
+       const [userFriendsResult, targetFriendsResult] = await Promise.all([
+         supabase
+           .from('connections')
+           .select('connected_user_id')
+           .eq('user_id', userId)
+           .eq('status', ConnectionStatus.CONNECTED),
+         supabase
+           .from('connections')
+           .select('connected_user_id')
+           .eq('user_id', targetUserId)
+           .eq('status', ConnectionStatus.CONNECTED)
+       ]);
+       
+       // エラーチェック
+       if (userFriendsResult.error) {
+         if (userFriendsResult.error.code === '42P01') { // テーブルが存在しない場合
+           console.warn('connectionsテーブルが存在しません');
+           return [];
+         }
+         throw userFriendsResult.error;
+       }
+       
+       if (targetFriendsResult.error) {
+         if (targetFriendsResult.error.code === '42P01') { // テーブルが存在しない場合
+           console.warn('connectionsテーブルが存在しません');
+           return [];
+         }
+         throw targetFriendsResult.error;
+       }
+       
+       // 友達のIDのみを抽出
+       const userFriendIds = userFriendsResult.data?.map(f => f.connected_user_id) || [];
+       const targetFriendIds = targetFriendsResult.data?.map(f => f.connected_user_id) || [];
+       
+       // 共通の友達を抽出
+       const commonFriendIds = userFriendIds.filter(id => targetFriendIds.includes(id));
+       
+       if (commonFriendIds.length === 0) {
+         return [];
+       }
+       
+       // 共通の友達のプロフィール情報を取得
+       const { data: profileData, error: profileError } = await supabase
+         .from('profiles')
+         .select('id, username, avatar_url')
+         .in('id', commonFriendIds);
+       
+       if (profileError) throw profileError;
+       
+       return profileData || [];
+       
+     } catch (error) {
+       console.error('共通の友達取得エラー:', error);
+       return [];
+     }
+    };
+    
+    /**
+    * YouTubeチャンネル情報を取得する関数
+    * @param userId - ユーザーID
+    * @returns YouTubeチャンネル情報
+    */
+    export const getYouTubeChannelData = async (userId: string): Promise<{ channel_url?: string } | null> => {
+     try {
+       if (!userId) {
+         throw new Error('ユーザーIDが指定されていません');
+       }
+       
+       // youtuber_profilesテーブルが存在するか確認
+       const youtuberProfilesExists = await checkTableExists('youtuber_profiles');
+       
+       if (!youtuberProfilesExists) {
+         // テーブルが存在しない場合は作成
+         await createTableIfNotExists('youtuber_profiles');
+         console.warn('youtuber_profilesテーブルが存在しないため新規作成しました');
+         return { channel_url: undefined };
+       }
+       
+       // ユーザーのYouTuberプロファイルを取得
+       const { data, error } = await supabase
+         .from('youtuber_profiles')
+         .select('channel_url, channel_id')
+         .eq('id', userId)
+         .maybeSingle();
+       
+       if (error) {
+         // ユーザーがYouTuberとして登録されていなくてもエラーとして扱わない
+         if (error.code === 'PGRST116' || error.code === '42P01') {
+           return { channel_url: undefined };
+         }
+         throw error;
+       }
+       
+       // チャンネルURLが存在する場合はそのまま返す
+       if (data?.channel_url) {
+         return { channel_url: data.channel_url };
+       }
+       
+       // チャンネルIDがある場合はURLを構築
+       if (data?.channel_id) {
+         return { channel_url: `https://www.youtube.com/channel/${data.channel_id}` };
+       }
+       
+       return { channel_url: undefined };
+       
+     } catch (error) {
+       console.error('YouTubeチャンネル情報取得エラー:', error);
+       return null;
+     }
+    };
+    
+    /**
+    * ユーザー間の接続リクエストを送信する関数
+    * @param userId - リクエスト送信者のユーザーID
+    * @param targetUserId - リクエスト受信者のユーザーID
+    * @returns 処理結果
+    */
+    export const connectUsers = async (
+     userId: string,
+     targetUserId: string
+    ): Promise<ConnectionResult> => {
+     try {
+       if (!userId || !targetUserId) {
+         return {
+           success: false,
+           status: ConnectionStatus.NONE,
+           error: 'ユーザーIDまたは対象ユーザーIDが指定されていません'
+         };
+       }
+    
+       if (userId === targetUserId) {
+         return {
+           success: false,
+           status: ConnectionStatus.NONE,
+           error: '自分自身に接続リクエストを送ることはできません'
+         };
+       }
+       
+       // connectionsテーブルが存在するか確認
+       const connectionsExists = await checkTableExists('connections');
+       
+       if (!connectionsExists) {
+         // テーブルが存在しない場合は作成
+         const created = await createTableIfNotExists('connections');
+         if (!created) {
+           return {
+             success: false,
+             status: ConnectionStatus.NONE,
+             error: 'connectionsテーブルの作成に失敗しました'
+           };
+         }
+       }
+    
+       // 既存の接続を確認
+       const { data: existingConnection, error: checkError } = await supabase
+         .from('connections')
+         .select('id, status, user_id, connected_user_id')
+         .or(`and(user_id.eq.${userId},connected_user_id.eq.${targetUserId}),and(user_id.eq.${targetUserId},connected_user_id.eq.${userId})`)
+         .maybeSingle();
+    
+       if (checkError) {
+         console.error('接続確認エラー:', checkError);
+         return {
+           success: false,
+           status: ConnectionStatus.NONE,
+           error: '接続確認中にエラーが発生しました'
+         };
+       }
+    
+       // 既に接続リクエストが存在する場合
+       if (existingConnection) {
+         return {
+           success: true,
+           status: existingConnection.status as ConnectionStatus,
+           connectionId: existingConnection.id
+         };
+       }
+    
+       // 新しい接続を作成
+       const { data: newConnection, error: connectionError } = await supabase
+         .from('connections')
+         .insert({
+           user_id: userId,
+           connected_user_id: targetUserId,
+           status: ConnectionStatus.PENDING,
+           created_at: new Date().toISOString(),
+           updated_at: new Date().toISOString()
+         })
+         .select()
+         .single();
+    
+       if (connectionError) {
+         console.error('接続作成エラー:', connectionError);
+         return {
+           success: false,
+           status: ConnectionStatus.NONE,
+           error: '接続レコードの作成に失敗しました'
+         };
+       }
+    
+       // 相手ユーザーに通知を送信
+       try {
+         // 通知サービスを使用して通知を作成
+         const matchScore = 70;
+         await notificationService.createMatchingNotification(
+           userId, // 送信者ID
+           targetUserId, // 対象ユーザーID
+           matchScore,
+           'connection_request'
+         );
+       } catch (notifyError) {
+         console.error('通知送信エラー:', notifyError);
+         // 通知エラーは処理続行
+       }
+    
+       return {
+         success: true,
+         status: ConnectionStatus.PENDING,
+         connectionId: newConnection?.id
+       };
+    
+     } catch (error) {
+       console.error('接続リクエスト送信エラー:', error);
+       return {
+         success: false,
+         status: ConnectionStatus.NONE,
+         error: error instanceof Error ? error.message : '接続リクエストの送信に失敗しました'
+       };
+     }
+    };
+    
+    /**
+    * 接続をリセットする関数
+    * @param userId - ユーザーID
+    * @param targetUserId - 対象ユーザーID
+    * @returns 処理結果
+    */
+    export const resetConnection = async (
+     userId: string,
+     targetUserId: string
+    ): Promise<ResetConnectionResult> => {
+     try {
+       if (!userId || !targetUserId) {
+         return { 
+           success: false, 
+           error: 'ユーザーIDまたは対象ユーザーIDが指定されていません' 
+         };
+       }
+       
+       // connectionsテーブルが存在するか確認
+       const connectionsExists = await checkTableExists('connections');
+       
+       if (!connectionsExists) {
+         // テーブルが存在しない場合は作成
+         await createTableIfNotExists('connections');
+         return { success: true }; // テーブルが存在しない場合は既に削除されているとみなす
+       }
+    
+       const { error: deleteError } = await supabase
+         .from('connections')
+         .delete()
+         .or(`and(user_id.eq.${userId},connected_user_id.eq.${targetUserId}),and(user_id.eq.${targetUserId},connected_user_id.eq.${userId})`);
+    
+       if (deleteError) {
+         console.error('接続削除エラー:', deleteError);
+         return { 
+           success: false, 
+           error: '接続の削除に失敗しました' 
+         };
+       }
+    
+       return {
+         success: true
+       };
+     } catch (error) {
+       console.error('接続リセットエラー:', error);
+       return {
+         success: false,
+         error: error instanceof Error ? error.message : '接続のリセットに失敗しました'
+       };
+     }
+    };

@@ -1,5 +1,5 @@
 // src/contexts/AuthContext.tsx
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
 import type { Profile } from '../types';
@@ -54,7 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
 
   // プレミアムステータスを計算する関数
-  const calculatePremiumStatus = (profileData: any): PremiumStatus | null => {
+  const calculatePremiumStatus = useCallback((profileData: any): PremiumStatus | null => {
     if (!profileData) return null;
     
     // プレミアム会員ではない場合
@@ -93,10 +93,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       expiresAt,
       daysRemaining
     };
-  };
+  }, []);
 
   // プロフィールからプレミアム情報を取得して設定する関数
-  const fetchAndSetPremiumInfo = async (userId: string) => {
+  const fetchAndSetPremiumInfo = useCallback(async (userId: string) => {
     try {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -134,10 +134,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsPremium(false);
       setPremiumStatus(null);
     }
-  };
+  }, [calculatePremiumStatus]);
 
   // YouTuberプロフィールを取得する関数 - 406エラー回避のため、profiles テーブルからデータを取得するように変更
-  const fetchYoutuberProfile = async (userId: string) => {
+  const fetchYoutuberProfile = useCallback(async (userId: string) => {
     try {
       // profiles テーブルからデータを取得してYouTuberプロフィール情報を構築
       const { data: profileData, error: profileError } = await supabase
@@ -173,7 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error fetching youtuber profile:', error);
       setYoutuberProfile(null);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -240,9 +240,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     initializeAuth();
-  }, []);
+  }, [fetchAndSetPremiumInfo, fetchYoutuberProfile]);
 
-  const signUp = async (email: string, password: string, metadata?: any) => {
+  const signUp = useCallback(async (email: string, password: string, metadata?: any) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -259,9 +259,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Sign up error:', error);
       return { data: null, error };
     }
-  };
+  }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -277,9 +277,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Sign in error:', error);
       return { data: null, error };
     }
-  };
+  }, []);
 
-  const signOut = async (): Promise<void> => {
+  const signOut = useCallback(async (): Promise<void> => {
     try {
       // まず状態をクリア
       setUser(null);
@@ -305,9 +305,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Sign out error:', error);
     }
-  };
+  }, []);
 
-  const resetPassword = async (email: string) => {
+  const resetPassword = useCallback(async (email: string) => {
     try {
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`
@@ -318,10 +318,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Reset password error:', error);
       return { data: null, error };
     }
-  };
+  }, []);
 
   // プレミアムステータスを更新する関数を拡張
-  const updatePremiumStatus = async (
+  const updatePremiumStatus = useCallback(async (
     status: boolean,
     plan?: string,
     expiresAt?: string
@@ -351,19 +351,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Premium status update error:', error);
     }
-  };
+  }, [user, fetchAndSetPremiumInfo]);
 
   // プレミアムステータスを明示的に更新する関数
-  const refreshPremiumStatus = async (): Promise<void> => {
+  const refreshPremiumStatus = useCallback(async (): Promise<void> => {
     try {
       if (!user) return;
       await fetchAndSetPremiumInfo(user.id);
     } catch (error) {
       console.error('Premium status refresh error:', error);
     }
-  };
+  }, [user, fetchAndSetPremiumInfo]);
 
-  const value = {
+  // Context値をuseMemoでメモ化して毎回の再レンダリングでの参照変更を防止
+  const contextValue = useMemo(() => ({
     user,
     session,
     loading,
@@ -377,7 +378,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     resetPassword,
     updatePremiumStatus,
     refreshPremiumStatus
-  };
+  }), [
+    user, 
+    session, 
+    loading, 
+    youtuberProfile, 
+    isPremium, 
+    premiumStatus,
+    signUp,
+    signIn,
+    signOut,
+    resetPassword,
+    updatePremiumStatus,
+    refreshPremiumStatus
+  ]);
 
   // 初期化中はローディング表示
   if (loading) {
@@ -388,7 +402,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {

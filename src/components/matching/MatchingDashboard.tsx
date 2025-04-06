@@ -1,6 +1,6 @@
-// src/components/matching/MatchingDashboard.tsx
+// src/components/matching/MatchingDashboard.tsx（修正版）
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import MatchPreferences from './MatchPreferences';
 import UserCard from './UserCard';
@@ -9,7 +9,6 @@ import useMatching from '../../hooks/useMatching';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faCoins, 
-  faCog, 
   faRedo, 
   faHistory, 
   faInfoCircle, 
@@ -21,11 +20,16 @@ import {
   faChartBar,
   faLayerGroup,
   faUserFriends,
-  faBrain
+  faBrain,
+  faExclamationTriangle,
+  faSliders,
+  faFilter,
+  faSearch
 } from '@fortawesome/free-solid-svg-icons';
-import { SkippedUser, VideoDetails } from '../../types/matching';
+import { SkippedUser, VideoDetails, OnlineStatus, ActivityLevel } from '../../types/matching';
 import { formatDistanceToNow } from 'date-fns';
 import { ja } from 'date-fns/locale';
+import usePoints from '../../hooks/usePoints'; // ポイント管理のフックをインポート
 
 const MatchingDashboard: React.FC = () => {
   const [showPreferences, setShowPreferences] = useState<boolean>(false);
@@ -34,59 +38,125 @@ const MatchingDashboard: React.FC = () => {
   const [skippedUsers, setSkippedUsers] = useState<SkippedUser[]>([]);
   const [showSkippedUsers, setShowSkippedUsers] = useState<boolean>(false);
   const [similarityScore, setSimilarityScore] = useState<number | undefined>(undefined);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   
   const detailsRef = useRef<HTMLDivElement>(null);
+  
+  // ポイント情報を取得
+  const { balance: remainingPoints, isPremium } = usePoints();
   
   const { 
     loading, 
     currentUser,
     noMoreUsers,
-    remainingPoints,
-    isPremium,
     processingAction,
     loadingDetails,
     loadingSkippedUsers,
+    isRelaxedMode,
     fetchMatchedUsers,
     handleLike, 
     handleSkip,
     fetchDetailedProfile,
     getSkippedUsers,
-    restoreSkippedUser
+    restoreSkippedUser,
+    toggleRelaxedMode,
+    ensureTableExists, // 追加: テーブル存在確認のために使用
+    error: matchingError // 追加: useMatchingのエラー状態も監視
   } = useMatching();
 
+  // エラー監視を追加
+  useEffect(() => {
+    if (matchingError) {
+      setFetchError(matchingError);
+    }
+  }, [matchingError]);
+  
+  // 初回レンダリング時にマッチング候補を取得
+  useEffect(() => {
+    const initialFetch = async () => {
+      try {
+        setFetchError(null);
+        
+        // 必要なテーブルの存在チェック (オプショナルなテーブルはスキップ)
+        try {
+          // 基本的なテーブルの存在確認
+          await Promise.all([
+            ensureTableExists('profiles'),
+            ensureTableExists('user_matching_preferences')
+          ]);
+        } catch (tableError) {
+          console.error('テーブル存在確認エラー:', tableError);
+          // テーブル存在エラーをハンドリング
+          setFetchError('データ構造の初期化に問題が発生しました。管理者に連絡してください。');
+          return;
+        }
+        
+        await fetchMatchedUsers();
+      } catch (error) {
+        console.error('マッチング候補取得エラー:', error);
+        setFetchError('マッチング候補の取得に失敗しました。データが存在しないか、サーバーエラーが発生している可能性があります。');
+      }
+    };
+    
+    initialFetch();
+  }, [fetchMatchedUsers, ensureTableExists]);
+
+  // 詳細表示が有効になったときにユーザー詳細を取得
   useEffect(() => {
     if (currentUser && showDetailedView) {
       fetchUserDetails();
     }
   }, [currentUser, showDetailedView]);
 
+  // スキップユーザー一覧表示が有効になったときにスキップしたユーザーを取得
   useEffect(() => {
-    // スキップしたユーザーのリストを取得（最大20名）
     const loadSkippedUsers = async () => {
+      if (!showSkippedUsers) return;
+      
       try {
+        // user_skipsテーブルの存在確認と取得
+        try {
+          await ensureTableExists('user_skips');
+        } catch (tableError) {
+          console.error('スキップテーブル確認エラー:', tableError);
+          toast.error('スキップリストの取得に問題が発生しました');
+          return;
+        }
+        
         const skipped = await getSkippedUsers(20);
         setSkippedUsers(skipped);
       } catch (error) {
         console.error('スキップユーザー取得エラー:', error);
+        toast.error('スキップしたユーザーの取得に失敗しました');
       }
     };
     
-    if (showSkippedUsers) {
-      loadSkippedUsers();
-    }
-  }, [showSkippedUsers, getSkippedUsers]);
+    loadSkippedUsers();
+  }, [showSkippedUsers, getSkippedUsers, ensureTableExists]);
 
-  // 詳細情報を取得する
-  const fetchUserDetails = async () => {
+  // 詳細情報を取得する関数
+  const fetchUserDetails = useCallback(async () => {
     if (!currentUser) return;
     
     try {
+      // 詳細プロフィールの取得前にテーブル存在確認
+      try {
+        await Promise.all([
+          ensureTableExists('user_points'), 
+          ensureTableExists('view_history'),
+          ensureTableExists('videos')
+        ]);
+      } catch (tableError) {
+        // エラーはログに残すが、致命的ではないので続行
+        console.warn('オプショナルテーブル確認警告:', tableError);
+      }
+      
       // 詳細プロフィールを取得
       const profileDetails = await fetchDetailedProfile(currentUser.id);
       
       if (profileDetails) {
         // 共通動画を設定
-        setCommonVideos(profileDetails.commonVideos);
+        setCommonVideos(profileDetails.commonVideos || []);
         
         // 類似度スコアを設定（もしプロフィール詳細に含まれている場合）
         if (profileDetails.profile && profileDetails.profile.matching_score) {
@@ -102,27 +172,46 @@ const MatchingDashboard: React.FC = () => {
       console.error('詳細情報取得エラー:', error);
       toast.error('詳細情報の取得に失敗しました');
     }
-  };
+  }, [currentUser, fetchDetailedProfile, ensureTableExists]);
 
   // 候補をリロードする
-  const refreshCandidates = () => {
+  const refreshCandidates = useCallback(() => {
     setShowDetailedView(false);
     setCommonVideos([]);
     setSimilarityScore(undefined);
+    setFetchError(null);
     
     toast.promise(
       fetchMatchedUsers(),
       {
         loading: '候補を更新中...',
         success: '新しいマッチング候補を読み込みました',
-        error: '候補の更新に失敗しました'
+        error: (err) => {
+          console.error('候補更新エラー:', err);
+          setFetchError('マッチング候補の取得に失敗しました。データが存在しないか、サーバーエラーが発生している可能性があります。');
+          return '候補の更新に失敗しました';
+        }
       }
     );
-  };
+  }, [fetchMatchedUsers]);
 
   // スキップ取り消し
-  const handleUndoSkip = async (skippedUser: SkippedUser) => {
+  const handleUndoSkip = useCallback(async (skippedUser: SkippedUser) => {
+    if (!skippedUser || !skippedUser.id) {
+      toast.error('無効なユーザー情報です');
+      return;
+    }
+    
     try {
+      // user_skipsテーブルの存在確認
+      try {
+        await ensureTableExists('user_skips');
+      } catch (tableError) {
+        console.error('スキップテーブル確認エラー:', tableError);
+        toast.error('スキップ機能に問題が発生しました');
+        return;
+      }
+      
       const success = await restoreSkippedUser(skippedUser.id);
       
       if (success) {
@@ -142,12 +231,12 @@ const MatchingDashboard: React.FC = () => {
       console.error('スキップ取り消しエラー:', error);
       toast.error('スキップの取り消しに失敗しました');
     }
-  };
+  }, [noMoreUsers, refreshCandidates, restoreSkippedUser, ensureTableExists]);
 
   // 詳細表示の切り替え
-  const toggleDetailedView = async () => {
+  const toggleDetailedView = useCallback(async () => {
     // 詳細表示がOFFの場合はポイント消費
-    if (!showDetailedView && !isPremium && remainingPoints < 5) {
+    if (!showDetailedView && !isPremium && (remainingPoints === null || remainingPoints < 5)) {
       toast.error('ポイントが不足しています');
       return;
     }
@@ -157,10 +246,50 @@ const MatchingDashboard: React.FC = () => {
     
     // 詳細表示ONでポイント消費（プレミアム会員は無料）
     if (newState && !isPremium && currentUser) {
+      // user_pointsテーブルの存在確認
+      try {
+        const pointsTableExists = await ensureTableExists('user_points');
+        if (!pointsTableExists) {
+          // ポイントテーブルがない場合は警告だけ出して続行（読み取り専用モード）
+          console.warn('ポイントテーブルが存在しません - ポイント消費なしで続行します');
+          toast.error('ポイントシステムに接続できません。一部機能が制限されます。');
+        }
+      } catch (tableError) {
+        console.error('ポイントテーブル確認エラー:', tableError);
+      }
+      
       // fetchDetailedProfile内でポイント消費が行われるためここでは直接呼び出さない
       fetchUserDetails();
     }
+  }, [showDetailedView, isPremium, remainingPoints, currentUser, fetchUserDetails, ensureTableExists]);
+
+  // デバッグ情報表示
+  const displayDebugInfo = () => {
+    return (
+      <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4 mb-6">
+        <h3 className="font-bold text-yellow-700 flex items-center mb-2">
+          <FontAwesomeIcon icon={faExclamationTriangle} className="mr-2" />
+          デバッグ情報
+        </h3>
+        <div className="text-sm text-yellow-800">
+          <p>候補がない可能性があります。以下の方法を試してください：</p>
+          <ul className="list-disc ml-5 mt-2">
+            <li>マッチング設定を開き、「条件緩和モード」ボタンを押してください</li>
+            <li>条件を緩くして保存すると、より多くの候補が表示されるようになります</li>
+            <li>テスト中は候補が少ない可能性があります。数人登録してテストしてください</li>
+          </ul>
+        </div>
+      </div>
+    );
   };
+
+  // 緩和モードの切り替え
+  const handleToggleRelaxedMode = useCallback(() => {
+    // isRelaxedModeの現在の状態と反対の値を渡す
+    toggleRelaxedMode(!isRelaxedMode);
+    toast.success(isRelaxedMode ? '通常モードに戻しました' : '条件緩和モードを適用しました');
+    setTimeout(() => refreshCandidates(), 300); // 少し遅延させてUIの状態更新を確実にする
+  }, [isRelaxedMode, toggleRelaxedMode, refreshCandidates]);
 
   // 活動レベルの表示テキスト
   const getActivityLevelText = (level: string | number | undefined) => {
@@ -170,10 +299,10 @@ const MatchingDashboard: React.FC = () => {
     const levelStr = typeof level === 'number' ? String(level) : level;
     
     switch (levelStr) {
-      case 'very_active': return '非常に活発';
-      case 'active': return '活発';
-      case 'moderate': return '普通';
-      case 'casual': return 'カジュアル';
+      case ActivityLevel.VERY_ACTIVE: return '非常に活発';
+      case ActivityLevel.ACTIVE: return '活発';
+      case ActivityLevel.MODERATE: return '普通';
+      case ActivityLevel.CASUAL: return 'カジュアル';
       default: 
         // 数値型の場合は活動度を表示
         if (!isNaN(Number(levelStr))) {
@@ -195,10 +324,10 @@ const MatchingDashboard: React.FC = () => {
     const levelStr = typeof level === 'number' ? String(level) : level;
     
     switch (levelStr) {
-      case 'very_active': return 'text-red-500';
-      case 'active': return 'text-orange-500';
-      case 'moderate': return 'text-blue-500';
-      case 'casual': return 'text-green-500';
+      case ActivityLevel.VERY_ACTIVE: return 'text-red-500';
+      case ActivityLevel.ACTIVE: return 'text-orange-500';
+      case ActivityLevel.MODERATE: return 'text-blue-500';
+      case ActivityLevel.CASUAL: return 'text-green-500';
       default: 
         // 数値型の場合は活動度に応じた色を表示
         if (!isNaN(Number(levelStr))) {
@@ -214,7 +343,7 @@ const MatchingDashboard: React.FC = () => {
 
   // オンライン状態の表示
   const getOnlineStatusDisplay = (status: string | undefined, lastActive?: string | Date) => {
-    if (status === 'online') {
+    if (status === OnlineStatus.ONLINE) {
       return <span className="text-green-500">●オンライン</span>;
     }
     
@@ -236,8 +365,13 @@ const MatchingDashboard: React.FC = () => {
 
   // 日付をフォーマットする
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return formatDistanceToNow(date, { addSuffix: true, locale: ja });
+    try {
+      const date = new Date(dateStr);
+      return formatDistanceToNow(date, { addSuffix: true, locale: ja });
+    } catch (e) {
+      console.error('日付フォーマットエラー:', e);
+      return '日時不明';
+    }
   };
 
   // 視聴傾向の表示
@@ -298,15 +432,61 @@ const MatchingDashboard: React.FC = () => {
     );
   };
 
+  // 緩和モードバッジ表示
+  const renderRelaxedModeBadge = () => {
+    if (!isRelaxedMode) return null;
+    
+    return (
+      <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full flex items-center text-sm ml-3 animate-pulse">
+        <FontAwesomeIcon icon={faFilter} className="mr-1.5" />
+        条件緩和モード
+      </div>
+    );
+  };
+
   if (loading) {
     return <LoadingSpinner />;
   }
 
+  // 重要機能ボタン - 常に表示する
+  const renderMainActionButtons = () => (
+    <div className="bg-white rounded-xl shadow-md p-4 mb-6">
+      <h2 className="text-lg font-bold mb-3">マッチング検索オプション</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button
+          onClick={handleToggleRelaxedMode}
+          className={`p-3 rounded-lg transition flex items-center justify-center font-medium ${
+            isRelaxedMode 
+              ? 'bg-blue-500 text-white hover:bg-blue-600' 
+              : 'bg-indigo-500 text-white hover:bg-indigo-600'
+          }`}
+          disabled={processingAction}
+        >
+          <FontAwesomeIcon icon={faSliders} className="mr-2" />
+          {isRelaxedMode ? '通常モードに戻す' : '条件緩和モードを適用する'}
+        </button>
+        
+        <button
+          onClick={() => setShowPreferences(true)}
+          className="p-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition flex items-center justify-center font-medium"
+        >
+          <FontAwesomeIcon icon={faSearch} className="mr-2" />
+          マッチング条件を設定する
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="container mx-auto p-4" ref={detailsRef}>
       <Toaster position="top-center" />
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">マッチング</h1>
+      
+      {/* ヘッダー：タイトルとステータス */}
+      <div className="flex justify-between items-center mb-5">
+        <div className="flex items-center">
+          <h1 className="text-2xl font-bold">マッチング</h1>
+          {renderRelaxedModeBadge()}
+        </div>
         <div className="flex items-center space-x-4">
           {!isPremium && (
             <span className="text-sm flex items-center">
@@ -322,16 +502,14 @@ const MatchingDashboard: React.FC = () => {
             <FontAwesomeIcon icon={faHistory} className="mr-2" />
             スキップ履歴
           </button>
-          <button
-            onClick={() => setShowPreferences(!showPreferences)}
-            className="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition flex items-center"
-            disabled={processingAction}
-          >
-            <FontAwesomeIcon icon={faCog} className="mr-2" />
-            設定
-          </button>
         </div>
       </div>
+
+      {/* 常に表示される機能ボタン */}
+      {renderMainActionButtons()}
+
+      {/* デバッグメッセージ表示 */}
+      {fetchError && displayDebugInfo()}
 
       {showPreferences ? (
         <MatchPreferences onClose={() => setShowPreferences(false)} />
@@ -497,7 +675,7 @@ const MatchingDashboard: React.FC = () => {
                         </div>
                       </div>
                       
-                      {/* 新しい視聴傾向セクション */}
+                      {/* 視聴傾向セクション */}
                       {currentUser.viewing_trends && Object.keys(currentUser.viewing_trends).length > 0 && (
                         <div className="mb-6">
                           <h3 className="font-semibold text-gray-700 mb-2 flex items-center">
@@ -523,7 +701,7 @@ const MatchingDashboard: React.FC = () => {
                         </div>
                       )}
                       
-                      {/* ユーザータイプ・適合度セクション */}
+                      {/* 適合度分析セクション */}
                       <div className="mb-6">
                         <h3 className="font-semibold text-gray-700 mb-2 flex items-center">
                           <FontAwesomeIcon icon={faBrain} className="mr-2 text-purple-500" />
@@ -605,6 +783,18 @@ const MatchingDashboard: React.FC = () => {
               </p>
               <div className="flex flex-col space-y-3">
                 <button
+                  onClick={handleToggleRelaxedMode}
+                  className={`px-4 py-2 rounded-lg transition flex items-center justify-center ${
+                    isRelaxedMode 
+                      ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' 
+                      : 'bg-green-500 text-white hover:bg-green-600'
+                  }`}
+                  disabled={processingAction}
+                >
+                  <FontAwesomeIcon icon={faSliders} className="mr-2" />
+                  {isRelaxedMode ? '通常モードに戻す' : '条件緩和モードを適用'}
+                </button>
+                <button
                   onClick={refreshCandidates}
                   className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition flex items-center justify-center"
                   disabled={processingAction}
@@ -631,25 +821,31 @@ const MatchingDashboard: React.FC = () => {
             </div>
           ) : (
             <div className="text-center py-10 bg-white p-8 rounded-xl shadow-md max-w-md w-full">
-              <p className="text-lg mb-4">マッチング候補が見つかりませんでした</p>
-              <p className="text-gray-500 mb-6">
-                設定を変更するか、後でもう一度お試しください
+              <h2 className="text-xl font-bold mb-4">マッチング候補が読み込めません</h2>
+              <p className="text-gray-600 mb-6">
+                条件に合うユーザーが見つからないか、データが存在しない可能性があります。
+                「条件緩和モード」を使用して設定を変更してみてください。
               </p>
               <div className="flex flex-col space-y-3">
+                <button
+                  onClick={handleToggleRelaxedMode}
+                  className={`px-4 py-2 rounded-lg transition flex items-center justify-center ${
+                    isRelaxedMode 
+                      ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' 
+                      : 'bg-green-500 text-white hover:bg-green-600'
+                  }`}
+                  disabled={processingAction}
+                >
+                  <FontAwesomeIcon icon={faSliders} className="mr-2" />
+                  {isRelaxedMode ? '通常モードに戻す' : '条件緩和モードを適用'}
+                </button>
                 <button
                   onClick={refreshCandidates}
                   className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition flex items-center justify-center"
                   disabled={processingAction}
                 >
                   <FontAwesomeIcon icon={faRedo} className="mr-2" />
-                  候補を更新する
-                </button>
-                <button
-                  onClick={() => setShowPreferences(true)}
-                  className="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition"
-                  disabled={processingAction}
-                >
-                  マッチング設定を変更
+                  候補を再取得
                 </button>
               </div>
             </div>

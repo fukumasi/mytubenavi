@@ -1,6 +1,6 @@
 // src/components/matching/UserCard.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
  faPercent, 
@@ -14,17 +14,23 @@ import {
  faForward,
  faExternalLinkAlt,
  faUserFriends,
- faEye
+ faEye,
+ faUserPlus, // 接続リクエスト用アイコン追加
+ faCheck, // 承認済みアイコン追加
+ faHourglass, // 保留中アイコン追加
+ faTimes // 拒否アイコン追加
 } from '@fortawesome/free-solid-svg-icons';
-import { MatchingUser, VideoDetails } from '../../types/matching';
+import { MatchingUser, VideoDetails, OnlineStatus, ActivityLevel, ConnectionStatus } from '../../types/matching';
 import { formatDistance } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
+// インターフェース名を元に戻す
 interface UserCardProps {
  user: MatchingUser;
  onLike: (userId: string) => Promise<boolean>;
  onSkip: (userId: string) => Promise<boolean>;
  onViewProfile?: (userId: string) => Promise<void>;
+ onConnect?: (userId: string) => Promise<boolean>; // 接続リクエスト送信メソッド追加
  commonVideos?: VideoDetails[];
  isPremium?: boolean;
  hasDetailedView?: boolean;
@@ -32,11 +38,13 @@ interface UserCardProps {
  showYouTubeLink?: boolean;
 }
 
+// インターフェース名を反映させる
 const UserCard: React.FC<UserCardProps> = ({ 
  user,
  onLike,
  onSkip,
  onViewProfile,
+ onConnect, // 接続リクエスト送信メソッド
  commonVideos = [],
  isPremium = false,
  hasDetailedView = false,
@@ -48,6 +56,14 @@ const UserCard: React.FC<UserCardProps> = ({
  const [error, setError] = useState<string | null>(null);
  const [showDetails, setShowDetails] = useState<boolean>(false);
  const [expandedVideos, setExpandedVideos] = useState<boolean>(false);
+ const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(user.connection_status || ConnectionStatus.NONE);
+
+ // ユーザーの接続状態が変更されたら内部状態を更新
+ useEffect(() => {
+   if (user.connection_status !== connectionStatus) {
+     setConnectionStatus(user.connection_status || ConnectionStatus.NONE);
+   }
+ }, [user.connection_status, connectionStatus]);
 
  // マッチングスコアを視覚的に分かりやすくするための関数
  const getMatchScoreColor = (score: number) => {
@@ -58,7 +74,7 @@ const UserCard: React.FC<UserCardProps> = ({
  };
 
  // 活動レベルを表示用に変換
- const getActivityLevelText = (level?: string | number) => {
+ const getActivityLevelText = (level?: ActivityLevel | number) => {
    if (level === undefined) return '不明';
    
    // 数値型の場合
@@ -70,18 +86,18 @@ const UserCard: React.FC<UserCardProps> = ({
      return '静か';
    }
    
-   // 文字列型の場合
+   // ActivityLevel列挙型の場合
    switch (level) {
-     case 'very_active': return '非常に活発';
-     case 'active': return '活発';
-     case 'moderate': return '普通';
-     case 'casual': return 'カジュアル';
+     case ActivityLevel.VERY_ACTIVE: return '非常に活発';
+     case ActivityLevel.ACTIVE: return '活発';
+     case ActivityLevel.MODERATE: return '普通';
+     case ActivityLevel.CASUAL: return 'カジュアル';
      default: return '不明';
    }
  };
 
  // 活動レベルのカラー
- const getActivityLevelColor = (level?: string | number) => {
+ const getActivityLevelColor = (level?: ActivityLevel | number) => {
    if (level === undefined) return 'text-gray-500';
    
    // 数値型の場合
@@ -93,12 +109,12 @@ const UserCard: React.FC<UserCardProps> = ({
      return 'text-gray-500';
    }
    
-   // 文字列型の場合
+   // ActivityLevel列挙型の場合
    switch (level) {
-     case 'very_active': return 'text-green-600';
-     case 'active': return 'text-green-500';
-     case 'moderate': return 'text-blue-500';
-     case 'casual': return 'text-yellow-500';
+     case ActivityLevel.VERY_ACTIVE: return 'text-green-600';
+     case ActivityLevel.ACTIVE: return 'text-green-500';
+     case ActivityLevel.MODERATE: return 'text-blue-500';
+     case ActivityLevel.CASUAL: return 'text-yellow-500';
      default: return 'text-gray-500';
    }
  };
@@ -107,7 +123,7 @@ const UserCard: React.FC<UserCardProps> = ({
  const getOnlineStatus = () => {
    if (!user.online_status) return null;
    
-   if (user.online_status === 'online') {
+   if (user.online_status === OnlineStatus.ONLINE) {
      return (
        <span className="inline-flex items-center text-green-600 text-xs">
          <span className="w-2 h-2 bg-green-600 rounded-full mr-1"></span>
@@ -178,6 +194,29 @@ const UserCard: React.FC<UserCardProps> = ({
    }
  };
 
+ // 接続リクエスト送信処理
+ const handleConnect = async () => {
+   if (!onConnect || isProcessing) return;
+   
+   setIsProcessing(true);
+   setError(null);
+   
+   try {
+     const success = await onConnect(user.id);
+     if (success) {
+       // 一時的に状態を更新して即座にUIに反映
+       setConnectionStatus(ConnectionStatus.PENDING);
+     } else {
+       setError('接続リクエストの送信に失敗しました。');
+     }
+   } catch (err) {
+     setError('エラーが発生しました。もう一度お試しください。');
+     console.error('接続リクエスト送信でエラー:', err);
+   } finally {
+     setIsProcessing(false);
+   }
+ };
+
  // 詳細プロフィール表示処理
  const handleViewProfile = async () => {
    if (!onViewProfile || isProcessing) return;
@@ -193,6 +232,57 @@ const UserCard: React.FC<UserCardProps> = ({
      console.error('プロフィール表示でエラー:', err);
    } finally {
      setIsProcessing(false);
+   }
+ };
+
+ // 接続状態に基づくボタン表示
+ const renderConnectionButton = () => {
+   if (!isPremium || !onConnect) return null;
+   
+   switch (connectionStatus) {
+     case ConnectionStatus.CONNECTED:
+       return (
+         <div className="mt-4">
+           <span className="inline-flex items-center justify-center w-full py-2 bg-green-100 text-green-700 font-semibold rounded-lg">
+             <FontAwesomeIcon icon={faCheck} className="mr-2" />
+             つながり済み
+           </span>
+         </div>
+       );
+     case ConnectionStatus.PENDING:
+       return (
+         <div className="mt-4">
+           <span className="inline-flex items-center justify-center w-full py-2 bg-blue-100 text-blue-700 font-semibold rounded-lg">
+             <FontAwesomeIcon icon={faHourglass} className="mr-2" />
+             リクエスト中
+           </span>
+         </div>
+       );
+     case ConnectionStatus.REJECTED:
+       return (
+         <div className="mt-4">
+           <span className="inline-flex items-center justify-center w-full py-2 bg-red-100 text-red-700 font-semibold rounded-lg">
+             <FontAwesomeIcon icon={faTimes} className="mr-2" />
+             接続できません
+           </span>
+         </div>
+       );
+     case ConnectionStatus.NONE:
+     default:
+       return (
+         <div className="mt-4">
+           <button
+             onClick={handleConnect}
+             disabled={isProcessing}
+             className={`w-full py-2 flex items-center justify-center bg-indigo-500 text-white font-semibold rounded-lg transition-colors ${
+               isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+             }`}
+           >
+             <FontAwesomeIcon icon={faUserPlus} className="mr-2" />
+             {isProcessing ? '処理中...' : 'つながる'}
+           </button>
+         </div>
+       );
    }
  };
 
@@ -338,8 +428,37 @@ const UserCard: React.FC<UserCardProps> = ({
    );
  };
 
+ // 接続状態に基づいてアニメーション効果を追加
+ const getCardClasses = () => {
+   let classes = "w-full max-w-md bg-white rounded-xl shadow-lg overflow-hidden";
+   
+   // 接続状態に応じたボーダースタイルを適用
+   if (connectionStatus === ConnectionStatus.CONNECTED) {
+     classes += " border-2 border-green-500 transform transition-all duration-500";
+   } else if (connectionStatus === ConnectionStatus.PENDING) {
+     classes += " border-2 border-blue-500 transform transition-all duration-500";
+   } else if (connectionStatus === ConnectionStatus.REJECTED) {
+     classes += " border-2 border-red-500 transform transition-all duration-500";
+   }
+   
+   return classes;
+ };
+
  return (
-   <div className="w-full max-w-md bg-white rounded-xl shadow-lg overflow-hidden">
+   <div className={getCardClasses()}>
+     {/* 接続状態のバッジ表示 - 新規追加 */}
+     {connectionStatus !== ConnectionStatus.NONE && (
+       <div className={`absolute top-0 left-0 z-10 px-3 py-1 font-semibold text-xs ${
+         connectionStatus === ConnectionStatus.CONNECTED ? 'bg-green-500 text-white' :
+         connectionStatus === ConnectionStatus.PENDING ? 'bg-blue-500 text-white' :
+         'bg-red-500 text-white'
+       }`}>
+         {connectionStatus === ConnectionStatus.CONNECTED ? 'つながり済み' :
+          connectionStatus === ConnectionStatus.PENDING ? 'リクエスト中' :
+          '接続拒否'}
+       </div>
+     )}
+     
      {/* ユーザーカードヘッダー */}
      <div className="relative h-48 bg-gradient-to-r from-indigo-500 to-purple-500">
        {/* プレミアムバッジ */}
@@ -526,6 +645,9 @@ const UserCard: React.FC<UserCardProps> = ({
            )}
          </div>
        )}
+       
+       {/* 接続ボタン表示 - 新規追加 */}
+       {renderConnectionButton()}
        
        {/* アクションボタン */}
        <div className="mt-6 flex justify-between">

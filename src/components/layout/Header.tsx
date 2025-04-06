@@ -1,6 +1,6 @@
 // src/components/layout/Header.tsx
 import { useState, useEffect, useRef } from 'react';
-import { LogIn, UserPlus, Youtube, User, Menu, Search, Crown } from 'lucide-react';
+import { LogIn, UserPlus, Youtube, User, Menu, Search, Crown, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -87,6 +87,17 @@ export default function Header() {
            <Link to="/" className="flex items-center">
              <h1 className="text-xl sm:text-2xl font-bold text-indigo-600">MyTubeNavi</h1>
            </Link>
+           
+           {/* デスクトップ用ナビゲーションリンク */}
+           <div className="hidden md:flex items-center ml-6 space-x-4">
+             <Link to="/genres" className="text-gray-600 hover:text-indigo-600">
+               ジャンル
+             </Link>
+             <Link to="/matching" className="flex items-center text-gray-600 hover:text-indigo-600">
+               <Users className="h-4 w-4 mr-1" />
+               マッチング
+             </Link>
+           </div>
          </div>
 
          {/* デスクトップ用検索バー - 常に表示 */}
@@ -167,6 +178,14 @@ export default function Header() {
                            {unreadCount}
                          </span>
                        )}
+                     </Link>
+                     <Link
+                       to="/matching"
+                       className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                       onClick={() => setIsUserMenuOpen(false)}
+                     >
+                       <Users className="h-4 w-4 text-indigo-500 mr-1.5" />
+                       マッチング
                      </Link>
                      
                      {isPremium ? (

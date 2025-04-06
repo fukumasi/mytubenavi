@@ -54,11 +54,18 @@ export interface VideoReviewCountResponse {
 // @ts-ignore
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    },
+    global: {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Prefer': 'return=representation'
+      }
     }
-});
+  });
 
 // 型定義を追加
 interface SupabaseVideoResponse {

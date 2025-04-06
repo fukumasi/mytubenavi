@@ -1,10 +1,11 @@
 // src/components/layout/NotificationBell.tsx
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Bell, Check, Crown, Star, ChevronRight, Clock } from 'lucide-react';
+import { Bell, Check, Crown, Star, ChevronRight, Clock, UserPlus, CheckCircle, XCircle } from 'lucide-react';
 import { useNotifications } from '../../hooks/useNotifications';
-import { Notification } from '../../types/notification';
+import { Notification, NotificationType } from '../../types/notification';
 import { useAuth } from '../../contexts/AuthContext';
+import { toast } from 'react-hot-toast';
 
 interface NotificationBellProps {}
 
@@ -15,11 +16,13 @@ export default function NotificationBell({}: NotificationBellProps) {
     markAsRead, 
     markAllAsRead, 
     getImportantNotifications,
-    premiumNotificationsCount 
+    premiumNotificationsCount,
+    executeNotificationAction
   } = useNotifications();
   const { isPremium } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [processingActions, setProcessingActions] = useState<Record<string, boolean>>({});
   const bellRef = useRef<HTMLDivElement>(null);
 
   // プレミアム会員でない場合は、5回目の通知確認後にアップグレード促進を表示
@@ -49,7 +52,11 @@ export default function NotificationBell({}: NotificationBellProps) {
     if (!notification.is_read) {
       await markAsRead(notification.id);
     }
-    setIsOpen(false);
+
+    // 接続リクエスト通知の場合は、クリックしてもドロップダウンを閉じない
+    if (notification.type !== 'connection_request') {
+      setIsOpen(false);
+    }
   };
 
   const handleMarkAllAsRead = async (e: React.MouseEvent) => {
@@ -57,12 +64,57 @@ export default function NotificationBell({}: NotificationBellProps) {
     await markAllAsRead();
   };
 
+  // 通知アクション（承認/拒否など）を実行
+  const handleAction = async (e: React.MouseEvent, notification: Notification, actionType: 'accept' | 'reject') => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    try {
+      setProcessingActions(prev => ({ ...prev, [notification.id]: true }));
+      
+      // 接続IDを取得
+      const connectionId = notification.metadata?.connection_data?.connection_id;
+      if (!connectionId) {
+        toast.error('接続情報が不足しています');
+        return;
+      }
+      
+      // useNotifications フックの executeNotificationAction を使用
+      const result = await executeNotificationAction(
+        notification.id,
+        {
+          id: `action-${actionType}-${Date.now()}`,
+          label: actionType === 'accept' ? '承認' : '拒否',
+          type: actionType,
+          payload: { connectionId }
+        }
+      );
+      
+      if (result.success) {
+        const actionVerb = actionType === 'accept' ? '承認' : '拒否';
+        toast.success(`リクエストを${actionVerb}しました`);
+        
+        // リダイレクトURLがある場合（例：メッセージページへ）
+        if (result.redirectUrl) {
+          window.location.href = result.redirectUrl;
+        }
+      } else if (result.error) {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error('通知アクション実行エラー:', error);
+      toast.error('操作に失敗しました。後でもう一度お試しください。');
+    } finally {
+      setProcessingActions(prev => ({ ...prev, [notification.id]: false }));
+    }
+  };
+
   // 表示する通知をフィルタリング（非プレミアム会員は重要・標準の通知のみ）
   const filteredNotifications = isPremium 
     ? notifications 
     : getImportantNotifications(10); // 非プレミアム会員は重要な通知のみ10件まで表示
 
-  const getNotificationIcon = (type: string) => {
+  const getNotificationIcon = (type: NotificationType) => {
     switch (type) {
       case 'video_comment':
         return '💬';
@@ -90,21 +142,33 @@ export default function NotificationBell({}: NotificationBellProps) {
         return '🎯';
       case 'subscription':
         return '📬';
-      // プレミアム対応のためのケースを追加
-      case 'premium_feature':
-        return '✨';
-      case 'premium_benefit':
-        return '🎁';
+      // 接続関連の通知アイコン
+      case 'connection_request':
+        return '🤝';
+      case 'connection_accepted':
+        return '✅';
+      case 'connection_rejected':
+        return '❌';
+      case 'match':
+        return '🔥';
+      // その他の通知タイプ
       case 'matching':
         return '🤝';
+      case 'message':
+        return '📩';
+      case 'mention':
+        return '🗣️';
       default:
         return '📝';
     }
   };
 
   // 通知種別に応じたクラスを返す
-  const getNotificationClass = (notification: any) => {
-    if (notification.is_premium_only) {
+  const getNotificationClass = (notification: Notification) => {
+    // premium_only は型定義にないので、メッセージの内容で判定
+    const isPremiumRelated = notification.message && notification.message.toLowerCase().includes('プレミアム');
+    
+    if (isPremiumRelated) {
       return 'bg-yellow-50 border-l-4 border-yellow-400';
     }
     
@@ -114,15 +178,29 @@ export default function NotificationBell({}: NotificationBellProps) {
         : 'bg-red-50 border-l-4 border-red-400';
     }
     
-    if (notification.message && notification.message.includes('プレミアム')) {
-      return 'bg-yellow-50';
+    if (notification.type === 'connection_request') {
+      return notification.is_read
+        ? 'bg-blue-50 bg-opacity-50'
+        : 'bg-blue-50 border-l-4 border-blue-500';
+    }
+    
+    if (notification.type === 'connection_accepted') {
+      return notification.is_read
+        ? 'bg-green-50 bg-opacity-50'
+        : 'bg-green-50 border-l-4 border-green-500';
+    }
+    
+    if (notification.type === 'connection_rejected') {
+      return notification.is_read
+        ? 'bg-gray-50 bg-opacity-50'
+        : 'bg-gray-50 border-l-4 border-gray-500';
     }
     
     return notification.is_read ? 'bg-white' : 'bg-blue-50 border-l-4 border-blue-400';
   };
 
   // 優先度に応じたバッジを取得
-  const getPriorityBadge = (notification: any) => {
+  const getPriorityBadge = (notification: Notification) => {
     if (notification.priority === 'high') {
       return (
         <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full flex items-center">
@@ -132,7 +210,9 @@ export default function NotificationBell({}: NotificationBellProps) {
       );
     }
     
-    if (notification.is_premium_only) {
+    // premium_only は型定義にないので、メッセージの内容で判定
+    const isPremiumRelated = notification.message && notification.message.toLowerCase().includes('プレミアム');
+    if (isPremiumRelated) {
       return (
         <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full flex items-center">
           <Crown className="h-3 w-3 mr-1" />
@@ -141,7 +221,80 @@ export default function NotificationBell({}: NotificationBellProps) {
       );
     }
     
+    if (notification.type === 'connection_request') {
+      return (
+        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full flex items-center">
+          <UserPlus className="h-3 w-3 mr-1" />
+          接続リクエスト
+        </span>
+      );
+    }
+    
     return null;
+  };
+
+  // 接続リクエストの通知コンテンツをレンダリング
+  const renderConnectionRequestContent = (notification: Notification) => {
+    const isProcessing = processingActions[notification.id] || false;
+    const metadata = notification.metadata;
+    const connectionData = metadata?.connection_data;
+    
+    if (!connectionData || !connectionData.action_required) {
+      return (
+        <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+          {notification.message}
+        </p>
+      );
+    }
+    
+    return (
+      <>
+        <p className="text-sm text-gray-500 mt-1 mb-2">
+          {notification.message}
+        </p>
+        <div className="flex justify-between gap-2 mt-2">
+          <button
+            disabled={isProcessing}
+            onClick={(e) => handleAction(e, notification, 'accept')}
+            className="flex-1 bg-green-500 hover:bg-green-600 text-white py-1 px-2 rounded text-xs flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isProcessing ? (
+              <span className="animate-pulse">処理中...</span>
+            ) : (
+              <>
+                <CheckCircle className="h-3 w-3 mr-1" /> 承認する
+              </>
+            )}
+          </button>
+          <button
+            disabled={isProcessing}
+            onClick={(e) => handleAction(e, notification, 'reject')}
+            className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-1 px-2 rounded text-xs flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isProcessing ? (
+              <span className="animate-pulse">処理中...</span>
+            ) : (
+              <>
+                <XCircle className="h-3 w-3 mr-1" /> 拒否する
+              </>
+            )}
+          </button>
+        </div>
+      </>
+    );
+  };
+
+  // 通知種別に応じたコンテンツをレンダリング
+  const renderNotificationContent = (notification: Notification) => {
+    if (notification.type === 'connection_request') {
+      return renderConnectionRequestContent(notification);
+    }
+    
+    return (
+      <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+        {notification.message}
+      </p>
+    );
   };
 
   // ベルアイコンのスタイルを決定
@@ -223,15 +376,13 @@ export default function NotificationBell({}: NotificationBellProps) {
                         <p className="text-sm font-medium text-gray-900 truncate">
                           {notification.title}
                         </p>
-                        {notification.is_premium_only && (
+                        {notification.message && notification.message.toLowerCase().includes('プレミアム') && (
                           <span className="ml-2">
                             <Crown className="h-4 w-4 text-yellow-500" />
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-500 mt-1 line-clamp-2">
-                        {notification.message}
-                      </p>
+                      {renderNotificationContent(notification)}
                       <div className="flex items-center justify-between mt-1">
                         <p className="text-xs text-gray-400 flex items-center">
                           <Clock className="h-3 w-3 mr-1" />

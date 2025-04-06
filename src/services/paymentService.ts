@@ -1083,21 +1083,18 @@ export const createManualPayment = async (paymentData: {
     const now = new Date().toISOString();
     
     // Stripe決済意図の作成（オフライン支払いとしてマーク）
-    const stripeResult = await createPaymentIntent(
-      paymentData.amount,
-      'jpy',
-      paymentData.planId,
-      undefined, // duration
-      {
-        description: `[手動作成] ${paymentData.description}`,
-        metadata: {
-          userId: paymentData.userId,
-          paymentType: paymentData.type,
-          isManualEntry: 'true',
-          notes: paymentData.notes || ''
-        }
-      }
-    );
+    const stripeResult = await createPaymentIntent({
+      amount: paymentData.amount,
+      currency: 'jpy',
+      bookingId: paymentData.planId || 'manual-' + Date.now(), // 必須のbookingIdを追加
+      metadata: {
+        userId: paymentData.userId,
+        paymentType: paymentData.type,
+        isManualEntry: 'true',
+        notes: paymentData.notes || ''
+      },
+      description: `[手動作成] ${paymentData.description}`
+    });
      
     if (!stripeResult || !stripeResult.paymentIntentId) {
       throw new Error('決済IDの作成に失敗しました');

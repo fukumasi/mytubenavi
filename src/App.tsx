@@ -1,6 +1,6 @@
 // src/App.tsx
 
-import React, { Suspense, lazy, useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState, useCallback } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
@@ -85,17 +85,17 @@ React.useEffect(() => {
       }
       
       const { data, error } = await supabase
-        .from('youtuber_profiles')
-        .select('id')
-        .eq('id', user.id)
-        .single();
+  .from('youtuber_profiles')
+  .select('id')
+  .eq('id', user.id);
 
-      if (error) {
-        console.error('YouTuber status check error:', error);
-        setIsYoutuber(false);
-      } else {
-        setIsYoutuber(!!data);
-      }
+if (error) {
+  console.error('YouTuber status check error:', error);
+  setIsYoutuber(false);
+} else {
+  // データが存在するかどうかを確認（データ配列が空でない場合）
+  setIsYoutuber(data && data.length > 0);
+}
     } catch (error) {
       console.error('Error checking YouTuber status:', error);
       setIsYoutuber(false);
@@ -107,7 +107,7 @@ React.useEffect(() => {
   if (!loading) {
     checkYoutuberStatus();
   }
-}, [user, loading]);
+}, [user?.id, loading]); // user全体ではなくuser.idだけを依存配列に含める
 
 if (loading || checkingStatus) {
   return (
@@ -171,7 +171,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
    if (!loading) {
      checkAdminStatus();
    }
- }, [user, loading]);
+ }, [user?.id, loading]); // user全体ではなくuser.idだけを依存配列に含める
 
  if (loading || checkingStatus) {
    return (
@@ -192,32 +192,39 @@ function PremiumRoute({ children }: { children: React.ReactNode }) {
 return <PremiumGuard>{children}</PremiumGuard>;
 }
 
-const App = () => {
-const { isPremium } = useAuth();
-const [appReady, setAppReady] = useState(false);
+// Supabaseクライアントと Stripe のインスタンスを一度だけロードするための関数
+const loadDependencies = async () => {
+  try {
+    const { supabase } = await import('./lib/supabase');
+    const { getStripe } = await import('./lib/stripe');
+    
+    let stripeInstance = null;
+    if (getStripe) {
+      stripeInstance = getStripe();
+    }
+    
+    return { supabase, stripe: stripeInstance };
+  } catch (error) {
+    console.error('Error loading dependencies:', error);
+    return { supabase: null, stripe: null };
+  }
+};
 
-// アプリケーション初期化時にリソースが利用可能かチェック
-useEffect(() => {
-  const initializeApp = async () => {
+const App = () => {
+  const { isPremium } = useAuth(); // userを削除し、必要なisPremiumのみを取得
+  const [appReady, setAppReady] = useState(false);
+
+  // アプリケーション初期化関数をuseCallbackでメモ化
+  const initializeApp = useCallback(async () => {
     try {
-      // Supabaseクライアントが利用可能か確認
-      const { supabase } = await import('./lib/supabase');
+      const { supabase, stripe } = await loadDependencies();
       
       if (!supabase) {
         console.error('Failed to initialize Supabase client');
       }
       
-      // Stripeが利用可能か確認 - getStripeを使用するよう修正
-      const { getStripe } = await import('./lib/stripe');
-      
-      if (!getStripe) {
-        console.error('Stripe initialization function is not defined');
-      } else {
-        // 実際にStripeの初期化が可能かテスト
-        const stripeInstance = getStripe();
-        if (!stripeInstance) {
-          console.warn('Unable to initialize Stripe - public key may be missing');
-        }
+      if (!stripe) {
+        console.warn('Unable to initialize Stripe - public key may be missing');
       }
       
     } catch (error) {
@@ -226,298 +233,281 @@ useEffect(() => {
       // 初期化完了を設定
       setAppReady(true);
     }
-  };
-  
-  initializeApp();
-}, []);
+  }, []);
 
-if (!appReady) {
+  // 初期化処理は一度だけ実行
+  useEffect(() => {
+    console.log('App initialization started');
+    initializeApp();
+  }, []); // 空の依存配列で一度だけ実行
+
+  if (!appReady) {
+    return (
+      <div className="min-h-screen flex justify-center items-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex justify-center items-center">
-      <LoadingSpinner />
-    </div>
-  );
-}
-
-return (
-  <NotificationProvider>
-    <StripeContextProvider>
-      <div className="min-h-screen flex flex-col bg-gray-100">
-        <Header />
-        <NotificationSound volume={0.5} enabled={true} />
-        
-        <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Suspense fallback={
-            <div className="flex justify-center items-center h-64">
-              <LoadingSpinner />
-            </div>
-          }>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/signup" element={<SignUp />} />
-              <Route path="/login" element={<Login />} />
-              
-              {/* プロフィール関連ルート */}
-              <Route 
-                path="/profile/*" 
-                element={
-                  <PrivateRoute>
-                    <ProfileRoutes />
-                  </PrivateRoute>
-                } 
-              />
-
-              {/* 管理者ダッシュボードルート */}
-              <Route
-                path="/admin"
-                element={
-                  <AdminRoute>
-                    <AdminDashboardPage />
-                  </AdminRoute>
-                }
-              />
-
-              {/* YouTuber関連ルート */}
-              <Route 
-                path="/youtuber/dashboard" 
-                element={
-                  <YouTuberRoute>
-                    <YouTuberDashboardPage />
-                  </YouTuberRoute>
-                } 
-              />
-              
-              <Route 
-                path="/youtuber/register" 
-                element={
-                  <PrivateRoute>
-                    <Register />
-                  </PrivateRoute>
-                } 
-              />
-
-              <Route 
-                path="/youtuber/promotions/active" 
-                element={
-                  <YouTuberRoute>
-                    <ActivePromotions />
-                  </YouTuberRoute>
-                } 
-              />
-
-              {/* プレミアム関連ルート */}
-              <Route path="/premium">
+    // 以下のコードは変更なし
+    <NotificationProvider>
+      <StripeContextProvider>
+        <div className="min-h-screen flex flex-col bg-gray-100">
+          <Header />
+          <NotificationSound volume={0.5} enabled={true} />
+          
+          <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <Suspense fallback={
+              <div className="flex justify-center items-center h-64">
+                <LoadingSpinner />
+              </div>
+            }>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/signup" element={<SignUp />} />
+                <Route path="/login" element={<Login />} />
+                
+                {/* プロフィール関連ルート */}
                 <Route 
-                  index 
+                  path="/profile/*" 
                   element={
                     <PrivateRoute>
-                      {isPremium ? 
-                        <Navigate to="/premium/dashboard" replace /> : 
-                        <Navigate to="/premium/upgrade" replace />
-                      }
+                      <ProfileRoutes />
                     </PrivateRoute>
+                  } 
+                />
+
+                {/* 管理者ダッシュボードルート */}
+                <Route
+                  path="/admin"
+                  element={
+                    <AdminRoute>
+                      <AdminDashboardPage />
+                    </AdminRoute>
                   }
                 />
-                
+
+                {/* YouTuber関連ルート */}
                 <Route 
-                  path="dashboard" 
+                  path="/youtuber/dashboard" 
                   element={
-                    <PremiumGuard>
-                      <PremiumDashboardPage />
-                    </PremiumGuard>
+                    <YouTuberRoute>
+                      <YouTuberDashboardPage />
+                    </YouTuberRoute>
                   } 
                 />
                 
                 <Route 
-                  path="upgrade" 
+                  path="/youtuber/register" 
                   element={
                     <PrivateRoute>
-                      <PremiumUpgradePage />
+                      <Register />
                     </PrivateRoute>
                   } 
                 />
-                
-                <Route 
-                  path="expired" 
-                  element={
-                    <PrivateRoute>
-                      <PremiumExpired />
-                    </PrivateRoute>
-                  } 
-                />
-                
-                <Route 
-                  path="features" 
-                  element={
-                    <PrivateRoute>
-                      <PremiumPlaceholder 
-                        title="プレミアム機能一覧"
-                        message="プレミアム会員だけが利用できる機能の一覧です。"
-                      />
-                    </PrivateRoute>
-                  } 
-                />
-                
-                {/* プレミアム会員専用ルート */}
-                <Route 
-                  path="matching"
-                  element={
-                    <PremiumRoute>
-                      <div className="max-w-4xl mx-auto">
-                        <h1 className="text-2xl font-bold mb-6">プレミアムマッチング</h1>
-                        <MatchingSystem />
-                      </div>
-                    </PremiumRoute>
-                  } 
-                />
-                
-                <Route 
-                  path="messaging/*"
-                  element={
-                    <PremiumRoute>
-                      <div className="max-w-4xl mx-auto">
-                        <h1 className="text-2xl font-bold mb-6">プレミアムメッセージ</h1>
-                        <p>プレミアム会員限定のメッセージ機能です。</p>
-                      </div>
-                    </PremiumRoute>
-                  } 
-                />
-                
-                <Route 
-                  path="advanced-search"
-                  element={
-                    <PremiumRoute>
-                      <div className="max-w-4xl mx-auto">
-                        <h1 className="text-2xl font-bold mb-6">高度な検索</h1>
-                        <p>プレミアム会員限定の高度な検索機能です。</p>
-                      </div>
-                    </PremiumRoute>
-                  } 
-                />
-                
-                <Route 
-                  path="extend"
-                  element={
-                    <PremiumRoute>
-                      <PremiumPlaceholder 
-                        title="プレミアム会員延長"
-                        message="プレミアム会員期間を延長するページです。"
-                      />
-                    </PremiumRoute>
-                  } 
-                />
-                
-                <Route 
-                  path="cancel"
-                  element={
-                    <PremiumRoute>
-                      <PremiumPlaceholder 
-                        title="自動更新の停止"
-                        message="プレミアム会員の自動更新を停止するページです。"
-                      />
-                    </PremiumRoute>
-                  } 
-                />
-              </Route>
 
-              {/* マッチングルート（新実装） */}
-              <Route 
-                path="/matching/new" 
-                element={
-                  <PrivateRoute>
-                    <MatchingPage />
-                  </PrivateRoute>
-                } 
-              />
-
-              {/* メッセージングルート */}
-              <Route 
-                path="/messages" 
-                element={
-                  <PrivateRoute>
-                    <MessagingPage />
-                  </PrivateRoute>
-                } 
-              />
-              <Route 
-                path="/messages/:conversationId" 
-                element={
-                  <PrivateRoute>
-                    <MessagingPage />
-                  </PrivateRoute>
-                } 
-              />
-
-              {/* 簡易マッチングルート（旧実装との互換性のため） */}
-              <Route 
-                path="/matching" 
-                element={
-                  <PrivateRoute>
-                    <div className="max-w-4xl mx-auto">
-                      <h1 className="text-2xl font-bold mb-6">マッチング</h1>
-                      {!isPremium && (
-                        <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg mb-6">
-                          <h2 className="text-lg font-semibold text-yellow-800 mb-2">
-                            プレミアム会員限定機能
-                          </h2>
-                          <p className="text-yellow-700 mb-4">
-                            マッチング機能のフル機能を利用するにはプレミアム会員へのアップグレードが必要です。
-                          </p>
-                          <div className="text-center">
-                            <a 
-                              href="/premium/upgrade" 
-                              className="inline-block bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-2 px-4 rounded transition duration-150"
-                            >
-                              プレミアム会員になる
-                            </a>
-                          </div>
-                        </div>
-                      )}
-                      <MatchingSystem />
-                    </div>
-                  </PrivateRoute>
-                } 
-              />
-
-              {/* 一般ページルート */}
-              <Route path="/genre/:slug" element={<GenreVideoList />} />
-              <Route path="/video/:videoId" element={<VideoDetail />} />
-              <Route path="/search" element={<SearchPage />} />
-
-              {/* イベント関連ルート */}
-              <Route path="/events">
-                <Route index element={<EventList />} />
                 <Route 
-                  path="new" 
+                  path="/youtuber/promotions/active" 
                   element={
-                    <PrivateRoute>
-                      <EventForm />
-                    </PrivateRoute>
+                    <YouTuberRoute>
+                      <ActivePromotions />
+                    </YouTuberRoute>
                   } 
                 />
-                <Route path=":id">
-                  <Route index element={<EventDetail />} />
+
+                {/* プレミアム関連ルート */}
+                <Route path="/premium">
                   <Route 
-                    path="edit" 
+                    index 
                     element={
                       <PrivateRoute>
-                        <EventEditForm />
+                        {isPremium ? 
+                          <Navigate to="/premium/dashboard" replace /> : 
+                          <Navigate to="/premium/upgrade" replace />
+                        }
+                      </PrivateRoute>
+                    }
+                  />
+                  
+                  <Route 
+                    path="dashboard" 
+                    element={
+                      <PremiumGuard>
+                        <PremiumDashboardPage />
+                      </PremiumGuard>
+                    } 
+                  />
+                  
+                  <Route 
+                    path="upgrade" 
+                    element={
+                      <PrivateRoute>
+                        <PremiumUpgradePage />
                       </PrivateRoute>
                     } 
                   />
+                  
+                  <Route 
+                    path="expired" 
+                    element={
+                      <PrivateRoute>
+                        <PremiumExpired />
+                      </PrivateRoute>
+                    } 
+                  />
+                  
+                  <Route 
+                    path="features" 
+                    element={
+                      <PrivateRoute>
+                        <PremiumPlaceholder 
+                          title="プレミアム機能一覧"
+                          message="プレミアム会員だけが利用できる機能の一覧です。"
+                        />
+                      </PrivateRoute>
+                    } 
+                  />
+                  
+                  {/* プレミアム会員専用ルート */}
+                  <Route 
+                    path="matching"
+                    element={
+                      <PremiumRoute>
+                        <div className="max-w-4xl mx-auto">
+                          <h1 className="text-2xl font-bold mb-6">プレミアムマッチング</h1>
+                          <MatchingSystem />
+                        </div>
+                      </PremiumRoute>
+                    } 
+                  />
+                  
+                  <Route 
+                    path="messaging/*"
+                    element={
+                      <PremiumRoute>
+                        <div className="max-w-4xl mx-auto">
+                          <h1 className="text-2xl font-bold mb-6">プレミアムメッセージ</h1>
+                          <p>プレミアム会員限定のメッセージ機能です。</p>
+                        </div>
+                      </PremiumRoute>
+                    } 
+                  />
+                  
+                  <Route 
+                    path="advanced-search"
+                    element={
+                      <PremiumRoute>
+                        <div className="max-w-4xl mx-auto">
+                          <h1 className="text-2xl font-bold mb-6">高度な検索</h1>
+                          <p>プレミアム会員限定の高度な検索機能です。</p>
+                        </div>
+                      </PremiumRoute>
+                    } 
+                  />
+                  
+                  <Route 
+                    path="extend"
+                    element={
+                      <PremiumRoute>
+                        <PremiumPlaceholder 
+                          title="プレミアム会員延長"
+                          message="プレミアム会員期間を延長するページです。"
+                        />
+                      </PremiumRoute>
+                    } 
+                  />
+                  
+                  <Route 
+                    path="cancel"
+                    element={
+                      <PremiumRoute>
+                        <PremiumPlaceholder 
+                          title="自動更新の停止"
+                          message="プレミアム会員の自動更新を停止するページです。"
+                        />
+                      </PremiumRoute>
+                    } 
+                  />
                 </Route>
-              </Route>
 
-              {/* 404ルート */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
-        </main>
-        <Footer />
-      </div>
-    </StripeContextProvider>
-  </NotificationProvider>
-);
+                {/* マッチングルート（新実装） - /matching/new も引き続き有効にしておく */}
+                <Route 
+                  path="/matching/new" 
+                  element={
+                    <PrivateRoute>
+                      <MatchingPage />
+                    </PrivateRoute>
+                  } 
+                />
+
+                {/* メッセージングルート */}
+                <Route 
+                  path="/messages" 
+                  element={
+                    <PrivateRoute>
+                      <MessagingPage />
+                    </PrivateRoute>
+                  } 
+                />
+                <Route 
+                  path="/messages/:conversationId" 
+                  element={
+                    <PrivateRoute>
+                      <MessagingPage />
+                    </PrivateRoute>
+                  } 
+                />
+
+                {/* 簡易マッチングルート - 修正後 */}
+                <Route 
+                  path="/matching" 
+                  element={
+                    <PrivateRoute>
+                      <MatchingPage />
+                    </PrivateRoute>
+                  } 
+                />
+
+                {/* 一般ページルート */}
+                <Route path="/genre/:slug" element={<GenreVideoList />} />
+                <Route path="/video/:videoId" element={<VideoDetail />} />
+                <Route path="/search" element={<SearchPage />} />
+
+                {/* イベント関連ルート */}
+                <Route path="/events">
+                  <Route index element={<EventList />} />
+                  <Route 
+                    path="new" 
+                    element={
+                      <PrivateRoute>
+                        <EventForm />
+                      </PrivateRoute>
+                    } 
+                  />
+                  <Route path=":id">
+                    <Route index element={<EventDetail />} />
+                    <Route 
+                      path="edit" 
+                      element={
+                        <PrivateRoute>
+                          <EventEditForm />
+                        </PrivateRoute>
+                      } 
+                    />
+                  </Route>
+                </Route>
+
+                {/* 404ルート */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </main>
+          <Footer />
+        </div>
+      </StripeContextProvider>
+    </NotificationProvider>
+  );
 };
 
 export default App;

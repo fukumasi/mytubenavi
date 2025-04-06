@@ -1,362 +1,278 @@
 // src/components/matching/MatchingSystem.tsx
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useMatching } from '../../hooks/useMatching';
 import { supabase } from '../../lib/supabase';
-import { User, MessageCircle, ThumbsUp, ThumbsDown, Crown, Lock, Users, Star, Clock as ClockIcon } from 'lucide-react';
+import { Crown, Lock, Users, AlertCircle, RefreshCw } from 'lucide-react';
+import UserCard from './UserCard';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import { Link } from 'react-router-dom';
-
-interface MatchedUser {
-  id: string;
-  username: string;
-  avatar_url?: string;
-  interests: string[];
-  matchScore: number;
-  is_premium?: boolean;
-  connection_status?: 'none' | 'pending' | 'connected' | 'rejected';
-}
-
+import { ConnectionStatus, MatchingUser } from '../../types/matching';
+import { toast } from 'react-hot-toast';
+import { connectUsers } from '../../services/matchingService';
 interface MatchingSystemProps {
   limit?: number;
 }
 
 export default function MatchingSystem({ limit }: MatchingSystemProps) {
   const { user, isPremium } = useAuth();
-  const [matches, setMatches] = useState<MatchedUser[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    loading, 
+    matchedUsers,
+    fetchMatchedUsers,
+    debugInfo,
+    initializeDefaultPreferences,
+    likeUser,
+    skipUser
+  } = useMatching();
+  
   const [error, setError] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+  // ローカルでの接続状態を追跡するstate
+  const [localConnectionStates, setLocalConnectionStates] = useState<{[key: string]: ConnectionStatus}>({});
+  // リアルタイム接続状態変更イベントの検出フラグ
+  const [connectionChanged, setConnectionChanged] = useState(false);
+  // 更新されたマッチングユーザーリスト
+  const [updatedMatchedUsers, setUpdatedMatchedUsers] = useState<MatchingUser[]>([]);
+  
+  // useRefを使用して初期ロードが完了したかを追跡
+  const initialLoadDone = useRef(false);
+  // 接続監視チャンネルを保持するためのref
+  const connectionChannelRef = useRef<any>(null);
+  // 前回のmatchedUsersの値を保持するref
+  const prevMatchedUsersRef = useRef<MatchingUser[]>([]);
+  // フェッチング状態を追跡するためのref
+  const isFetchingRef = useRef(false);
 
-  // 表示件数の決定（プロップスで上書き可能）
-  const calculateLimit = () => {
-    if (limit) return limit;
-    return isPremium ? 10 : 3;
-  };
-
+  // matchedUsersが変更されたら更新 - 深い比較と参照比較を行い、実際に変更があった場合のみ更新
   useEffect(() => {
-    if (!user) return;
-    fetchMatches();
-  }, [user]);
-
-  const fetchMatches = async () => {
-    if (!user) return;
-
-    try {
-      setLoading(true);
+    // matchedUsersが空でなく、かつ変更があった場合にのみ更新
+    if (matchedUsers.length > 0) {
+      // 前回の値との比較
+      const hasChanged = matchedUsers.length !== prevMatchedUsersRef.current.length || 
+                         JSON.stringify(matchedUsers) !== JSON.stringify(prevMatchedUsersRef.current);
       
-      // ユーザーの視聴履歴とお気に入りを取得
-      const { error: historyError } = await supabase
-        .from('view_history')
-        .select('video_id')
-        .eq('user_id', user.id);
-
-      if (historyError) {
-        console.error('視聴履歴の取得エラー:', historyError);
-        // エラーが発生しても処理を続行
+      if (hasChanged) {
+        console.log('マッチングユーザーリストが更新されました', matchedUsers.length);
+        setUpdatedMatchedUsers(matchedUsers);
+        // 前回の値を更新
+        prevMatchedUsersRef.current = [...matchedUsers];
       }
-
-      const { error: favoritesError } = await supabase
-        .from('favorites')
-        .select('video_id')
-        .eq('user_id', user.id);
-
-      if (favoritesError) {
-        console.error('お気に入りの取得エラー:', favoritesError);
-        // エラーが発生しても処理を続行
-      }
-
-      // ユーザーの興味ジャンルを取得
-      const { error: interestsError } = await supabase
-        .from('user_interests')
-        .select('genre_id')
-        .eq('user_id', user.id);
-
-      if (interestsError) {
-        console.error('興味ジャンルの取得エラー:', interestsError);
-        // ここでエラーが発生しても処理を続行
-        // テーブルは作成したばかりなのでデータがないことが予想される
-      }
-
-      // テーブルを確認し、存在しなければ作成する
-      const checkAndCreateTable = async (tableName: string) => {
-        try {
-          // 代替方法: 対象テーブルからカウントクエリを実行して存在チェックを行う
-          const { error } = await supabase
-            .from(tableName)
-            .select('*', { count: 'exact', head: true });
-          
-          // エラーがなければテーブルは存在する
-          return !error;
-        } catch (err) {
-          console.log(`テーブル${tableName}の確認エラー:`, err);
-          return false;
-        }
-      };
-
-      // connections テーブルの確認
-      const connectionsExists = await checkAndCreateTable('connections');
-      let connections: Array<{connected_user_id: string, status: string}> = [];
-      
-      if (connectionsExists) {
-        // 既存の接続リクエストを取得
-        const { data: connectionsData, error: connectionsError } = await supabase
-          .from('connections')
-          .select('connected_user_id, status')
-          .eq('user_id', user.id);
-
-        if (connectionsError) {
-          console.error('接続情報の取得エラー:', connectionsError);
-          // エラーが発生しても処理を続行
-        } else {
-          connections = connectionsData || [];
-        }
-      }
-
-      // 他のユーザーの情報を取得
-      const { data: otherUsers, error: usersError } = await supabase
-        .from('profiles')
-        .select('id, username, avatar_url, is_premium')
-        .neq('id', user.id);
-
-      if (usersError) {
-        console.error('ユーザー情報の取得エラー:', usersError);
-        setError('ユーザー情報の取得に失敗しました');
-        setLoading(false);
-        return;
-      }
-
-      if (!otherUsers || otherUsers.length === 0) {
-        setMatches([]);
-        setLoading(false);
-        return;
-      }
-
-      // user_reactions テーブルの確認
-      await checkAndCreateTable('user_reactions');
-
-      // 簡略化されたマッチングロジック - データベーステーブルが整備されるまでの暫定対応
-      const simulatedMatches = otherUsers.map((otherUser) => {
-        // 既存の接続状態を確認（connectionsテーブルがある場合）
-        const existingConnection = connectionsExists 
-          ? connections?.find(c => c.connected_user_id === otherUser.id)
-          : null;
-          
-        const connectionStatus = existingConnection 
-          ? existingConnection.status as 'pending' | 'connected' | 'rejected'
-          : 'none';
-
-        // 簡易的なランダムスコア（実際のデータがないため）
-        // 乱数を使ってスコアを生成（30〜95の間）
-        const randomScore = Math.floor(Math.random() * 65) + 30;
-
-        // ゲーム、アニメ、音楽、映画、テクノロジーからランダムに2〜4個選択
-        const defaultInterests = ['ゲーム', 'アニメ', '音楽', '映画', 'テクノロジー', 'スポーツ', '料理', '旅行'];
-        const numInterests = Math.floor(Math.random() * 3) + 2; // 2〜4個
-        const selectedInterests = [];
-        
-        for (let i = 0; i < numInterests; i++) {
-          const randomIndex = Math.floor(Math.random() * defaultInterests.length);
-          selectedInterests.push(defaultInterests[randomIndex]);
-          defaultInterests.splice(randomIndex, 1); // 選択済みの要素を削除
-        }
-
-        return {
-          ...otherUser,
-          interests: selectedInterests,
-          matchScore: randomScore,
-          connection_status: connectionStatus as 'none' | 'pending' | 'connected' | 'rejected'
-        };
-      });
-
-      // スコアでソート
-      const sortedMatches = simulatedMatches.sort((a, b) => b.matchScore - a.matchScore);
-      
-      // 表示件数を計算（プロップスで上書き可能）
-      const displayLimit = calculateLimit();
-      setMatches(sortedMatches as MatchedUser[]);
-      
-      // 表示件数を超える場合は「もっと見る」を表示するフラグを設定
-      setShowMore(sortedMatches.length > displayLimit && !limit);
-
-    } catch (err) {
-      console.error('マッチング取得エラー:', err);
-      setError('マッチングの取得に失敗しました');
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [matchedUsers]);
 
-  const handleConnect = async (userId: string) => {
-    if (!user) return;
-    
-    // プレミアム会員でない場合は接続できない
-    if (!isPremium) {
-      alert('この機能はプレミアム会員限定です');
+  // マッチングデータを取得する関数
+  const loadMatches = useCallback(async () => {
+    if (isFetchingRef.current) {
+      console.log('既にロード中のため、取得をスキップします');
       return;
     }
-
-    try {
-      setIsProcessing(true);
-
-      // connectionsテーブルが存在するか確認
-      const { error: tableCheckError } = await supabase.rpc('check_table_exists', { table_name: 'connections' });
-      
-      if (tableCheckError) {
-        console.log('connectionsテーブルの確認に失敗しました', tableCheckError);
-        // テーブルが存在しない可能性が高いので、作成する
-        const { error: createTableError } = await supabase.rpc('create_connections_table');
-        
-        if (createTableError) {
-          console.error('connectionsテーブルの作成に失敗しました:', createTableError);
-          throw new Error('接続情報の保存に失敗しました');
-        }
-      }
-
-      const { error: connectionError } = await supabase
-        .from('connections')
-        .insert([{
-          user_id: user.id,
-          connected_user_id: userId,
-          status: 'pending',
-          created_at: new Date().toISOString()
-        }]);
-      
-      if (connectionError) {
-        console.error('接続リクエストのエラー:', connectionError);
-        throw connectionError;
-      }
-      
-      // 通知テーブルに通知を追加
-      await supabase
-        .from('notifications')
-        .insert([{
-          user_id: userId,
-          type: 'connection_request',
-          title: '新しい接続リクエスト',
-          message: `${user.user_metadata?.name || '新しいユーザー'}さんから接続リクエストが届きました。`,
-          is_read: false,
-          priority: 'medium',
-          created_at: new Date().toISOString()
-        }]);
-      
-      // マッチリストを更新
-      await fetchMatches();
-      
-      // 完了メッセージ
-      alert('接続リクエストを送信しました');
-    } catch (err) {
-      console.error('接続エラー:', err);
-      setError('接続リクエストの送信に失敗しました');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleReaction = async (userId: string, isPositive: boolean) => {
-    if (!user || !isPremium) return;
     
     try {
-      setIsProcessing(true);
+      console.log('マッチング取得開始');
+      setIsFetching(true);
+      isFetchingRef.current = true;
       
-      // user_reactionsテーブルが存在するか確認
-      const { error: tableCheckError } = await supabase.rpc('check_table_exists', { table_name: 'user_reactions' });
+      // マッチング設定がない場合に初期化する
+      await initializeDefaultPreferences();
       
-      if (tableCheckError) {
-        console.log('user_reactionsテーブルの確認に失敗しました', tableCheckError);
-        // テーブルが存在しない可能性が高いので、作成する
-        const { error: createTableError } = await supabase.rpc('create_user_reactions_table');
-        
-        if (createTableError) {
-          console.error('user_reactionsテーブルの作成に失敗しました:', createTableError);
-          throw new Error('反応の記録に失敗しました');
-        }
-      }
-      
-      // 反応を記録
-      const { error: reactionError } = await supabase
-        .from('user_reactions')
-        .insert([{
-          user_id: user.id,
-          target_user_id: userId,
-          reaction_type: isPositive ? 'like' : 'dislike',
-          created_at: new Date().toISOString()
-        }]);
-      
-      if (reactionError) {
-        console.error('反応の記録エラー:', reactionError);
-        throw reactionError;
-      }
-      
-      // マッチリストを更新
-      await fetchMatches();
-      
+      await fetchMatchedUsers();
+      setError(null);
+      console.log('マッチング取得完了');
     } catch (err) {
-      console.error('反応の記録エラー:', err);
+      console.error('マッチングユーザーの取得エラー:', err);
+      setError('マッチングユーザーの取得に失敗しました');
     } finally {
-      setIsProcessing(false);
+      setIsFetching(false);
+      isFetchingRef.current = false;
     }
-  };
+  }, [fetchMatchedUsers, initializeDefaultPreferences]);
 
-  // 開発環境でマッチングがない場合にサンプルデータを表示
+  // 初期ロード
   useEffect(() => {
-    if (!loading && matches.length === 0 && process.env.NODE_ENV === 'development') {
-      const timer = setTimeout(() => {
-        showSampleData();
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [loading, matches.length]);
-
-  // レコメンドのないユーザーにサンプルデータを表示（開発用・後で削除）
-  const showSampleData = () => {
-    const sampleMatches: MatchedUser[] = [
-      {
-        id: '1',
-        username: '山田太郎',
-        interests: ['アニメ', '映画', 'ゲーム', 'スポーツ', '音楽'],
-        matchScore: 85,
-        is_premium: true,
-        connection_status: 'none'
-      },
-      {
-        id: '2',
-        username: '佐藤花子',
-        interests: ['料理', '旅行', 'DIY', 'アウトドア', 'ペット'],
-        matchScore: 72,
-        is_premium: false,
-        connection_status: 'none'
-      },
-      {
-        id: '3',
-        username: '鈴木一郎',
-        interests: ['スポーツ', 'テクノロジー', '読書', '映画', '音楽'],
-        matchScore: 68,
-        is_premium: true,
-        connection_status: 'none'
-      },
-      {
-        id: '4',
-        username: '高橋京子',
-        interests: ['ファッション', '美容', '料理', '旅行', 'カフェ'],
-        matchScore: 65,
-        is_premium: false,
-        connection_status: 'none'
-      },
-      {
-        id: '5',
-        username: '中村健太',
-        interests: ['ゲーム', 'プログラミング', 'アニメ', '漫画', 'テクノロジー'],
-        matchScore: 60,
-        is_premium: true,
-        connection_status: 'none'
-      }
-    ];
+    // ユーザーがいない場合は何もしない
+    if (!user) return;
     
-    setMatches(sampleMatches);
-    setShowMore(sampleMatches.length > calculateLimit() && !limit);
-    setLoading(false);
+    // 初期ロード時に実行
+    const loadData = async () => {
+      // 既にロード中の場合はスキップ
+      if (isFetchingRef.current) {
+        console.log('既にロード中のため、初期ロードをスキップします');
+        return;
+      }
+      
+      try {
+        await loadMatches();
+        
+        // 初期ロード完了フラグを立てる（初回のみ）
+        if (!initialLoadDone.current) {
+          initialLoadDone.current = true;
+        }
+      } catch (error) {
+        console.error('データ読み込みエラー:', error);
+        setError('データの読み込みに失敗しました');
+        
+        // エラー時は状態をリセット
+        setIsFetching(false);
+        isFetchingRef.current = false;
+      }
+    };
+    
+    // 初期ロード時に実行
+    if (!initialLoadDone.current) {
+      loadData();
+    }
+  }, [user, loadMatches]);
+
+  // 接続状態変更のリアルタイム監視
+  useEffect(() => {
+    // すでに接続されているチャンネルがある場合はスキップ
+    if (!user || connectionChannelRef.current) {
+      return () => {
+        // クリーンアップのみ提供
+      };
+    }
+
+    console.log('UI更新用接続監視を開始');
+    
+    // 接続状態変更のサブスクリプション
+    const connectionsChannel = supabase.channel('matching-ui-updates')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'connections',
+        filter: `or(user_id.eq.${user.id},connected_user_id.eq.${user.id})`
+      }, (payload) => {
+        console.log('接続状態変更をUIで検知:', payload);
+        
+        // 変更フラグを立てる
+        setConnectionChanged(true);
+        
+        // 新しい接続データ
+        const newData = payload.new as any;
+        
+        // 接続状態が変更された場合、ローカル状態を更新
+        if (newData && (newData.user_id === user.id || newData.connected_user_id === user.id)) {
+          // 対象ユーザーIDを特定
+          const targetUserId = newData.user_id === user.id ? newData.connected_user_id : newData.user_id;
+          
+          // ローカル状態を更新
+          setLocalConnectionStates(prev => ({
+            ...prev,
+            [targetUserId]: newData.status as ConnectionStatus
+          }));
+          
+          // マッチングユーザーリストのUI状態も更新
+          setUpdatedMatchedUsers(prevUsers => {
+            // ユーザーリストに変更がある場合のみ更新を行う
+            const updatedUsers = prevUsers.map(u => {
+              if (u.id === targetUserId) {
+                return { ...u, connection_status: newData.status as ConnectionStatus };
+              }
+              return u;
+            });
+            
+            // 変更がない場合は同じ参照を返して不要な再レンダリングを防止
+            return JSON.stringify(updatedUsers) !== JSON.stringify(prevUsers) 
+              ? updatedUsers 
+              : prevUsers;
+          });
+        }
+      })
+      .subscribe();
+    
+    // 接続を保存
+    connectionChannelRef.current = connectionsChannel;
+    
+    // クリーンアップ関数
+    return () => {
+      console.log('UI更新用接続監視を終了');
+      if (connectionChannelRef.current) {
+        supabase.removeChannel(connectionChannelRef.current)
+          .then(status => {
+            console.log("Channel removed with status:", status);
+            connectionChannelRef.current = null;
+          })
+          .catch(err => console.error("Failed to remove channel:", err));
+      }
+    };
+  }, [user]);
+
+  // 接続状態変更時にデータを再取得（連続更新を防ぐためにディレイを入れる）
+  useEffect(() => {
+    if (!connectionChanged) return;
+    
+    const timer = setTimeout(() => {
+      // 接続状態の変更後、データを再取得
+      console.log('接続状態が変更されたため、データを再取得します');
+      loadMatches();
+      
+      // フラグをリセット
+      setConnectionChanged(false);
+    }, 1500);
+    
+    return () => clearTimeout(timer);
+  }, [connectionChanged, loadMatches]);
+  
+  // 接続リクエスト送信のハンドラー
+  const handleConnect = async (userId: string): Promise<boolean> => {
+    if (!isPremium || !user) {
+      toast.error('この機能はプレミアム会員限定です');
+      return false;
+    }
+    
+    try {
+      // matchingService.tsの関数を使用
+      const result = await connectUsers(user.id, userId);
+      
+      if (result.success) {
+        if (result.status === ConnectionStatus.PENDING) {
+          toast.success('接続リクエストを送信しました');
+        } else if (result.status === ConnectionStatus.CONNECTED) {
+          toast.success('既につながっています');
+        } else if (result.status === ConnectionStatus.REJECTED) {
+          toast.error('このユーザーとは接続できません');
+        }
+        
+        // ローカル状態を即時更新してUIに反映
+        setLocalConnectionStates(prev => ({
+          ...prev,
+          [userId]: result.status
+        }));
+        
+        return true;
+      } else {
+        throw new Error(result.error || '接続リクエストの送信に失敗しました');
+      }
+    } catch (err) {
+      console.error('接続リクエストエラー:', err);
+      
+      // 重複エラーの場合は特別なメッセージを表示
+      if (err && typeof err === 'object' && 'code' in err && (err as any).code === '23505') {
+        toast.error('既に接続リクエストを送信済みです');
+        // 重複エラーの場合もPENDINGとして扱う
+        setLocalConnectionStates(prev => ({
+          ...prev,
+          [userId]: ConnectionStatus.PENDING
+        }));
+        return true; // エラーではあるが、既に送信済みなのでUIとしては成功扱い
+      } else {
+        setError('接続リクエストの送信に失敗しました');
+        toast.error('接続リクエストの送信に失敗しました');
+        return false;
+      }
+    }
+  };
+
+  // いいね処理のハンドラー
+  const handleLike = async (userId: string): Promise<boolean> => {
+    return await likeUser(userId);
+  };
+
+  // スキップ処理のハンドラー
+  const handleSkip = async (userId: string): Promise<boolean> => {
+    return await skipUser(userId);
   };
 
   if (!user) {
@@ -374,189 +290,165 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
   }
 
   // 表示件数を計算
-  const displayLimit = calculateLimit();
-  const displayedMatches = limit ? matches.slice(0, limit) : (showMore ? matches : matches.slice(0, displayLimit));
+  const calculateLimit = (customLimit?: number) => {
+    if (customLimit) return customLimit;
+    return isPremium ? 10 : 3;
+  };
+  
+  const displayLimit = calculateLimit(limit);
+  const displayedMatches = limit 
+    ? updatedMatchedUsers.slice(0, limit) 
+    : (showMore ? updatedMatchedUsers : updatedMatchedUsers.slice(0, displayLimit));
+
+  // ローディング状態の統合 - 明確な単一の状態に
+  const isLoading = isFetching || loading;
 
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold text-gray-900">おすすめのユーザー</h2>
-        {isPremium ? (
-          <span className="flex items-center bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm">
-            <Crown className="w-4 h-4 mr-1.5 text-yellow-600" />
-            プレミアム機能
-          </span>
-        ) : (
-          <Link 
-            to="/premium" 
-            className="flex items-center text-sm text-gray-600 hover:text-indigo-600 transition-colors"
-          >
-            <Lock className="w-4 h-4 mr-1" />
-            プレミアムへアップグレード
-          </Link>
-        )}
+        <div className="flex space-x-2">
+          {isPremium ? (
+            <span className="flex items-center bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm">
+              <Crown className="w-4 h-4 mr-1.5 text-yellow-600" />
+              プレミアム機能
+            </span>
+          ) : (
+            <Link 
+              to="/premium" 
+              className="flex items-center text-sm text-gray-600 hover:text-indigo-600 transition-colors"
+            >
+              <Lock className="w-4 h-4 mr-1" />
+              プレミアムへアップグレード
+            </Link>
+          )}
+        </div>
       </div>
 
-      {loading ? (
+      {/* リフレッシュボタン */}
+      <div className="mb-4">
+        <button
+          onClick={loadMatches}
+          disabled={isLoading}
+          className="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isLoading ? (
+            <>
+              <LoadingSpinner className="w-4 h-4 mr-1.5" />
+              ロード中...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="w-4 h-4 mr-1.5" />
+              マッチング候補を更新
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* デバッグ情報表示エリア（開発環境のみ） */}
+      {process.env.NODE_ENV === 'development' && debugInfo && (
+        <div className="mt-2 mb-4 text-xs font-mono p-2 bg-gray-800 text-white rounded-md overflow-auto max-h-40">
+          <div>候補件数: {debugInfo.enhancedCandidatesCount || debugInfo.candidatesCount || 0}件</div>
+          <div>取得時間: {debugInfo.fetchTime || '-'}</div>
+          <div>ポイント残高: {debugInfo.remainingPoints || 0}</div>
+          <div>プレミアム: {debugInfo.isPremium ? 'あり' : 'なし'}</div>
+          <div>視聴履歴: {debugInfo.userHistoryCount || 0}件</div>
+          <div>スキップユーザー: {debugInfo.skippedUsersCount || 0}件</div>
+          {debugInfo.realtimeUpdate && (
+            <div className="text-green-400">
+              リアルタイム更新: {debugInfo.realtimeUpdate.time} ({debugInfo.realtimeUpdate.type})
+            </div>
+          )}
+          {debugInfo.matchingError && (
+            <div className="text-red-400">エラー: {String(debugInfo.matchingError)}</div>
+          )}
+        </div>
+      )}
+
+      {/* ローディング中 */}
+      {isLoading ? (
         <div className="flex justify-center py-8">
           <LoadingSpinner />
         </div>
       ) : error ? (
-        <div className="text-center py-8 text-red-600">{error}</div>
-      ) : matches.length === 0 ? (
+        <div className="py-8">
+          <div className="flex items-center justify-center text-red-600 mb-2">
+            <AlertCircle className="w-5 h-5 mr-2" />
+            <span>{error}</span>
+          </div>
+          <button
+            onClick={loadMatches}
+            className="mx-auto block px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+          >
+            再試行
+          </button>
+        </div>
+      ) : displayedMatches.length === 0 ? (
         <div className="text-center py-8 text-gray-600">
           マッチするユーザーが見つかりませんでした
+          <div className="mt-4">
+            <button
+              onClick={loadMatches}
+              disabled={isLoading}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            >
+              {isLoading ? 'ロード中...' : 'マッチング候補を再取得'}
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="space-y-4">
-          {displayedMatches.map((match) => (
-            <div
-              key={match.id}
-              className={`bg-white rounded-lg shadow-sm p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
-                match.is_premium ? 'border-l-4 border-yellow-400' : ''
-              }`}
-            >
-              <div className="flex items-center space-x-4">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0 ${
-                  match.is_premium ? 'ring-2 ring-yellow-400' : 'bg-gray-200'
-                }`}>
-                  {match.avatar_url ? (
-                    <img
-                      src={match.avatar_url}
-                      alt={match.username}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <User className="w-6 h-6 text-gray-400" />
-                  )}
-                </div>
-                
-                <div>
-                  <div className="flex items-center">
-                    <h3 className="text-lg font-medium text-gray-900">
-                      {match.username}
-                    </h3>
-                    {match.is_premium && (
-                      <Crown className="w-4 h-4 ml-1.5 text-yellow-500" />
-                    )}
-                  </div>
-                  <div className="mt-1">
-                    <div className="text-sm text-gray-500 flex items-center">
-                      マッチ度: 
-                      <div className="ml-1 flex">
-                        {[...Array(5)].map((_, i) => (
-                          <Star 
-                            key={i} 
-                            className={`w-3 h-3 ${
-                              i < Math.floor(match.matchScore/20) 
-                                ? 'text-yellow-500 fill-yellow-500' 
-                                : 'text-gray-300'
-                            }`} 
-                          />
-                        ))}
-                      </div>
-                      <span className="ml-1 font-semibold text-indigo-600">{match.matchScore}%</span>
-                    </div>
-                    {match.interests.length > 0 && (
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {match.interests.slice(0, isPremium ? 5 : 2).map((interest, index) => (
-                          <span
-                            key={index}
-                            className="px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-full"
-                          >
-                            {interest}
-                          </span>
-                        ))}
-                        {match.interests.length > (isPremium ? 5 : 2) && (
-                          <span className="text-xs text-gray-500">+{match.interests.length - (isPremium ? 5 : 2)}</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
+        <div className="space-y-6">
+          {displayedMatches.map((match) => {
+            // データベースの状態とローカル状態を組み合わせて最終的な接続状態を決定
+            const effectiveConnectionStatus = localConnectionStates[match.id] || match.connection_status;
+            
+            // 接続状態を反映した更新済みマッチングユーザーを作成
+            const updatedMatch: MatchingUser = {
+              ...match,
+              connection_status: effectiveConnectionStatus
+            };
+            
+            return (
+              <div key={match.id} className="w-full flex justify-center">
+                <UserCard
+                  user={updatedMatch}
+                  onLike={handleLike}
+                  onSkip={handleSkip}
+                  onConnect={handleConnect}
+                  isPremium={isPremium}
+                  hasDetailedView={false}
+                  showYouTubeLink={true}
+                />
               </div>
-
-              <div className="flex items-center space-x-2 ml-auto">
-                {match.connection_status === 'connected' ? (
-                  <span className="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md text-green-700 bg-green-100">
-                    <Users className="w-4 h-4 mr-1.5" />
-                    つながり済み
-                  </span>
-                ) : match.connection_status === 'pending' ? (
-                  <span className="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md text-blue-700 bg-blue-100">
-                    <ClockIcon className="w-4 h-4 mr-1.5" />
-                    リクエスト中
-                  </span>
-                ) : isPremium ? (
-                  <button
-                    onClick={() => handleConnect(match.id)}
-                    disabled={isProcessing}
-                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isProcessing ? (
-                      <span className="mr-1.5">処理中...</span>
-                    ) : (
-                      <MessageCircle className="w-4 h-4 mr-1.5" />
-                    )}
-                    つながる
-                  </button>
-                ) : (
-                  <Link
-                    to="/premium"
-                    className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-                  >
-                    <Lock className="w-4 h-4 mr-1.5" />
-                    プレミアム限定
-                  </Link>
-                )}
-                
-                {isPremium && match.connection_status === 'none' && (
-                  <div className="flex space-x-1">
-                    <button 
-                      className="p-2 text-gray-400 hover:text-green-500 transition-colors"
-                      onClick={() => handleReaction(match.id, true)}
-                      disabled={isProcessing}
-                    >
-                      <ThumbsUp className="w-5 h-5" />
-                    </button>
-                    <button 
-                      className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                      onClick={() => handleReaction(match.id, false)}
-                      disabled={isProcessing}
-                    >
-                      <ThumbsDown className="w-5 h-5" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
           
           {/* プレミアム会員でない場合はもっと見るボタンを表示 */}
-          {!isPremium && matches.length > displayLimit && !limit && (
+          {!isPremium && updatedMatchedUsers.length > displayLimit && !limit && (
             <div className="pt-4">
               <Link
                 to="/premium"
                 className="block w-full py-3 px-4 text-center bg-gradient-to-r from-yellow-50 to-yellow-100 hover:from-yellow-100 hover:to-yellow-200 text-yellow-700 font-medium rounded-lg transition-colors"
               >
                 <Crown className="inline-block w-5 h-5 mr-2 text-yellow-500" />
-                プレミアム会員になって{matches.length - displayLimit}人以上のマッチングを見る
+                プレミアム会員になって{updatedMatchedUsers.length - displayLimit}人以上のマッチングを見る
               </Link>
             </div>
           )}
           
           {/* プレミアム会員で表示制限がある場合のもっと見るボタン */}
-          {isPremium && !showMore && matches.length > displayLimit && !limit && (
+          {isPremium && !showMore && updatedMatchedUsers.length > displayLimit && !limit && (
             <button
               onClick={() => setShowMore(true)}
               className="block w-full py-3 px-4 text-center bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium rounded-lg transition-colors"
             >
-              すべて表示（{matches.length}人）
+              すべて表示（{updatedMatchedUsers.length}人）
             </button>
           )}
           
           {/* プレミアム会員の詳細ページへのリンク */}
-          {isPremium && limit && matches.length > limit && (
+          {isPremium && limit && updatedMatchedUsers.length > limit && (
             <div className="pt-4 text-center">
               <Link
                 to="/premium/matching"

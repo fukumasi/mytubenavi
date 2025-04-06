@@ -1,7 +1,7 @@
 // src/services/messagingService.ts
 
 import { supabase } from '../lib/supabase';
-import { Message, Conversation, ConversationWithProfile } from '../types/matching';
+import { Message, Conversation, ConversationWithProfile, ConnectionStatus } from '../types/matching';
 
 /**
  * メッセージングサービス
@@ -337,6 +337,118 @@ export const messagingService = {
     // サブスクリプション解除関数を返す
     return () => {
       supabase.removeChannel(subscription);
+    };
+  }
+};
+
+/**
+ * ユーザー間の接続リクエストを送信する関数
+ * @param userId - リクエスト送信者のユーザーID
+ * @param targetUserId - リクエスト受信者のユーザーID
+ * @returns 処理結果
+ */
+export const connectUsers = async (
+  userId: string,
+  targetUserId: string
+): Promise<{ success: boolean; status: ConnectionStatus; error?: string }> => {
+  try {
+    if (!userId || !targetUserId) {
+      throw new Error('ユーザーIDまたは対象ユーザーIDが指定されていません');
+    }
+
+    if (userId === targetUserId) {
+      throw new Error('自分自身に接続リクエストを送ることはできません');
+    }
+
+    console.log(`接続リクエスト: ${userId} -> ${targetUserId}`);
+
+    // 既存の接続を確認
+    const { data: existingConnection, error: checkError } = await supabase
+      .from('connections')
+      .select('id, status')
+      .or(`and(user_id.eq.${userId},connected_user_id.eq.${targetUserId}),and(user_id.eq.${targetUserId},connected_user_id.eq.${userId})`)
+      .maybeSingle();
+    
+    if (checkError) {
+      console.error('接続確認エラー:', checkError);
+      throw checkError;
+    }
+    
+    // 既に接続リクエストが存在する場合は処理をスキップ
+    if (existingConnection) {
+      console.log('既存の接続が見つかりました:', existingConnection);
+      return {
+        success: true,
+        status: existingConnection.status as ConnectionStatus
+      };
+    }
+    
+    // 新しい接続を作成
+    const { error: connectionError } = await supabase
+      .from('connections')
+      .insert({
+        user_id: userId,
+        connected_user_id: targetUserId,
+        status: ConnectionStatus.PENDING,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    
+    if (connectionError) {
+      // 挿入時のエラーをログ出力
+      console.error('接続作成エラー:', connectionError);
+      throw connectionError;
+    }
+    
+    console.log('接続が正常に作成されました');
+    
+    // 相手ユーザーに通知を送信
+    try {
+      console.log(`通知送信: ユーザー${targetUserId}へ、送信者${userId}からの接続リクエスト`);
+      const { data: senderData } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', userId)
+        .single();
+
+      const senderName = senderData?.username || 'ユーザー';
+
+      const { error: notificationError } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: targetUserId, // 対象ユーザーのID
+          type: 'connection_request',
+          title: '新しい接続リクエスト',
+          message: `${senderName}さんから接続リクエストが届きました。`,
+          is_read: false,
+          created_at: new Date().toISOString(),
+          priority: 'medium',
+          sender_id: userId, // 送信者のID
+          notification_group: 'matching'
+        });
+      
+      if (notificationError) {
+        console.error('通知作成エラー:', notificationError);
+        // 通知のエラーは処理を続行
+      } else {
+        console.log('通知送信成功');
+      }
+    } catch (notifyError) {
+      console.error('通知送信中のエラー:', notifyError);
+      // 通知エラーは処理続行
+    }
+    
+    return {
+      success: true,
+      status: ConnectionStatus.PENDING
+    };
+    
+  } catch (error) {
+    console.error('接続リクエスト送信エラー:', error);
+    return {
+      success: false,
+      status: ConnectionStatus.NONE,
+      error: error instanceof Error ? error.message : '接続リクエストの送信に失敗しました'
     };
   }
 };

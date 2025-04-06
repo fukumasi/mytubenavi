@@ -31,14 +31,26 @@ export default function AdsSection() {
         setIsYoutuber(false);
         return;
       }
-
+    
       try {
-        // Supabaseでyoutuber_profilesテーブルを確認
-        const { data } = await supabase
+        // まず単純なクエリでテスト
+        console.log('テスト1: 単純なGETクエリ');
+        const { data: testData, error: testError } = await supabase
+          .from('youtuber_profiles')
+          .select('*')
+          .limit(1);
+        
+        console.log('テスト1結果:', { testData, testError });
+        
+        // 次に対象の条件クエリをテスト
+        console.log('テスト2: 条件付きクエリ');
+        const { data, error } = await supabase
           .from('youtuber_profiles')
           .select('id')
-          .eq('user_id', user.id)
+          .eq('id', user.id)
           .single();
+        
+        console.log('テスト2結果:', { data, error });
         
         setIsYoutuber(!!data);
       } catch (error) {

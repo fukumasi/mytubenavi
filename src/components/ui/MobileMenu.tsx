@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Crown, Sparkles, ThumbsUp, Bell, Home, Search, User, Heart, Youtube, LogOut } from 'lucide-react';
+import { Crown, Sparkles, ThumbsUp, Bell, Home, Search, User, Heart, Youtube, LogOut, Users } from 'lucide-react';
 
 interface MobileMenuProps {
  isOpen: boolean;
@@ -87,6 +87,18 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, isPremium = fa
                >
                  <Search className="h-5 w-5 mr-3 text-gray-500" />
                  検索
+               </Link>
+             </li>
+             
+             {/* マッチング機能へのリンク */}
+             <li>
+               <Link 
+                 to="/matching"
+                 className="flex items-center px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"
+                 onClick={handleMenuItemClick}
+               >
+                 <Users className="h-5 w-5 mr-3 text-indigo-500" />
+                 マッチング
                </Link>
              </li>
              

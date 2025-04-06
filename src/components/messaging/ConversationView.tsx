@@ -9,7 +9,7 @@ import { ja } from 'date-fns/locale';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import { Send, Clock, Crown, Lock } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import useMatching from '../../hooks/useMatching';
+import { useMatching } from '../../hooks/useMatching';
 
 interface ConversationViewProps {
  conversationId?: string;
