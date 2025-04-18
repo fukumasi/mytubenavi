@@ -9,10 +9,11 @@ import ViewHistory from './ViewHistory';
 import NotificationsPage from './NotificationsPage';
 import NotificationSettings from './NotificationSettings';
 import SettingsPage from './SettingsPage';
+import VerificationPage from './VerificationPage';
 import MatchingSystem from '../matching/MatchingSystem';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
-import { Users } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { Users, Shield } from 'lucide-react';
 
 export default function ProfileRoutes() {
   const location = useLocation();
@@ -124,6 +125,17 @@ export default function ProfileRoutes() {
             通知
           </Link>
           <Link
+            to="/profile/verification"
+            className={`px-6 py-4 text-sm font-medium flex items-center ${
+              isActive('/verification') 
+                ? 'text-indigo-600 border-b-2 border-indigo-600' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            アカウント認証
+            <Shield className="ml-1 h-4 w-4" />
+          </Link>
+          <Link
             to="/profile/settings"
             className={`px-6 py-4 text-sm font-medium ${
               isActive('/settings') 
@@ -142,6 +154,7 @@ export default function ProfileRoutes() {
           <Route path="/favorites" element={<FavoriteVideos />} />
           <Route path="/reviews" element={<ReviewHistory />} />
           <Route path="/history" element={<ViewHistory />} />
+          <Route path="/verification" element={<VerificationPage />} />
           <Route path="/matching" element={
             <div className="space-y-6">
               <div className="flex items-center justify-between">

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Star } from 'lucide-react';
-import { useFavorites } from '../../hooks/useFavorites';
-import { useAuth } from '../../contexts/AuthContext';
+import { useFavorites } from '@/hooks/useFavorites';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface FavoriteButtonProps {
   videoId: string;

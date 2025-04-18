@@ -43,79 +43,251 @@ interface PromotionSlotInfo {
 }
 
 /**
- * 返金処理を実行する
+ * 予約ステータス更新の引数型定義
  */
-export const processRefund = async (params: RefundParams): Promise<RefundResult> => {
+export interface UpdateBookingStatusParams {
+  bookingId: string;
+  paymentStatus: 'succeeded' | 'processing' | 'cancelled' | 'paid' | 'refunded' | 'pending';
+  sendNotification?: boolean;
+}
+
+/**
+ * 掲載枠を有効化する
+ * @param slotId 有効化する掲載枠ID
+ */
+const activatePromotionSlot = async (slotId: string) => {
   try {
-    // Stripeで返金処理を実行
-    const stripeRefund = await refundPayment({
-      paymentIntentId: params.stripePaymentIntentId,
-      amount: params.amount,
-      reason: params.reason
-    });
-
-    if (!stripeRefund.success || !stripeRefund.refundId) {
-      throw new Error(stripeRefund.error || '返金処理に失敗しました');
+    const { error } = await supabase
+      .from('promotion_slots')
+      .update({
+        is_active: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', slotId);
+    
+    if (error) {
+      console.error('掲載枠の有効化に失敗しました:', error);
     }
-
-    // Supabaseの支払いデータを更新
-    if (params.paymentType === 'premium') {
-      // プレミアム会員の支払いを更新
-      const { error } = await supabase
-        .from('premium_payments')
-        .update({
-          status: params.isFullRefund ? 'refunded' : 'partially_refunded',
-          refund_amount: params.amount,
-          refund_reason: params.reason,
-          refund_date: new Date().toISOString(),
-          refund_id: stripeRefund.refundId
-        })
-        .eq('id', params.paymentId);
-
-      if (error) throw error;
-    } else {
-      // 広告枠の予約支払いを更新
-      const { error } = await supabase
-        .from('slot_bookings')
-        .update({
-          status: params.isFullRefund ? 'refunded' : 'partially_refunded',
-          refund_amount: params.amount,
-          refund_reason: params.reason,
-          refund_date: new Date().toISOString(),
-          refund_id: stripeRefund.refundId
-        })
-        .eq('id', params.paymentId);
-
-      if (error) throw error;
-    }
-
-    // 返金通知を作成
-    await createRefundNotification(params);
-
-    // 管理ログに記録
-    await recordAdminAction({
-      action: 'refund',
-      resourceType: params.paymentType,
-      resourceId: params.paymentId,
-      details: {
-        amount: params.amount,
-        reason: params.reason,
-        isFullRefund: params.isFullRefund,
-        stripeRefundId: stripeRefund.refundId
-      }
-    });
-
-    return {
-      success: true,
-      refundId: stripeRefund.refundId
-    };
   } catch (error) {
-    console.error('返金処理エラー:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : '返金処理中にエラーが発生しました'
+    console.error('掲載枠の有効化エラー:', error);
+    // エラーは上位に伝播させない
+  }
+};
+
+/**
+ * 掲載枠を無効化する
+ * @param slotId 無効化する掲載枠ID
+ */
+const deactivatePromotionSlot = async (slotId: string) => {
+  try {
+    const { error } = await supabase
+      .from('promotion_slots')
+      .update({
+        is_active: false,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', slotId);
+    
+    if (error) {
+      console.error('掲載枠の無効化に失敗しました:', error);
+    }
+  } catch (error) {
+    console.error('掲載枠の無効化エラー:', error);
+    // エラーは上位に伝播させない
+  }
+};
+
+/**
+ * 日付範囲をフォーマットする
+ */
+const formatDateRange = (startDate: string, endDate: string): string => {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  return `${start.toLocaleDateString('ja-JP')} 〜 ${end.toLocaleDateString('ja-JP')}`;
+};
+
+/**
+ * ステータスコードをテキストに変換
+ */
+const getStatusText = (status: string): string => {
+  const statusMap: Record<string, string> = {
+    // プレミアム関連
+    'active': '有効',
+    'succeeded': '決済完了',
+    'canceled': 'キャンセル',
+    'refunded': '返金済み',
+    'partially_refunded': '一部返金',
+    'failed': '失敗',
+    'pending': '処理中',
+    'trialing': '試用期間中',
+    'past_due': '支払い期限超過',
+    'incomplete': '未完了',
+    'incomplete_expired': '期限切れ',
+    'unpaid': '未払い',
+    
+    // 広告枠関連
+    'completed': '完了',
+    'expired': '期限切れ',
+    'rejected': '却下'
+  };
+  
+  return statusMap[status] || status;
+};
+
+/**
+ * 予約ステータス変更通知を作成する
+ */
+const createBookingStatusNotification = async (
+  bookingId: string,
+  userId: string, 
+  bookingStatus: string,
+  paymentStatus: string
+) => {
+  try {
+    // 予約と掲載枠の情報を取得
+    const { data, error } = await supabase
+      .from('slot_bookings')
+      .select(`
+        id,
+        amount_paid,
+        slot_id,
+        start_date,
+        end_date,
+        promotion_slots (name, type)
+      `)
+      .eq('id', bookingId)
+      .single();
+    
+    if (error || !data) {
+      throw new Error('予約情報の取得に失敗しました');
+    }
+    
+    const slotInfo = data.promotion_slots as PromotionSlotInfo;
+    const slotName = slotInfo?.name || '未定義の掲載枠';
+    const amount = data.amount_paid || 0;
+    
+    // 通知タイトルとメッセージの作成
+    let title = '';
+    let message = '';
+    let priority = 'medium';
+    
+    switch(bookingStatus) {
+      case 'active':
+        title = '掲載枠の予約が確定しました';
+        message = `「${slotName}」の掲載枠(¥${amount.toLocaleString()})の支払いが完了し、予約が確定しました。掲載期間: ${formatDateRange(data.start_date, data.end_date)}`;
+        break;
+      case 'cancelled':
+        title = '掲載枠の予約がキャンセルされました';
+        message = `「${slotName}」の掲載枠(¥${amount.toLocaleString()})の予約がキャンセルされました。`;
+        priority = 'high';
+        break;
+      case 'refunded':
+        title = '掲載枠の予約が返金されました';
+        message = `「${slotName}」の掲載枠(¥${amount.toLocaleString()})の予約が返金処理されました。`;
+        break;
+      case 'pending':
+        if (paymentStatus === 'processing') {
+          title = '掲載枠の支払いが処理中です';
+          message = `「${slotName}」の掲載枠(¥${amount.toLocaleString()})の支払いが処理中です。完了までしばらくお待ちください。`;
+        } else {
+          title = '掲載枠の予約状況が更新されました';
+          message = `「${slotName}」の掲載枠(¥${amount.toLocaleString()})の予約状況が更新されました。`;
+        }
+        break;
+      default:
+        title = '掲載枠の予約状況が更新されました';
+        message = `「${slotName}」の掲載枠の予約状況が「${getStatusText(bookingStatus)}」に更新されました。`;
+    }
+    
+    // 通知を作成
+    const { error: notifyError } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: userId,
+        type: 'booking_status',
+        title,
+        message,
+        is_read: false,
+        priority,
+        metadata: {
+          bookingId,
+          bookingStatus,
+          paymentStatus,
+          slotName,
+          amount,
+          startDate: data.start_date,
+          endDate: data.end_date
+        },
+        link: '/youtuber/promotions'
+      });
+    
+    if (notifyError) {
+      console.error('通知作成エラー:', notifyError);
+    }
+  } catch (error) {
+    console.error('予約ステータス変更通知作成エラー:', error);
+    // 通知作成のエラーは上位に伝播させない
+  }
+};
+
+/**
+ * 管理者の操作ログを記録する
+ */
+const recordAdminAction = async (actionData: {
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  details: Record<string, any>;
+}): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('admin_action_logs')
+      .insert({
+        action: actionData.action,
+        resource_type: actionData.resourceType,
+        resource_id: actionData.resourceId,
+        details: actionData.details,
+        created_at: new Date().toISOString(),
+        // 実際の実装では現在のログインユーザー（管理者）のIDを取得して設定する
+        admin_id: (await supabase.auth.getUser()).data.user?.id
+      });
+
+    if (error) {
+      console.error('管理者ログ記録エラー:', error);
+    }
+  } catch (error) {
+    console.error('管理者ログ記録エラー:', error);
+    // ログ記録のエラーは返金処理自体を失敗させない
+  }
+};
+
+/**
+ * プロモーションスロットの情報を安全に取得する
+ */
+const safeGetPromotionSlotInfo = (promotionSlots: any): PromotionSlotInfo => {
+  if (!promotionSlots) {
+    return { name: 'Unknown', type: 'Unknown' };
+  }
+  
+  // オブジェクトの場合
+  if (typeof promotionSlots === 'object' && !Array.isArray(promotionSlots)) {
+    return { 
+      name: promotionSlots.name || 'Unknown', 
+      type: promotionSlots.type || 'Unknown' 
     };
   }
+  
+  // 配列の場合
+  if (Array.isArray(promotionSlots) && promotionSlots.length > 0) {
+    const firstSlot = promotionSlots[0];
+    return { 
+      name: firstSlot?.name || 'Unknown', 
+      type: firstSlot?.type || 'Unknown' 
+    };
+  }
+  
+  return { name: 'Unknown', type: 'Unknown' };
 };
 
 /**
@@ -204,33 +376,496 @@ const createRefundNotification = async (params: RefundParams): Promise<void> => 
 };
 
 /**
- * 管理者の操作ログを記録する
+ * ステータス変更通知を作成する
  */
-const recordAdminAction = async (actionData: {
-  action: string;
-  resourceType: string;
-  resourceId: string;
-  details: Record<string, any>;
-}): Promise<void> => {
+const createStatusChangeNotification = async (
+  paymentId: string,
+  paymentType: 'premium' | 'promotion',
+  newStatus: string
+) => {
   try {
-    const { error } = await supabase
-      .from('admin_action_logs')
-      .insert({
-        action: actionData.action,
-        resource_type: actionData.resourceType,
-        resource_id: actionData.resourceId,
-        details: actionData.details,
-        created_at: new Date().toISOString(),
-        // 実際の実装では現在のログインユーザー（管理者）のIDを取得して設定する
-        admin_id: (await supabase.auth.getUser()).data.user?.id
-      });
+    // 対象ユーザーと支払い情報を取得
+    let userId: string | null = null;
+    let paymentInfo: any = null;
+    
+    if (paymentType === 'premium') {
+      const { data } = await supabase
+        .from('premium_payments')
+        .select('user_id, plan, amount')
+        .eq('id', paymentId)
+        .single();
+      
+      userId = data?.user_id;
+      paymentInfo = data;
+    } else {
+      const { data } = await supabase
+        .from('slot_bookings')
+        .select(`
+          user_id, 
+          amount_paid,
+          slot_id,
+          promotion_slots (name)
+        `)
+        .eq('id', paymentId)
+        .single();
 
-    if (error) {
-      console.error('管理者ログ記録エラー:', error);
+      userId = data?.user_id;
+      paymentInfo = data;
     }
+    
+    if (!userId || !paymentInfo) return;
+    
+    // 支払い説明文の作成
+    let paymentDesc = 'Unknown';
+    if (paymentType === 'premium') {
+      paymentDesc = `プレミアムプラン (${paymentInfo?.plan || 'Unknown'})`;
+    } else {
+      const slotInfo = paymentInfo.slotName ? 
+        { name: paymentInfo.slotName } : 
+        safeGetPromotionSlotInfo(paymentInfo.promotion_slots);
+        
+      paymentDesc = `広告枠 (${slotInfo.name})`;
+    }
+    
+    // ステータスに応じたメッセージを作成
+    let title = '';
+    let message = '';
+    
+    if (newStatus === 'active' || newStatus === 'succeeded' || newStatus === 'completed') {
+      title = `お支払いが確認されました`;
+      message = `${paymentDesc}のお支払い(¥${(paymentInfo.amount || paymentInfo.amount_paid || 0).toLocaleString()})が確認されました。`;
+    } else if (newStatus === 'refunded') {
+      title = `返金処理が完了しました`;
+      message = `${paymentDesc}のお支払い(¥${(paymentInfo.amount || paymentInfo.amount_paid || 0).toLocaleString()})の返金処理が完了しました。`;
+    } else if (newStatus === 'canceled' || newStatus === 'rejected') {
+      title = `お支払いがキャンセルされました`;
+      message = `${paymentDesc}のお支払い(¥${(paymentInfo.amount || paymentInfo.amount_paid || 0).toLocaleString()})がキャンセルされました。`;
+    } else if (newStatus === 'failed') {
+      title = `お支払いに問題が発生しました`;
+      message = `${paymentDesc}のお支払い(¥${(paymentInfo.amount || paymentInfo.amount_paid || 0).toLocaleString()})に問題が発生しました。詳細はサポートにお問い合わせください。`;
+    } else {
+      title = `お支払いステータスが更新されました`;
+      message = `${paymentDesc}のお支払い(¥${(paymentInfo.amount || paymentInfo.amount_paid || 0).toLocaleString()})のステータスが「${getStatusText(newStatus)}」に更新されました。`;
+    }
+    
+    // 通知を作成
+    const { error } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: userId,
+        type: 'payment_status',
+        title,
+        message,
+        is_read: false,
+        priority: newStatus === 'failed' ? 'high' : 'medium',
+        metadata: {
+          paymentId,
+          paymentType,
+          newStatus,
+          amount: paymentInfo.amount || paymentInfo.amount_paid,
+          paymentDescription: paymentDesc
+        },
+        link: '/profile/payments'
+      });
+    
+    if (error) throw error;
   } catch (error) {
-    console.error('管理者ログ記録エラー:', error);
-    // ログ記録のエラーは返金処理自体を失敗させない
+    console.error('ステータス変更通知作成エラー:', error);
+    // 通知作成のエラーは処理全体を失敗させない
+  }
+};
+
+/**
+ * 予約をキャンセルする
+ * @param bookingId 予約ID
+ * @param reason キャンセル理由
+ * @returns 処理結果
+ */
+export const cancelBooking = async (bookingId: string, reason: string = '') => {
+  try {
+    // 予約情報を取得
+    const { data: booking, error: fetchError } = await supabase
+      .from('slot_bookings')
+      .select('status, payment_status, user_id, slot_id')
+      .eq('id', bookingId)
+      .single();
+    
+    if (fetchError) {
+      throw new Error(`予約情報の取得に失敗しました: ${fetchError.message}`);
+    }
+    
+    if (!booking) {
+      throw new Error('該当する予約が見つかりません');
+    }
+    
+    // すでにキャンセル済みや完了済みの場合はエラー
+    if (['cancelled', 'refunded', 'completed', 'expired'].includes(booking.status)) {
+      throw new Error(`この予約は既に ${getStatusText(booking.status)} 状態のため、キャンセルできません`);
+    }
+    
+    // 予約ステータスを更新
+const { error: updateError } = await supabase
+.from('slot_bookings')
+.update({
+  status: 'cancelled',
+  payment_status: booking.payment_status === 'succeeded' ? 'cancelled' : booking.payment_status,
+  updated_at: new Date().toISOString(),
+  refund_reason: reason // cancel_reasonからrefund_reasonに修正
+})
+.eq('id', bookingId);
+    
+    if (updateError) {
+      throw new Error(`予約キャンセルに失敗しました: ${updateError.message}`);
+    }
+    
+    // スロットを無効化（掲載中だった場合）
+    if (booking.slot_id) {
+      await deactivatePromotionSlot(booking.slot_id);
+    }
+    
+    // 通知送信
+    if (booking.user_id) {
+      await createBookingStatusNotification(bookingId, booking.user_id, 'cancelled', booking.payment_status);
+    }
+    
+    return {
+      success: true,
+      message: '予約がキャンセルされました',
+      newStatus: 'cancelled'
+    };
+  } catch (error) {
+    console.error('予約キャンセルエラー:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '予約キャンセル中にエラーが発生しました'
+    };
+  }
+};
+
+/**
+ * 有効な予約のみを取得する
+ * @param userId ユーザーID
+ * @returns 有効な予約一覧
+ */
+export const getActiveBookings = async (userId: string) => {
+  try {
+    // 有効な予約のみを取得（修正：適切な条件に変更）
+    const { data, error } = await supabase
+      .from('slot_bookings')
+      .select(`
+        id,
+        slot_id,
+        video_id,
+        position,
+        start_date,
+        end_date,
+        status,
+        payment_status,
+        amount_paid,
+        created_at,
+        updated_at,
+        promotion_slots (id, name, type, price)
+      `)
+      .eq('user_id', userId)
+      .eq('status', 'active') // ステータスが「アクティブ」のものだけを取得
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      throw error;
+    }
+    
+    return {
+      success: true,
+      data: data || [],
+      count: data?.length || 0
+    };
+  } catch (error) {
+    console.error('有効な予約取得エラー:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '予約データの取得中にエラーが発生しました',
+      data: [],
+      count: 0
+    };
+  }
+};
+
+/**
+ * 期限切れの予約を自動的に更新する
+ * バッチ処理やスケジュールされたタスクから呼び出すことを想定
+ */
+export const updateExpiredBookings = async () => {
+  try {
+    const now = new Date().toISOString();
+    
+    // 期限切れの予約を検索（終了日が過ぎているもの、かつステータスが active のもの）
+    const { data, error } = await supabase
+      .from('slot_bookings')
+      .select('id, status, end_date')
+      .lt('end_date', now)
+      .eq('status', 'active');
+    
+    if (error) {
+      throw error;
+    }
+    
+    if (!data || data.length === 0) {
+      return {
+        success: true,
+        message: '期限切れの予約はありません',
+        updatedCount: 0
+      };
+    }
+    
+    // 一括でステータスを更新
+    const bookingIds = data.map(booking => booking.id);
+    const { error: updateError } = await supabase
+      .from('slot_bookings')
+      .update({
+        status: 'expired',
+        updated_at: now
+      })
+      .in('id', bookingIds);
+    
+    if (updateError) {
+      throw updateError;
+    }
+    
+    return {
+      success: true,
+      message: `${data.length}件の期限切れ予約を更新しました`,
+      updatedCount: data.length
+    };
+  } catch (error) {
+    console.error('期限切れ予約更新エラー:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '予約ステータスの更新中にエラーが発生しました',
+      updatedCount: 0
+    };
+  }
+};
+
+/**
+ * 決済ステータスに基づいて予約ステータスを更新する
+ * @param params 更新パラメータ
+ * @returns 更新結果
+ */
+export const updateBookingStatusByPayment = async (params: UpdateBookingStatusParams) => {
+  try {
+    const { bookingId, paymentStatus, sendNotification = true } = params;
+    
+    // 対応する予約ステータスを決定
+    let bookingStatus = 'pending';
+    
+    switch(paymentStatus) {
+      case 'succeeded':
+      case 'paid':
+        // 支払い完了の場合は予約をアクティブに
+        bookingStatus = 'active';
+        break;
+      case 'cancelled':
+        // キャンセルの場合
+        bookingStatus = 'cancelled';
+        break;
+      case 'refunded':
+        // 返金済みの場合
+        bookingStatus = 'refunded';
+        break;
+      case 'processing':
+        // 処理中の場合はpendingのまま
+        bookingStatus = 'pending';
+        break;
+      default:
+        bookingStatus = 'pending';
+    }
+    
+    // 予約情報の取得（スロットIDを取得するため）
+    const { data: bookingData, error: fetchError } = await supabase
+      .from('slot_bookings')
+      .select('slot_id, user_id')
+      .eq('id', bookingId)
+      .single();
+    
+    if (fetchError) {
+      throw new Error(`予約情報の取得に失敗しました: ${fetchError.message}`);
+    }
+    
+    if (!bookingData) {
+      throw new Error('該当する予約が見つかりません');
+    }
+    
+    // 予約ステータスを更新
+    const { error: updateError } = await supabase
+      .from('slot_bookings')
+      .update({
+        status: bookingStatus,
+        payment_status: paymentStatus,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', bookingId);
+    
+    if (updateError) {
+      throw new Error(`予約ステータスの更新に失敗しました: ${updateError.message}`);
+    }
+    
+    // 支払い完了の場合、掲載枠を自動的に有効化
+    if (bookingStatus === 'active' && bookingData.slot_id) {
+      await activatePromotionSlot(bookingData.slot_id);
+    }
+    
+    // 通知送信（オプション）
+    if (sendNotification && bookingData.user_id) {
+      await createBookingStatusNotification(bookingId, bookingData.user_id, bookingStatus, paymentStatus);
+    }
+    
+    return {
+      success: true,
+      newStatus: bookingStatus,
+      paymentStatus
+    };
+  } catch (error) {
+    console.error('予約ステータス更新エラー:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '予約ステータスの更新中にエラーが発生しました'
+    };
+  }
+};
+
+/**
+ * Stripe決済ウェブフックから予約ステータスを更新する
+ * @param paymentIntentId Stripe決済ID
+ * @param status Stripe決済ステータス
+ */
+export const updateBookingByStripeWebhook = async (paymentIntentId: string, status: string) => {
+  try {
+    // payment_intent_idから対応する予約を検索
+    const { data, error } = await supabase
+      .from('slot_bookings')
+      .select('id')
+      .eq('payment_intent_id', paymentIntentId)
+      .single();
+    
+    if (error) {
+      console.error('Stripeウェブフック: 予約の検索に失敗しました', error);
+      return { success: false, error: error.message };
+    }
+    
+    if (!data) {
+      console.error('Stripeウェブフック: 対応する予約が見つかりません', paymentIntentId);
+      return { success: false, error: '対応する予約が見つかりません' };
+    }
+    
+    // Stripeステータスを当サービスのステータスに変換
+    let paymentStatus: 'succeeded' | 'processing' | 'cancelled' | 'paid' | 'refunded' | 'pending' = 'pending';
+    
+    switch(status) {
+      case 'succeeded':
+        paymentStatus = 'succeeded';
+        break;
+      case 'processing':
+        paymentStatus = 'processing';
+        break;
+      case 'canceled':
+        paymentStatus = 'cancelled';
+        break;
+      case 'requires_payment_method':
+      case 'requires_action':
+        paymentStatus = 'pending';
+        break;
+      default:
+        paymentStatus = 'pending';
+    }
+    
+    // 予約ステータスを更新
+    return await updateBookingStatusByPayment({
+      bookingId: data.id,
+      paymentStatus,
+      sendNotification: true
+    });
+  } catch (error) {
+    console.error('Stripeウェブフックによるステータス更新エラー:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'ステータス更新中にエラーが発生しました'
+    };
+  }
+};
+
+/**
+ * 返金処理を実行する
+ */
+export const processRefund = async (params: RefundParams): Promise<RefundResult> => {
+  try {
+    // Stripeで返金処理を実行
+    const stripeRefund = await refundPayment({
+      paymentIntentId: params.stripePaymentIntentId,
+      amount: params.amount,
+      reason: params.reason
+    });
+
+    if (!stripeRefund.success || !stripeRefund.refundId) {
+      throw new Error(stripeRefund.error || '返金処理に失敗しました');
+    }
+
+    // Supabaseの支払いデータを更新
+    if (params.paymentType === 'premium') {
+      // プレミアム会員の支払いを更新
+      const { error } = await supabase
+        .from('premium_payments')
+        .update({
+          status: params.isFullRefund ? 'refunded' : 'partially_refunded',
+          refund_amount: params.amount,
+          refund_reason: params.reason,
+          refund_date: new Date().toISOString(),
+          refund_id: stripeRefund.refundId
+        })
+        .eq('id', params.paymentId);
+
+      if (error) throw error;
+    } else {
+      // 広告枠の予約支払いを更新
+      const { error } = await supabase
+        .from('slot_bookings')
+        .update({
+          status: params.isFullRefund ? 'refunded' : 'partially_refunded',
+          refund_amount: params.amount,
+          refund_reason: params.reason,
+          refund_date: new Date().toISOString(),
+          refund_id: stripeRefund.refundId
+        })
+        .eq('id', params.paymentId);
+
+      if (error) throw error;
+    }
+
+    // 返金通知を作成
+    await createRefundNotification(params);
+
+    // 管理ログに記録
+    await recordAdminAction({
+      action: 'refund',
+      resourceType: params.paymentType,
+      resourceId: params.paymentId,
+      details: {
+        amount: params.amount,
+        reason: params.reason,
+        isFullRefund: params.isFullRefund,
+        stripeRefundId: stripeRefund.refundId
+      }
+    });
+
+    return {
+      success: true,
+      refundId: stripeRefund.refundId
+    };
+  } catch (error) {
+    console.error('返金処理エラー:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '返金処理中にエラーが発生しました'
+    };
   }
 };
 
@@ -335,7 +970,7 @@ export const getAllPayments = async (
         slot_id,
         start_date,
         end_date,
-        amount,
+        amount_paid,
         status,
         created_at,
         payment_intent_id,
@@ -357,10 +992,10 @@ export const getAllPayments = async (
       slotQuery = slotQuery.eq('status', filters.status);
     }
     if (filters.minAmount) {
-      slotQuery = slotQuery.gte('amount', filters.minAmount);
+      slotQuery = slotQuery.gte('amount_paid', filters.minAmount);
     }
     if (filters.maxAmount) {
-      slotQuery = slotQuery.lte('amount', filters.maxAmount);
+      slotQuery = slotQuery.lte('amount_paid', filters.maxAmount);
     }
     if (filters.searchTerm) {
       // 検索はあとでメモリ上でフィルターする
@@ -409,7 +1044,7 @@ export const getAllPayments = async (
         avatarUrl: userProfile.avatar_url,
         type: 'promotion',
         description: `広告枠: ${slotInfo.name || 'Unknown'} (${slotInfo.type || 'Unknown'})`,
-        amount: item.amount,
+        amount: item.amount_paid, // amount_paidを使用するよう修正
         status: item.status,
         createdAt: item.created_at,
         startDate: item.start_date,
@@ -525,7 +1160,7 @@ export const getPaymentSummary = async (
     // Slot bookings クエリ
     let slotQuery = supabase
       .from('slot_bookings')
-      .select('amount, status, refund_amount');
+      .select('amount_paid, status, refund_amount');
 
     // フィルター適用
     if (startDate) {
@@ -557,7 +1192,7 @@ export const getPaymentSummary = async (
     );
 
     const promotionAmount = (slotResult.data || []).reduce(
-      (sum, item) => sum + (item.amount || 0) - (item.refund_amount || 0),
+      (sum, item) => sum + (item.amount_paid || 0) - (item.refund_amount || 0),
       0
     );
 
@@ -647,7 +1282,7 @@ export const getPaymentDetail = async (paymentId: string, paymentType: 'premium'
     return {
       id: paymentData.id,
       type: paymentType,
-      amount: paymentData.amount,
+      amount: paymentType === 'premium' ? paymentData.amount : paymentData.amount_paid, // amount_paidを使用する
       status: paymentData.status,
       createdAt: paymentData.created_at,
       user: userData ? {
@@ -851,34 +1486,6 @@ export const exportPaymentsReport = async (
 };
 
 /**
- * ステータスコードをテキストに変換
- */
-const getStatusText = (status: string): string => {
-  const statusMap: Record<string, string> = {
-    // プレミアム関連
-    'active': '有効',
-    'succeeded': '決済完了',
-    'canceled': 'キャンセル',
-    'refunded': '返金済み',
-    'partially_refunded': '一部返金',
-    'failed': '失敗',
-    'pending': '処理中',
-    'trialing': '試用期間中',
-    'past_due': '支払い期限超過',
-    'incomplete': '未完了',
-    'incomplete_expired': '期限切れ',
-    'unpaid': '未払い',
-    
-    // 広告枠関連
-    'completed': '完了',
-    'expired': '期限切れ',
-    'rejected': '却下'
-  };
-  
-  return statusMap[status] || status;
-};
-
-/**
  * 支払いステータスを更新する
  */
 export const updatePaymentStatus = async (
@@ -935,134 +1542,6 @@ export const updatePaymentStatus = async (
       success: false, 
       error: error instanceof Error ? error.message : '更新中にエラーが発生しました'
     };
-  }
-};
-
-/**
- * プロモーションスロットの情報を安全に取得する
- */
-const safeGetPromotionSlotInfo = (promotionSlots: any): PromotionSlotInfo => {
-  if (!promotionSlots) {
-    return { name: 'Unknown', type: 'Unknown' };
-  }
-  
-  // オブジェクトの場合
-  if (typeof promotionSlots === 'object' && !Array.isArray(promotionSlots)) {
-    return { 
-      name: promotionSlots.name || 'Unknown', 
-      type: promotionSlots.type || 'Unknown' 
-    };
-  }
-  
-  // 配列の場合
-  if (Array.isArray(promotionSlots) && promotionSlots.length > 0) {
-    const firstSlot = promotionSlots[0];
-    return { 
-      name: firstSlot?.name || 'Unknown', 
-      type: firstSlot?.type || 'Unknown' 
-    };
-  }
-  
-  return { name: 'Unknown', type: 'Unknown' };
-};
-
-/**
- * ステータス変更通知を作成する
- */
-const createStatusChangeNotification = async (
-  paymentId: string,
-  paymentType: 'premium' | 'promotion',
-  newStatus: string
-) => {
-  try {
-    // 対象ユーザーと支払い情報を取得
-    let userId: string | null = null;
-    let paymentInfo: any = null;
-    
-    if (paymentType === 'premium') {
-      const { data } = await supabase
-        .from('premium_payments')
-        .select('user_id, plan, amount')
-        .eq('id', paymentId)
-        .single();
-      
-      userId = data?.user_id;
-      paymentInfo = data;
-    } else {
-      const { data } = await supabase
-        .from('slot_bookings')
-        .select(`
-          user_id, 
-          amount,
-          slot_id,
-          promotion_slots (name)
-        `)
-        .eq('id', paymentId)
-        .single();
-
-      userId = data?.user_id;
-      paymentInfo = data;
-    }
-    
-    if (!userId || !paymentInfo) return;
-    
-    // 支払い説明文の作成
-    let paymentDesc = 'Unknown';
-    if (paymentType === 'premium') {
-      paymentDesc = `プレミアムプラン (${paymentInfo?.plan || 'Unknown'})`;
-    } else {
-      const slotInfo = paymentInfo.slotName ? 
-        { name: paymentInfo.slotName } : 
-        safeGetPromotionSlotInfo(paymentInfo.promotion_slots);
-        
-      paymentDesc = `広告枠 (${slotInfo.name})`;
-    }
-    
-    // ステータスに応じたメッセージを作成
-    let title = '';
-    let message = '';
-    
-    if (newStatus === 'active' || newStatus === 'succeeded' || newStatus === 'completed') {
-      title = `お支払いが確認されました`;
-      message = `${paymentDesc}のお支払い(¥${paymentInfo.amount.toLocaleString()})が確認されました。`;
-    } else if (newStatus === 'refunded') {
-      title = `返金処理が完了しました`;
-      message = `${paymentDesc}のお支払い(¥${paymentInfo.amount.toLocaleString()})の返金処理が完了しました。`;
-    } else if (newStatus === 'canceled' || newStatus === 'rejected') {
-      title = `お支払いがキャンセルされました`;
-      message = `${paymentDesc}のお支払い(¥${paymentInfo.amount.toLocaleString()})がキャンセルされました。`;
-    } else if (newStatus === 'failed') {
-      title = `お支払いに問題が発生しました`;
-      message = `${paymentDesc}のお支払い(¥${paymentInfo.amount.toLocaleString()})に問題が発生しました。詳細はサポートにお問い合わせください。`;
-    } else {
-      title = `お支払いステータスが更新されました`;
-      message = `${paymentDesc}のお支払い(¥${paymentInfo.amount.toLocaleString()})のステータスが「${getStatusText(newStatus)}」に更新されました。`;
-    }
-    
-    // 通知を作成
-    const { error } = await supabase
-      .from('notifications')
-      .insert({
-        user_id: userId,
-        type: 'payment_status',
-        title,
-        message,
-        is_read: false,
-        priority: newStatus === 'failed' ? 'high' : 'medium',
-        metadata: {
-          paymentId,
-          paymentType,
-          newStatus,
-          amount: paymentInfo.amount,
-          paymentDescription: paymentDesc
-        },
-        link: '/profile/payments'
-      });
-    
-    if (error) throw error;
-  } catch (error) {
-    console.error('ステータス変更通知作成エラー:', error);
-    // 通知作成のエラーは処理全体を失敗させない
   }
 };
 
@@ -1142,7 +1621,7 @@ export const createManualPayment = async (paymentData: {
         .insert({
           user_id: paymentData.userId,
           slot_id: paymentData.planId,
-          amount: paymentData.amount,
+          amount_paid: paymentData.amount, // カラム名修正
           status: 'active',
           created_at: now,
           start_date: paymentData.startDate || now,
@@ -1155,6 +1634,11 @@ export const createManualPayment = async (paymentData: {
         .single();
       
       if (error) throw error;
+      
+      // 予約が有効化されたので、掲載枠も有効化
+      if (paymentData.planId) {
+        await activatePromotionSlot(paymentData.planId);
+      }
       
       return { success: true, paymentId: data.id };
     } else {
@@ -1169,6 +1653,58 @@ export const createManualPayment = async (paymentData: {
   }
 };
 
+/**
+ * 支払いを処理中から完了に更新する
+ * @param bookingId 予約ID
+ * @param paymentIntentId 決済ID
+ */
+export const completePaymentProcess = async (bookingId: string, paymentIntentId: string) => {
+  try {
+    // 予約情報を取得
+    const { data: booking, error: fetchError } = await supabase
+      .from('slot_bookings')
+      .select('status, payment_status, payment_intent_id')
+      .eq('id', bookingId)
+      .single();
+    
+    if (fetchError) {
+      throw new Error(`予約情報の取得に失敗しました: ${fetchError.message}`);
+    }
+    
+    if (!booking) {
+      throw new Error('該当する予約が見つかりません');
+    }
+    
+    // 支払いIDの検証
+    if (booking.payment_intent_id && booking.payment_intent_id !== paymentIntentId) {
+      throw new Error('支払いIDが一致しません');
+    }
+    
+    // 支払いステータスが完了していなければ更新
+    if (booking.payment_status !== 'succeeded' && booking.payment_status !== 'paid') {
+      // 予約ステータスを更新
+      return await updateBookingStatusByPayment({
+        bookingId,
+        paymentStatus: 'succeeded',
+        sendNotification: true
+      });
+    }
+    
+    return {
+      success: true,
+      message: '既に支払いは完了しています',
+      newStatus: booking.status,
+      paymentStatus: booking.payment_status
+    };
+  } catch (error) {
+    console.error('支払い完了処理エラー:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '支払い完了処理中にエラーが発生しました'
+    };
+  }
+};
+
 export default {
   processRefund,
   getAllPayments,
@@ -1178,5 +1714,11 @@ export default {
   updatePaymentPlan,
   exportPaymentsReport,
   updatePaymentStatus,
-  createManualPayment
-}; 
+  createManualPayment,
+  updateBookingStatusByPayment,
+  updateBookingByStripeWebhook,
+  completePaymentProcess,
+  cancelBooking,        
+  getActiveBookings,    
+  updateExpiredBookings  
+};

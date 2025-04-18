@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, Clock, Star } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import ProfileLayout from './ProfileLayout';
-import type { Video } from '../../types';
+import type { Video } from '@/types';
 
 // 視聴履歴用に拡張した型を定義
 interface HistoryVideo extends Video {
@@ -58,7 +58,7 @@ export default function ViewHistory() {
                setHistory(formattedVideos);
            } catch (err) {
                console.error('視聴履歴の取得エラー:', err);
-               setError(err instanceof Error ? err.message : '不明なエラーが発生しました');
+               setError(err instanceof Error ? err.message : '不明なエラーが発生しました');    
            } finally {
                setLoading(false);
            }
@@ -127,7 +127,7 @@ export default function ViewHistory() {
                                            alt={video.title}
                                            className="w-full h-27 object-cover rounded-lg"
                                            onError={(e) => {
-                                               (e.target as HTMLImageElement).src = '/placeholder.jpg';
+                                               (e.target as HTMLImageElement).src = '/placeholder.jpg';    
                                            }}
                                        />
                                        {video.duration && (
@@ -142,18 +142,18 @@ export default function ViewHistory() {
                                            {video.title}
                                        </h3>
 
-                                       <div className="flex items-center text-sm text-gray-600 mb-2">
-                                           <span className="font-medium">{video.channel_title}</span>
+                                       <div className="flex items-center text-sm text-gray-600 mb-2">      
+                                           <span className="font-medium">{video.channel_title}</span>      
                                        </div>
 
-                                       <div className="flex items-center space-x-4 text-sm text-gray-500">
+                                       <div className="flex items-center space-x-4 text-sm text-gray-500"> 
                                            <div className="flex items-center">
                                                <Eye className="h-4 w-4 mr-1" />
                                                <span>{video.view_count ? `${(video.view_count / 10000).toFixed(1)}万回視聴` : '再生回数不明'}</span>
                                            </div>
                                            {video.rating !== undefined && (
                                                <div className="flex items-center">
-                                                   <Star className="h-4 w-4 text-yellow-400 mr-1" />
+                                                   <Star className="h-4 w-4 text-yellow-400 mr-1" />       
                                                    <span>{video.rating.toFixed(1)}</span>
                                                </div>
                                            )}

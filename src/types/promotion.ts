@@ -17,6 +17,9 @@ export interface PromotionSlot {
   youtube_id?: string;
   video_title?: string;
   thumbnail_url?: string;
+  genre_id?: string;    // ジャンルID（ジャンル特定用）
+  genres?: string[];    // 複数ジャンルに対応する場合
+  image_url?: string;   // 掲載枠のサムネイル画像URL
 }
 
 export interface SlotBooking {
@@ -36,6 +39,11 @@ export interface SlotBooking {
   payment_intent_id?: string;  // Stripe決済ID
   slot?: PromotionSlot;     // 関連する掲載枠
   video?: Video;            // 関連する動画
+}
+
+// APIから返されるデータ用の拡張インターフェース
+export interface SlotBookingWithPayment extends SlotBooking {
+  amount_paid?: number; // DB上の支払い金額カラム
 }
 
 export interface PromotionStats {

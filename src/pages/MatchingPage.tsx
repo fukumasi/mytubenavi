@@ -2,15 +2,15 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
-import UserCard from '../components/matching/UserCard';
-import MatchPreferences from '../components/matching/MatchPreferences';
+import { useAuth } from '@/contexts/AuthContext';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import UserCard from '@/components/matching/UserCard';
+import MatchPreferences from '@/components/matching/MatchPreferences';
 import { toast, Toaster } from 'react-hot-toast';
-import { supabase } from '../lib/supabase';
-import { usePoints } from '../hooks/usePoints';
-import useMatching from '../hooks/useMatching';
-import { SkippedUser, VideoDetails } from '../types/matching';
+import { supabase } from '@/lib/supabase';
+import { usePoints } from '@/hooks/usePoints';
+import useMatching from '@/hooks/useMatching';
+import { SkippedUser, VideoDetails } from '@/types/matching';
 import { formatDistanceToNow } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -33,7 +33,9 @@ import {
   faFilter,
   faSearch
 } from '@fortawesome/free-solid-svg-icons';
-import { hasEnoughPoints, consumePoints } from '../utils/pointsUtils';
+import { hasEnoughPoints, consumePoints } from '@/utils/pointsUtils';
+import VerificationGuard from '@/components/matching/VerificationGuard';
+import { VerificationLevel } from '@/services/verificationService';
 
 const MatchingPage: React.FC = () => {
   const { user } = useAuth();
@@ -184,20 +186,20 @@ const MatchingPage: React.FC = () => {
       }
       
       // ポイント消費処理（プレミアム会員は消費しない）
-if (!isPremium) {
-  const deductSuccess = await consumePoints(
-    user.id,
-    5, 
-    'profile_view', 
-    currentUser.id  // 参照IDとして相手のユーザーIDを渡す
-  );
-  
-  if (!deductSuccess) {
-    toast.error('ポイント消費処理に失敗しました');
-    setShowDetailedView(false);
-    return;
-  }
-}
+    if (!isPremium) {
+      const deductSuccess = await consumePoints(
+        user.id,
+        5, 
+        'profile_view', 
+        currentUser.id  // 参照IDとして相手のユーザーIDを渡す
+      );
+      
+      if (!deductSuccess) {
+        toast.error('ポイント消費処理に失敗しました');
+        setShowDetailedView(false);
+        return;
+      }
+    }
       
       // 詳細プロフィールを取得
       const profileDetails = await fetchDetailedProfile(currentUser.id);
@@ -475,7 +477,7 @@ if (!isPremium) {
                 認証を完了すると、メッセージの送受信が可能になります。
               </p>
               <button
-                onClick={() => navigate('/verification')}
+                onClick={() => navigate('/profile/verification')}
                 className="mt-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
               >
                 認証手続きへ進む
@@ -707,8 +709,7 @@ if (!isPremium) {
                     {loadingDetails ? (
                       <div className="flex justify-center py-8">
                         <LoadingSpinner />
-                      </div>
-                    ) : (
+                      </div>) : (
                       <>
                         <h2 className="text-xl font-bold mb-4 flex items-center">
                           <FontAwesomeIcon icon={faInfoCircle} className="mr-2 text-blue-500" />
@@ -717,7 +718,8 @@ if (!isPremium) {
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                           <div>
-                            <h3 className="font-semibold text-gray-700 mb-2">プロフィール</h3><div className="bg-gray-50 rounded-lg p-4">
+                            <h3 className="font-semibold text-gray-700 mb-2">プロフィール</h3>
+                            <div className="bg-gray-50 rounded-lg p-4">
                               <div className="mb-2">
                                 <span className="text-gray-500 text-sm">ステータス:</span>
                                 <div className="text-sm mt-1">
@@ -964,26 +966,31 @@ if (!isPremium) {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-6xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">マッチング</h1>
-        <p className="text-gray-600 mt-1">あなたと趣味や視聴傾向が似ているユーザーを見つけましょう</p>
-      </div>
-      
-      <Toaster position="top-center" />
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1 space-y-6">
-          {renderPointBalance()}
-          {renderVerificationBanner()}
-          {renderPremiumBanner()}
+    <VerificationGuard 
+      requiredLevel={VerificationLevel.PHONE_VERIFIED}
+      fallbackMessage="マッチング機能を利用するには電話番号認証が必要です。認証を完了すると20ポイントのボーナスも獲得できます。"
+    >
+      <div className="container mx-auto px-4 py-6 max-w-6xl">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-800">マッチング</h1>
+          <p className="text-gray-600 mt-1">あなたと趣味や視聴傾向が似ているユーザーを見つけましょう</p>
         </div>
         
-        <div className="lg:col-span-2">
-          {renderMatchingDashboard()}
+        <Toaster position="top-center" />
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1 space-y-6">
+            {renderPointBalance()}
+            {renderVerificationBanner()}
+            {renderPremiumBanner()}
+          </div>
+          
+          <div className="lg:col-span-2">
+            {renderMatchingDashboard()}
+          </div>
         </div>
       </div>
-    </div>
+    </VerificationGuard>
   );
 };
 

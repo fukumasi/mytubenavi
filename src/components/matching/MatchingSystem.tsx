@@ -1,15 +1,15 @@
 // src/components/matching/MatchingSystem.tsx
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useMatching } from '../../hooks/useMatching';
-import { supabase } from '../../lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { useMatching } from '@/hooks/useMatching';
+import { supabase } from '@/lib/supabase';
 import { Crown, Lock, Users, AlertCircle, RefreshCw } from 'lucide-react';
-import UserCard from './UserCard';
-import LoadingSpinner from '../ui/LoadingSpinner';
+import UserCard from '@/components/matching/UserCard';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Link } from 'react-router-dom';
-import { ConnectionStatus, MatchingUser } from '../../types/matching';
+import { ConnectionStatus, MatchingUser } from '@/types/matching';
 import { toast } from 'react-hot-toast';
-import { connectUsers } from '../../services/matchingService';
+import { connectUsers } from '@/services/matchingService';
 interface MatchingSystemProps {
   limit?: number;
 }

@@ -1,9 +1,10 @@
 // src/contexts/AuthContext.tsx
 import React, { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
-import type { Profile } from '../types';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
+import type { Profile } from '@/types';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import verificationService from '@/services/verificationService';
 
 // プレミアム会員のステータス情報を表す型
 interface PremiumStatus {
@@ -98,11 +99,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // プロフィールからプレミアム情報を取得して設定する関数
   const fetchAndSetPremiumInfo = useCallback(async (userId: string) => {
     try {
-      const { data: profileData, error: profileError } = await supabase
+      const { data, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .limit(1);
       
       if (profileError) {
         console.error('Profile fetch error:', profileError);
@@ -110,6 +111,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setPremiumStatus(null);
         return;
       }
+      
+      // データが存在するか確認
+      if (!data || data.length === 0) {
+        console.log('No profile data found for user:', userId);
+        setIsPremium(false);
+        setPremiumStatus(null);
+        return;
+      }
+      
+      const profileData = data[0];
       
       // プレミアムステータスを計算
       const status = calculatePremiumStatus(profileData);
@@ -128,6 +139,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             updated_at: new Date().toISOString()
           })
           .eq('id', userId);
+        
+        console.log('Premium membership expired, updated profile to non-premium');
       }
     } catch (error) {
       console.error('Error fetching premium info:', error);
@@ -140,17 +153,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchYoutuberProfile = useCallback(async (userId: string) => {
     try {
       // profiles テーブルからデータを取得してYouTuberプロフィール情報を構築
-      const { data: profileData, error: profileError } = await supabase
+      const { data, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .limit(1);
       
       if (profileError) {
         console.error('Profile fetch error:', profileError);
         setYoutuberProfile(null);
         return;
       }
+      
+      // データが存在するか確認
+      if (!data || data.length === 0) {
+        console.log('No profile data found for user:', userId);
+        setYoutuberProfile(null);
+        return;
+      }
+      
+      const profileData = data[0];
       
       // profileデータからYouTuber情報に必要なデータを抽出
       const youtuberProfileData = {
@@ -281,6 +303,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = useCallback(async (): Promise<void> => {
     try {
+      // Firebase認証のクリーンアップ
+      await verificationService.cleanupFirebaseAuth();
+      
       // まず状態をクリア
       setUser(null);
       setSession(null);

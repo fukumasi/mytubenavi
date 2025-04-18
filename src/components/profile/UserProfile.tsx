@@ -1,7 +1,7 @@
 // src/components/profile/UserProfile.tsx
 import { useEffect, useState } from 'react';
-import { getProfile, updateProfile } from '../../lib/supabase';
-import type { Profile } from '../../types';
+import { getProfile, updateProfile } from '@/lib/supabase';
+import type { Profile } from '@/types';
 import ProfileLayout from './ProfileLayout';
 import { ProfileAvatar } from './ProfileAvatar';
 

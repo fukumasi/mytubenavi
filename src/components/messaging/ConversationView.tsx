@@ -1,15 +1,16 @@
 // src/components/messaging/ConversationView.tsx
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
-import { Message, Conversation } from '../../types/matching';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { Message, Conversation } from '@/types/matching';
 import { formatDistanceToNow } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import LoadingSpinner from '../ui/LoadingSpinner';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Send, Clock, Crown, Lock } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { useMatching } from '../../hooks/useMatching';
+import { useMatching } from '@/hooks/useMatching';
+import { consumePoints } from '@/utils/pointsUtils';
 
 interface ConversationViewProps {
  conversationId?: string;
@@ -18,7 +19,7 @@ interface ConversationViewProps {
 
 const ConversationView: React.FC<ConversationViewProps> = ({ conversationId, otherUserId }) => {
  const { user, isPremium } = useAuth();
- const { consumePoints, remainingPoints } = useMatching();
+ const { pointBalance: remainingPoints } = useMatching();
  const [loading, setLoading] = useState<boolean>(true);
  const [sending, setSending] = useState<boolean>(false);
  const [messages, setMessages] = useState<Message[]>([]);
@@ -177,7 +178,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({ conversationId, oth
      // 通常メッセージは1ポイント、ハイライトは10ポイント
      const requiredPoints = isHighlighted ? 10 : 1;
      
-     if (remainingPoints < requiredPoints) {
+     if (remainingPoints !== null && remainingPoints < requiredPoints) {
        toast.error(`ポイントが不足しています（必要: ${requiredPoints}ポイント）`);
        return;
      }
@@ -223,6 +224,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({ conversationId, oth
      if (!isPremium) {
        const pointAmount = isHighlighted ? 10 : 1;
        await consumePoints(
+         user.id,
          pointAmount, 
          'message', 
          messageData.id
@@ -484,9 +486,9 @@ const ConversationView: React.FC<ConversationViewProps> = ({ conversationId, oth
          </div>
          <button
            type="submit"
-           disabled={sending || !newMessage.trim() || (!isPremium && remainingPoints < (isHighlighted ? 10 : 1))}
+           disabled={sending || !newMessage.trim() || (!isPremium && remainingPoints !== null && remainingPoints < (isHighlighted ? 10 : 1))}
            className={`ml-2 p-2 rounded-full ${
-             sending || !newMessage.trim() || (!isPremium && remainingPoints < (isHighlighted ? 10 : 1))
+             sending || !newMessage.trim() || (!isPremium && remainingPoints !== null && remainingPoints < (isHighlighted ? 10 : 1))
                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                : 'bg-indigo-500 text-white hover:bg-indigo-600'
            }`}
@@ -495,7 +497,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({ conversationId, oth
          </button>
        </div>
        
-       {!isPremium && remainingPoints < 1 && (
+       {!isPremium && remainingPoints !== null && remainingPoints < 1 && (
          <div className="mt-2 text-xs text-red-500 flex items-center">
            <Lock className="w-3 h-3 mr-1" />
            ポイントが不足しています。

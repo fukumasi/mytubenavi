@@ -1,4 +1,4 @@
-// src/components/shared/PromotionCard.tsx
+// src/components/shared/PromotionCard.tsx（修正版）
 import { useState, useEffect, useRef } from 'react';
 import { ExternalLink, Info, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -150,10 +150,8 @@ export default function PromotionCard({
     }
   };
 
-  // YouTube動画リンク
-  const videoUrl = youtubeId 
-    ? `https://www.youtube.com/watch?v=${youtubeId}` 
-    : `/video/${videoId}`;
+  // 内部ビデオページへのリンク（YouTube IDを無視）
+  const videoUrl = `/video/${videoId}`;
 
   const cardClasses = `${getCardStyle()} ${className} relative transition-all duration-200 ${
     isHovered ? 'transform-gpu scale-[1.02]' : ''
@@ -180,8 +178,6 @@ export default function PromotionCard({
         <div className="relative overflow-hidden">
           <Link 
             to={videoUrl} 
-            target={youtubeId ? "_blank" : undefined}
-            rel={youtubeId ? "noopener noreferrer" : undefined}
             className="block"
           >
             <img
@@ -213,8 +209,6 @@ export default function PromotionCard({
         <div className={getContentStyle()}>
           <Link 
             to={videoUrl}
-            target={youtubeId ? "_blank" : undefined}
-            rel={youtubeId ? "noopener noreferrer" : undefined}
             className="block"
           >
             <h3 className={`font-medium text-gray-900 ${
@@ -237,12 +231,18 @@ export default function PromotionCard({
             <p className="text-xs text-gray-500 mt-1 line-clamp-2">{description}</p>
           )}
           
-          {/* 外部リンク表示（YouTube動画の場合） */}
+          {/* YouTubeへのリンクボタン（オプション） */}
           {youtubeId && position !== 'related' && (
-            <div className={`flex items-center mt-1 text-xs text-gray-500 ${isHovered ? 'text-blue-600' : ''}`}>
+            <a 
+              href={`https://www.youtube.com/watch?v=${youtubeId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex items-center mt-1 text-xs text-gray-500 hover:text-blue-600`}
+              onClick={(e) => e.stopPropagation()} // メインのクリックイベントを阻止
+            >
               <ExternalLink className="w-3 h-3 mr-1" />
               <span>YouTube で見る</span>
-            </div>
+            </a>
           )}
         </div>
       </div>

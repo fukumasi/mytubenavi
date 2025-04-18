@@ -1,9 +1,11 @@
 // src/components/youtuber/CreateSlotModal.tsx
+import { promotionService } from '@/services/promotionService';
 import React, { useState, useEffect } from 'react';
-import { X, AlertTriangle, Youtube } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
-import type { PromotionSlot } from '../../types';
+import { X, AlertTriangle, Youtube, Info } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import type { PromotionSlot } from '@/types';
+
 
 interface CreateSlotModalProps {
   isOpen: boolean;
@@ -23,6 +25,14 @@ function extractYouTubeId(url: string): string | null {
   return (match && match[2].length === 11) ? match[2] : null;
 }
 
+// 各掲載タイプの推奨価格を定義
+const RECOMMENDED_PRICES = {
+  premium: { min: 1000, max: 5000, default: 0 },
+  sidebar: { min: 500, max: 2000, default: 0 },
+  genre: { min: 300, max: 1500, default: 0 },
+  related: { min: 200, max: 1000, default: 0 }
+};
+
 export default function CreateSlotModal({
   isOpen,
   onClose,
@@ -37,7 +47,7 @@ export default function CreateSlotModal({
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    price: 1000,
+    price: 0,
     type: 'sidebar', // デフォルトタイプ
     youtubeUrl: '',
     youtube_id: '',
@@ -80,7 +90,7 @@ export default function CreateSlotModal({
       setFormData({
         name: slot.name || '',
         description: slot.description || '',
-        price: slot.price || 1000,
+        price: slot.price || RECOMMENDED_PRICES.sidebar.default,
         type: slot.type || 'sidebar',
         youtubeUrl: slot.youtube_id ? `https://www.youtube.com/watch?v=${slot.youtube_id}` : '',
         youtube_id: slot.youtube_id || '',
@@ -90,7 +100,7 @@ export default function CreateSlotModal({
       setFormData({
         name: '',
         description: '',
-        price: 1000,
+        price: RECOMMENDED_PRICES.sidebar.default,
         type: 'sidebar',
         youtubeUrl: '',
         youtube_id: '',
@@ -100,10 +110,21 @@ export default function CreateSlotModal({
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'price' ? Number(value) : value,
-    }));
+    
+    if (name === 'type' && !slot) {
+      // タイプが変更された場合、推奨価格を設定
+      const slotType = value as keyof typeof RECOMMENDED_PRICES;
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+        price: RECOMMENDED_PRICES[slotType].default,
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: name === 'price' ? Number(value) : value,
+      }));
+    }
   };
   
   const handleYouTubeUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -141,15 +162,19 @@ export default function CreateSlotModal({
     setError(null);
     
     try {
+      // formData.typeの型を明示的に指定する
+      const slotType = formData.type as "premium" | "sidebar" | "genre" | "related";
+  
       // データベーススキーマに合わせてデータを整形
       const slotData = {
         name: formData.name,
         description: formData.description,
         price: formData.price,
-        type: formData.type,
+        type: slotType, // 型キャストしたものを使用
         youtube_id: formData.youtube_id,
         max_videos: 1, // デフォルト値
-         };
+        is_active: true // アクティブ状態を明示的に設定
+      };
       
       if (slot) {
         // 編集モード
@@ -160,19 +185,24 @@ export default function CreateSlotModal({
           
         if (updateError) throw updateError;
       } else {
-        // 新規作成モード - youtuber_idは含めない（DBにこのカラムがない）
-        const { error: insertError } = await supabase
-          .from('promotion_slots')
-          .insert([slotData]);
-          
-        if (insertError) throw insertError;
+        // 新規作成モード - 掲載枠の上限をチェック
+        const activeSlotCount = await promotionService.countActiveSlots();
+        if (activeSlotCount >= 5) {
+          throw new Error('掲載枠の最大数（5）に達しています。新しい掲載枠を作成する前に、既存の掲載枠を削除してください。');
+        }
+        
+        // promotionServiceを使用して掲載枠を作成
+        const newSlot = await promotionService.createPromotionSlot(slotData);
+        if (!newSlot) {
+          throw new Error('掲載枠の作成に失敗しました');
+        }
       }
       
       onSuccess();
       onClose();
     } catch (err) {
       console.error('Error saving promotion slot:', err);
-      setError('掲載枠の保存に失敗しました');
+      setError(err instanceof Error ? err.message : '掲載枠の保存に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -184,6 +214,9 @@ export default function CreateSlotModal({
   const thumbnailUrl = formData.youtube_id 
     ? `https://img.youtube.com/vi/${formData.youtube_id}/mqdefault.jpg`
     : '';
+  
+  // 現在選択されているタイプの推奨価格範囲
+  const currentTypePrice = RECOMMENDED_PRICES[formData.type as keyof typeof RECOMMENDED_PRICES];
   
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -222,8 +255,11 @@ export default function CreateSlotModal({
                 onChange={handleChange}
                 required
                 className="w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                placeholder="例: トップページプレミアム枠"
+                placeholder="管理用の名前（例: 春の新作PR用トップページ枠）"
               />
+              <p className="mt-1 text-xs text-gray-500">
+                あなたの管理用に覚えやすい名前をつけてください。この名前はダッシュボードでの識別用です。
+              </p>
             </div>
             
             <div>
@@ -257,6 +293,9 @@ export default function CreateSlotModal({
                   <option value="genre">ジャンルページ</option>
                   <option value="related">関連動画</option>
                 </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  掲載位置により表示効果や露出度が異なります
+                </p>
               </div>
               
               <div>
@@ -269,10 +308,17 @@ export default function CreateSlotModal({
                   value={formData.price}
                   onChange={handleChange}
                   required
-                  min={100}
+                  min={0}
                   step={100}
                   className="w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                 />
+                <div className="mt-1 flex items-start">
+                  <Info className="h-4 w-4 text-blue-500 mr-1 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-blue-600">
+                    推奨価格帯: {currentTypePrice.min}円〜{currentTypePrice.max}円
+                    {formData.price === 0 && " (無料掲載も可能ですが、有料掲載の方が優先表示されます)"}
+                  </p>
+                </div>
               </div>
             </div>
             
@@ -316,6 +362,17 @@ export default function CreateSlotModal({
                 </div>
               </div>
             )}
+            
+            {/* 価格設定に関する説明 */}
+            <div className="bg-blue-50 p-4 rounded-md">
+              <h3 className="text-sm font-medium text-blue-700 mb-2">価格設定のガイドライン</h3>
+              <ul className="text-xs text-blue-600 space-y-1 list-disc pl-4">
+                <li>掲載価格は0円から設定可能ですが、有料掲載の方が優先的に表示されます</li>
+                <li>掲載位置によって推奨価格が異なります（プレミアム枠が最も露出度が高く、効果的です）</li>
+                <li>初期は低価格から始めて、効果を見ながら調整することをお勧めします</li>
+                <li>アクセス数や掲載効果は「分析」タブで確認できます</li>
+              </ul>
+            </div>
           </div>
           
           <div className="flex justify-end space-x-3 mt-6">

@@ -1,12 +1,14 @@
 // src/components/admin/RefundModal.tsx
 
+// src/components/admin/RefundModal.tsx
+
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form, InputGroup, Spinner, Alert } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { toast } from 'react-toastify';
-import { processRefund } from '../../services/paymentService';
+import { processRefund } from '@/services/paymentService';
 
 // フォームデータの型定義
 interface RefundFormData {

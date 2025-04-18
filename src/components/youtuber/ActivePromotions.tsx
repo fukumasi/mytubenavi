@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { Eye, Clock, ExternalLink, AlertTriangle, BarChart } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
-import LoadingSpinner from '../ui/LoadingSpinner';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface Promotion {
   id: string;

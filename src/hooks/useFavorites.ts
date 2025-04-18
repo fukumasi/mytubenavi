@@ -24,14 +24,15 @@ export function useFavorites(videoId?: string) {
         .select('id')
         .eq('user_id', user.id)
         .eq('video_id', videoId)
-        .maybeSingle();
+        .limit(1);
 
       if (error) {
         console.error('お気に入りステータスの確認エラー:', error);
         return;
       }
 
-      setIsFavorite(!!data);
+      // データを配列として処理
+      setIsFavorite(data && data.length > 0);
     } catch (error) {
       console.error('お気に入りステータスの確認エラー:', error);
     } finally {

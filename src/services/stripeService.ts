@@ -165,8 +165,8 @@ export const createPaymentIntent = async (params: CreatePaymentIntentParams): Pr
       throw new Error('指定された予約が見つかりません');
     }
 
-    // 金額の整合性チェック
-    if (bookingData.amount !== params.amount) {
+    // 金額の整合性チェック - amount_paidフィールドを使用するように修正
+    if (bookingData.amount_paid !== params.amount) {
       throw new Error('予約金額と支払い金額が一致しません');
     }
 
@@ -200,6 +200,11 @@ export const createPaymentIntent = async (params: CreatePaymentIntentParams): Pr
       throw new Error('関連する動画が見つかりません');
     }
 
+    // 開始日と終了日から期間（日数）を計算
+    const startDate = new Date(bookingData.start_date);
+    const endDate = new Date(bookingData.end_date);
+    const durationDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
     // メタデータの構築
     const metadata = {
       booking_id: params.bookingId,
@@ -209,13 +214,13 @@ export const createPaymentIntent = async (params: CreatePaymentIntentParams): Pr
       video_title: videoData.title || '不明な動画',
       slot_name: slotData.name || '不明な掲載枠',
       slot_type: slotData.type || 'unknown',
-      duration: bookingData.duration.toString(),
+      duration: durationDays.toString(),
       ...params.metadata || {}
     };
 
     // 決済説明の構築
     const description = params.description || 
-      `掲載枠予約: ${slotData.name} (${slotData.type}) - ${bookingData.duration}日間`;
+      `掲載枠予約: ${slotData.name} (${slotData.type}) - ${durationDays}日間`;
 
     // エッジ関数へのリクエスト
     const response = await apiRequest<PaymentIntentResponse>(
@@ -419,7 +424,7 @@ export const createPromotionPayment = async (
     const end = new Date(start);
     end.setDate(end.getDate() + duration);
 
-    // 予約データを挿入
+    // 予約データを挿入 - フィールド名をamountからamount_paidに変更
     const { data: bookingData, error: bookingError } = await supabase
       .from('slot_bookings')
       .insert([{
@@ -430,7 +435,7 @@ export const createPromotionPayment = async (
         start_date: start.toISOString(),
         end_date: end.toISOString(),
         duration: duration,
-        amount: amount,
+        amount_paid: amount,  // amountからamount_paidに変更
         status: 'pending',
         payment_status: 'pending',
         created_at: new Date().toISOString()
@@ -478,7 +483,7 @@ export const updatePaymentStatus = async (
       await updatePremiumStatus(true);
     } else if (paymentType === 'promotion' && status.status === 'succeeded') {
       // プロモーション枠の予約完了処理
-      await updatePromotionSlotStatus(paymentIntentId, 'completed');
+      await updatePromotionSlotStatus(paymentIntentId, 'active');
     }
 
     return status;
@@ -516,7 +521,7 @@ export const updatePremiumStatus = async (isPremium: boolean): Promise<{ success
 // プロモーションスロットステータスの更新
 export const updatePromotionSlotStatus = async (
   paymentIntentId: string, 
-  status: 'pending' | 'completed' | 'cancelled'
+  status: 'pending' | 'active' | 'completed' | 'cancelled'
 ): Promise<{ success: boolean }> => {
   try {
     // 関連するスロット予約を取得
@@ -533,15 +538,15 @@ export const updatePromotionSlotStatus = async (
       .from('slot_bookings')
       .update({ 
         status, 
-        payment_status: status === 'completed' ? 'succeeded' : 
+        payment_status: status === 'active' || status === 'completed' ? 'succeeded' : 
                       status === 'cancelled' ? 'cancelled' : 'pending'
       })
       .eq('payment_intent_id', paymentIntentId);
 
     if (updateError) throw updateError;
     
-    // completed状態の場合、動画情報を掲載枠に連携
-    if (status === 'completed' && bookingData) {
+    // active状態または完了状態の場合、動画情報を掲載枠に連携
+    if ((status === 'active' || status === 'completed') && bookingData) {
       await updateSlotVideoInfo(bookingData.slot_id, bookingData.video_id);
     }
     
@@ -564,7 +569,7 @@ export const updateSlotVideoInfo = async (
     // 動画情報を取得
     const { data: videoData, error: videoError } = await supabase
       .from('videos')
-      .select('youtube_id, title, thumbnail_url')
+      .select('youtube_id, title, thumbnail')  // thumbnail_urlからthumbnailに修正
       .eq('id', videoId)
       .single();
       
@@ -575,9 +580,7 @@ export const updateSlotVideoInfo = async (
       .from('promotion_slots')
       .update({ 
         video_id: videoId,
-        youtube_id: videoData.youtube_id,
-        video_title: videoData.title,
-        thumbnail_url: videoData.thumbnail_url
+        youtube_id: videoData.youtube_id
       })
       .eq('id', slotId);
       

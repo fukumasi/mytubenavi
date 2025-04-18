@@ -1,6 +1,6 @@
 import React from 'react';
 import { MessageSquare, ThumbsUp } from 'lucide-react';
-import type { Review } from '../../types/review';
+import type { Review } from '@/types/review';
 
 interface ReviewCardProps {
   review: Review;
@@ -48,13 +48,13 @@ export const ReviewCard: React.FC<ReviewCardProps> = ({ review, onVideoClick }) 
           <p className="text-gray-700 whitespace-pre-wrap">{review.content}</p>
           
           <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-            {review.likes_count > 0 && (
+            {review.likes_count !== undefined && review.likes_count > 0 && (
               <div className="flex items-center space-x-1">
                 <ThumbsUp className="w-4 h-4" />
                 <span>{review.likes_count}</span>
               </div>
             )}
-            {review.child_reviews_count > 0 && (
+            {review.child_reviews_count !== undefined && review.child_reviews_count > 0 && (
               <div className="flex items-center space-x-1">
                 <MessageSquare className="w-4 h-4" />
                 <span>{review.child_reviews_count}件の返信</span>

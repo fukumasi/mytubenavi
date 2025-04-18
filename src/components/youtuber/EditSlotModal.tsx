@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, AlertTriangle, Save, Youtube } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
-import type { PromotionSlot } from '../../types';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import type { PromotionSlot } from '@/types';
 
 interface EditSlotModalProps {
   isOpen: boolean;

@@ -231,8 +231,8 @@ export const YouTubeAPI = {
                  .single();
 
              const createdAt = new Date().toISOString();
-             const viewCount = parseInt(item.statistics.viewCount);
-             const likeCount = item.statistics.likeCount ? parseInt(item.statistics.likeCount) : 0;
+             const viewCount = parseInt(item.statistics?.viewCount);
+             const likeCount = item.statistics?.likeCount ? parseInt(item.statistics.likeCount) : 0;
              const rating = likeCount ? (likeCount / viewCount) * 5 : 0;
 
              let dbVideo;
@@ -372,10 +372,43 @@ export const YouTubeAPI = {
 
  async fetchChannelVideos(channelId: string, maxResults = 50) {
      try {
+         // @記号で始まるカスタムチャンネルIDの処理
+         let apiChannelId = channelId;
+         
+         if (channelId.startsWith('@')) {
+             console.log(`@形式のチャンネルIDを処理: ${channelId}`);
+             
+             try {
+                 // まず正しいチャンネルIDを取得する
+                 const searchResponse = await axios.get(`${BASE_URL}/search`, {
+                     params: {
+                         part: 'snippet',
+                         q: channelId,
+                         type: 'channel',
+                         maxResults: 1,
+                         key: API_KEY
+                     }
+                 });
+                 
+                 if (searchResponse.data.items && searchResponse.data.items.length > 0) {
+                     // 検索結果から実際のチャンネルIDを取得
+                     apiChannelId = searchResponse.data.items[0].snippet.channelId;
+                     console.log(`@形式から実際のチャンネルIDを取得: ${apiChannelId}`);
+                 } else {
+                     console.error(`チャンネルが見つかりませんでした: ${channelId}`);
+                     throw new Error(`チャンネル '${channelId}' が見つかりませんでした`);
+                 }
+             } catch (error) {
+                 console.error(`@形式のチャンネルID検索エラー:`, error);
+                 throw new Error(`チャンネルID '${channelId}' の検索に失敗しました`);
+             }
+         }
+         
+         // 取得した実際のチャンネルIDでAPIリクエスト
          const response = await axios.get<YouTubeSearchResponse>(`${BASE_URL}/search`, {
              params: {
                  part: 'snippet',
-                 channelId: channelId,
+                 channelId: apiChannelId, // 修正後のチャンネルIDを使用
                  maxResults: maxResults,
                  type: 'video',
                  key: API_KEY
@@ -390,63 +423,134 @@ export const YouTubeAPI = {
      }
  },
 
- async getChannelDetails(channelId: string) {
-     try {
-         const response = await axios.get<YouTubeChannelDetailsResponse>(`${BASE_URL}/channels`, {
-             params: {
-                 part: 'snippet,statistics',
-                 id: channelId,
-                 key: API_KEY
-             }
-         });
-
-         const channel = response.data.items[0];
-         if (!channel) throw new Error('Channel not found');
-
-         return {
-             title: channel.snippet.title,
-             description: channel.snippet.description,
-             thumbnails: channel.snippet.thumbnails,
-             subscriberCount: channel.statistics.subscriberCount,
-             videoCount: channel.statistics.videoCount,
-             viewCount: channel.statistics.viewCount
-         };
-     } catch (error) {
-         console.error('Error fetching channel details:', error);
-         throw new Error('チャンネル情報の取得に失敗しました');
-     }
- },
+// src/lib/youtube.ts のgetChannelDetailsメソッドを修正
+async getChannelDetails(channelId: string) {
+    try {
+        // @から始まるカスタムチャンネルIDの処理を改善
+        let channels: Array<YouTubeChannelDetailsResponse['items'][0]> = [];
+        
+        // @から始まる場合、YouTube APIのsearchエンドポイントを使用
+        if (channelId.startsWith('@')) {
+            try {
+                console.log(`@形式のチャンネルID検索: ${channelId}`);
+                
+                // YouTube Data API v3のsearchエンドポイントを使用
+                const searchResponse = await axios.get(`${BASE_URL}/search`, {
+                    params: {
+                        part: 'snippet',
+                        q: channelId,
+                        type: 'channel',
+                        maxResults: 1,
+                        key: API_KEY
+                    }
+                });
+                
+                if (searchResponse.data.items && searchResponse.data.items.length > 0) {
+                    // 検索結果からチャンネルIDを取得
+                    const channelIdFromSearch = searchResponse.data.items[0].snippet.channelId;
+                    console.log(`検索でチャンネルID取得: ${channelIdFromSearch}`);
+                    
+                    // 取得したチャンネルIDで詳細情報を取得
+                    const channelResponse = await axios.get(`${BASE_URL}/channels`, {
+                        params: {
+                            part: 'snippet,statistics',
+                            id: channelIdFromSearch,
+                            key: API_KEY
+                        }
+                    });
+                    
+                    if (channelResponse.data.items && channelResponse.data.items.length > 0) {
+                        channels = channelResponse.data.items;
+                    }
+                }
+            } catch (error: any) {
+                console.error('カスタムチャンネルID検索エラー:', error);
+                // エラー詳細をログに出力
+                if (error.response) {
+                    console.error('レスポンスエラー:', error.response.status, error.response.data);
+                }
+            }
+        } else {
+            // 通常のチャンネルID検索
+            try {
+                const response = await axios.get(`${BASE_URL}/channels`, {
+                    params: {
+                        part: 'snippet,statistics',
+                        id: channelId,
+                        key: API_KEY
+                    }
+                });
+                
+                channels = response.data.items;
+            } catch (error: any) {
+                console.error('チャンネルID検索エラー:', error);
+                if (error.response) {
+                    console.error('レスポンスエラー:', error.response.status, error.response.data);
+                }
+            }
+        }
+        
+        // チャンネルが見つからなかった場合
+        if (!channels || channels.length === 0) {
+            console.error('チャンネルデータが見つかりませんでした:', channelId);
+            throw new Error(`チャンネル '${channelId}' が見つかりませんでした`);
+        }
+        
+        const channel = channels[0];
+        return {
+            title: channel.snippet.title,
+            description: channel.snippet.description,
+            thumbnails: channel.snippet.thumbnails,
+            subscriberCount: channel.statistics.subscriberCount,
+            videoCount: channel.statistics.videoCount,
+            viewCount: channel.statistics.viewCount
+        };
+    } catch (error) {
+        console.error('チャンネル情報取得エラー:', error);
+        throw new Error('チャンネル情報の取得に失敗しました');
+    }
+},
 };
 
 export const YouTuberSync = {
- async syncYoutuberChannel(channelUrl: string) {
-     try {
-         const channelId = this.extractChannelId(channelUrl);
-         const channelDetails = await YouTubeAPI.getChannelDetails(channelId);
-
-         const { data, error } = await supabase
-             .from('youtuber_profiles')
-             .upsert({
-                 channel_name: channelDetails.title,
-                 channel_url: channelUrl,
-                 channel_description: channelDetails.description,
-                 verification_status: 'pending',
-                 channel_id: channelId,
-                 avatar_url: channelDetails.thumbnails.default.url,
-                 subscribers: parseInt(channelDetails.subscriberCount),
-                 video_count: parseInt(channelDetails.videoCount),
-                 total_views: parseInt(channelDetails.viewCount)
-             })
-             .select();
-
-         if (error) throw error;
-
-         return data?.[0];
-     } catch (error) {
-         console.error('チャンネル同期エラー:', error);
-         throw error;
-     }
- },
+    async syncYoutuberChannel(channelUrl: string) {
+        try {
+            const channelId = this.extractChannelId(channelUrl);
+            const channelDetails = await YouTubeAPI.getChannelDetails(channelId);
+    
+            // youtuber_profilesテーブルに存在するカラムのみを使用
+            // .select()メソッドを削除
+            const { error } = await supabase
+                .from('youtuber_profiles')
+                .upsert({
+                    channel_name: channelDetails.title,
+                    channel_url: channelUrl,
+                    channel_description: channelDetails.description,
+                    verification_status: 'pending',
+                    category: 'general', // カテゴリの初期値を設定
+                    updated_at: new Date().toISOString()
+                });
+    
+            if (error) throw error;
+    
+            // 更新したデータが必要な場合は別クエリで取得
+            const { data: updatedData, error: fetchError } = await supabase
+                .from('youtuber_profiles')
+                .select('*')
+                .eq('channel_url', channelUrl)
+                .limit(1);
+    
+            if (fetchError) {
+                console.error('更新後のデータ取得エラー:', fetchError);
+                return null;
+            }
+    
+            return updatedData?.[0];
+        } catch (error) {
+            console.error('チャンネル同期エラー:', error);
+            throw error;
+        }
+    },
 
  async syncYoutuberVideos(channelId: string, maxResults = 50) {
      try {
@@ -454,7 +558,7 @@ export const YouTuberSync = {
          const syncResults = await Promise.all(
              videos.map(video => this.syncSingleVideo(video))
          );
-         return syncResults.filter(result => result !== null);
+         return syncResults.filter((result): result is any => result !== null);
      } catch (error) {
          console.error('動画同期エラー:', error);
          throw error;
@@ -556,8 +660,37 @@ export const YouTuberSync = {
  },
 
  extractChannelId(channelUrl: string): string {
-     const match = channelUrl.match(/(?:channel\/|@)([^/]+)/);
-     if (!match) throw new Error('無効なチャンネルURL');
-     return match[1];
+     if (!channelUrl) return '';
+    
+     // 既にUC...形式のチャンネルIDの場合はそのまま返す
+     if (channelUrl.startsWith('UC') && channelUrl.length > 10) {
+         return channelUrl;
+     }
+     
+     // @username 形式
+     if (channelUrl.startsWith('@')) {
+         return channelUrl; // @を維持
+     }
+     
+     // 複数のURL形式に対応
+     // channel/UC... 形式
+     const channelMatch = channelUrl.match(/channel\/([a-zA-Z0-9_-]{24})/);
+     if (channelMatch) return channelMatch[1];
+     
+     // youtube.com/@username 形式
+     const atMatch = channelUrl.match(/youtube\.com\/@([a-zA-Z0-9_-]+)/);
+     if (atMatch) return '@' + atMatch[1];
+     
+     // youtube.com/c/customname 形式
+     const cMatch = channelUrl.match(/youtube\.com\/c\/([a-zA-Z0-9_-]+)/);
+     if (cMatch) return '@' + cMatch[1];
+     
+     // youtube.com/user/username 形式
+     const userMatch = channelUrl.match(/youtube\.com\/user\/([a-zA-Z0-9_-]+)/);
+     if (userMatch) return '@' + userMatch[1];
+     
+     // 上記のパターンに一致しない場合
+     console.warn('Unknown channel URL format:', channelUrl);
+     return channelUrl;
  }
 };

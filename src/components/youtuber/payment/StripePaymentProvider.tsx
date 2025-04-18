@@ -1,7 +1,7 @@
 // src/components/youtuber/payment/StripePaymentProvider.tsx
 
 import PaymentForm from './PaymentForm';
-import StripeContextProvider from '../../../contexts/StripeContext';
+import StripeContextProvider from '@/contexts/StripeContext';
 
 /**
  * 決済フォームのラッパーコンポーネント

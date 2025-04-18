@@ -64,6 +64,8 @@ export interface MatchingUser {
   online_status?: OnlineStatus;  // オンライン状態
   last_active?: string;  // 最終アクティブ日時（ISO 8601形式）
   connection_status?: ConnectionStatus;  // 接続状態
+  is_liked?: boolean;  // いいね済みかどうか
+  is_matched?: boolean;
   // YouTubeクリエイターの場合
   channel_url?: string;  // YouTubeチャンネルURL
   // 視聴傾向（ジャンルごとの視聴割合）
@@ -110,6 +112,7 @@ export interface MatchingPreferences {
   has_video_history?: boolean;  // 視聴履歴があるユーザーのみを表示
   recent_activity?: boolean;  // 最近活動したユーザーのみを表示
   filter_skipped?: boolean;  // スキップしたユーザーを表示しないかどうか
+  exclude_liked_users?: boolean;  // いいね済みユーザーを除外するかどうか
 }
 
 /**
@@ -203,6 +206,7 @@ export interface Conversation {
  * 相手のプロフィール情報を含む会話情報
  * 会話リスト表示用に拡張した会話情報
  */
+// ConversationWithProfileインターフェースの修正
 export interface ConversationWithProfile extends Conversation {
   otherUser: {  // 相手ユーザーの情報
     id: string;
@@ -211,12 +215,14 @@ export interface ConversationWithProfile extends Conversation {
     is_premium?: boolean;
     online_status?: OnlineStatus | string;
     last_active?: string;  // ISO 8601形式
+    verification_level?: number; // 追加：認証レベル
   };
   last_message?: {  // 最後のメッセージ情報
     content: string;
     created_at: string;  // ISO 8601形式
     sender_id: string;
     is_read: boolean;
+    is_highlighted?: boolean; // 追加：ハイライトメッセージかどうか
   } | null;
   unread_count: number;  // 現在のユーザーの未読数
 }

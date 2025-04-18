@@ -1,3 +1,4 @@
+// src/pages/HomePage.tsx
 import { Suspense, lazy } from 'react';
 import { Genre } from '@/types';
 import { useNavigate } from 'react-router-dom';
@@ -7,6 +8,7 @@ const GenreList = lazy(() => import('@/components/home/GenreList'));
 const AdsSection = lazy(() => import('@/components/home/AdsSection'));
 const FeaturedVideos = lazy(() => import('@/components/home/FeaturedVideos'));
 const LatestReviewedVideos = lazy(() => import('@/components/home/LatestReviewedVideos'));
+const PromotedVideos = lazy(() => import('@/components/home/PromotedVideos'));
 
 export default function HomePage() {
     const navigate = useNavigate();
@@ -32,6 +34,10 @@ export default function HomePage() {
                             <section>
                                 <h2 className="text-2xl font-semibold mb-4 text-gray-900">ジャンルから探す</h2>
                                 <GenreList onGenreClick={handleGenreClick} />
+                            </section>
+
+                            <section>
+                                <PromotedVideos showIfEmpty={false} title="スポンサード動画" />
                             </section>
 
                             <section>

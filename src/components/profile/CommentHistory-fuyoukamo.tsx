@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProfileLayout from './ProfileLayout';
-import { supabase } from '../../lib/supabase';
-import ReviewCard from '../ui/ReviewCard';
-import type { Review } from '../../types/review';
+import { supabase } from '@/lib/supabase';
+import ReviewCard from '@/components/ui/ReviewCard';
+import type { Review } from '@/types/review';
 
 export default function ReviewHistory() {
   const navigate = useNavigate();

@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { User, Star, History, Bell, Settings, Heart, Crown, MessageSquare, Calendar, Search } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState } from 'react';
 
 export default function ProfileMenu() {

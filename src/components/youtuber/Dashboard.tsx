@@ -1,25 +1,28 @@
 // src/components/youtuber/Dashboard.tsx
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faChartLine, 
   faCalendarAlt, 
   faCog, 
   faQuestionCircle,
-  faHistory
+  faHistory,
+  faChartBar // 効果分析アイコン用に追加
 } from '@fortawesome/free-solid-svg-icons';
-import LoadingSpinner from '../ui/LoadingSpinner';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import PromotionStats from './PromotionStats';
 import PromotionAnalytics from './PromotionAnalytics';
 import BookingForm from './BookingForm';
 import BookingHistory from './BookingHistory';
-import { PromotionStats as PromotionStatsType } from '../../types/promotion';
+import { PromotionStats as PromotionStatsType } from '@/types/promotion';
+import AnalyticsDashboard from './AnalyticsDashboard'; // 直接インポート
 
-type DashboardTab = 'stats' | 'bookings' | 'history' | 'analytics' | 'settings' | 'help';
+type DashboardTab = 'stats' | 'bookings' | 'history' | 'analytics' | 'settings' | 'help' | 'effect';
 
 const Dashboard: React.FC = () => {
+  console.log("Dashboard コンポーネントがレンダリングされました");
   const [activeTab, setActiveTab] = useState<DashboardTab>('stats');
   const [loading, setLoading] = useState<boolean>(true);
   const [youtuberData, setYoutuberData] = useState<any>(null);
@@ -29,6 +32,7 @@ const Dashboard: React.FC = () => {
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   
   useEffect(() => {
+    console.log("Dashboard useEffect 実行");
     const fetchYoutuberData = async () => {
       try {
         setLoading(true);
@@ -154,7 +158,14 @@ const Dashboard: React.FC = () => {
     }
   };
   
+  const handleTabClick = (tab: DashboardTab) => {
+    console.log(`タブ切り替え: ${activeTab} -> ${tab}`);
+    setActiveTab(tab);
+  };
+  
   const renderTabContent = () => {
+    console.log("renderTabContent が呼び出されました。現在のタブ:", activeTab);
+    
     const defaultStats = {
       impressions: 0,
       clicks: 0,
@@ -170,19 +181,30 @@ const Dashboard: React.FC = () => {
 
     switch (activeTab) {
       case 'stats':
+        console.log("stats タブを表示");
         // 型キャストを使用して一時的に型チェックをバイパス
         return <PromotionStats stats={(statsData || defaultStats) as any} />;
       case 'bookings':
+        console.log("bookings タブを表示");
         return <BookingManagement />;
       case 'history':
+        console.log("history タブを表示");
         return <BookingHistory />;
       case 'analytics':
+        console.log("analytics タブを表示");
         return <PromotionAnalytics />;
       case 'settings':
+        console.log("settings タブを表示");
         return <Settings />;
       case 'help':
+        console.log("help タブを表示");
         return <Help />;
+      case 'effect':
+        console.log("effect タブを表示 - AnalyticsDashboard を initialTab='effect' で表示");
+        // 掲載効果分析タブを直接表示
+        return <AnalyticsDashboard initialTab="effect" />;
       default:
+        console.log("デフォルトタブを表示 (activeTab が不明な値である可能性があります)");
         // 型キャストを使用して一時的に型チェックをバイパス
         return <PromotionStats stats={(statsData || defaultStats) as any} />;
     }
@@ -300,6 +322,9 @@ const Dashboard: React.FC = () => {
     );
   }
   
+  // activeTabの値をコンソールに出力して確認
+  console.log("現在のアクティブタブ:", activeTab);
+  
   return (
     <div className="flex flex-col md:flex-row gap-6">
       {/* サイドナビゲーション */}
@@ -318,7 +343,7 @@ const Dashboard: React.FC = () => {
                 className={`w-full text-left px-4 py-2 rounded flex items-center ${
                   activeTab === 'stats' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
                 }`}
-                onClick={() => setActiveTab('stats')}
+                onClick={() => handleTabClick('stats')}
               >
                 <FontAwesomeIcon icon={faChartLine} className="mr-2" />
                 掲載枠の概要
@@ -329,7 +354,7 @@ const Dashboard: React.FC = () => {
                 className={`w-full text-left px-4 py-2 rounded flex items-center ${
                   activeTab === 'bookings' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
                 }`}
-                onClick={() => setActiveTab('bookings')}
+                onClick={() => handleTabClick('bookings')}
               >
                 <FontAwesomeIcon icon={faCalendarAlt} className="mr-2" />
                 掲載枠予約
@@ -340,7 +365,7 @@ const Dashboard: React.FC = () => {
                 className={`w-full text-left px-4 py-2 rounded flex items-center ${
                   activeTab === 'history' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
                 }`}
-                onClick={() => setActiveTab('history')}
+                onClick={() => handleTabClick('history')}
               >
                 <FontAwesomeIcon icon={faHistory} className="mr-2" />
                 予約履歴
@@ -351,10 +376,22 @@ const Dashboard: React.FC = () => {
                 className={`w-full text-left px-4 py-2 rounded flex items-center ${
                   activeTab === 'analytics' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
                 }`}
-                onClick={() => setActiveTab('analytics')}
+                onClick={() => handleTabClick('analytics')}
               >
                 <FontAwesomeIcon icon={faChartLine} className="mr-2" />
                 分析
+              </button>
+            </li>
+            {/* 掲載効果分析タブを追加 - ここが重要なポイント */}
+            <li className="relative">
+              <button
+                className={`w-full text-left px-4 py-2 rounded flex items-center ${
+                  activeTab === 'effect' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+                }`}
+                onClick={() => handleTabClick('effect')}
+              >
+                <FontAwesomeIcon icon={faChartBar} className="mr-2" />
+                掲載効果分析
               </button>
             </li>
             <li>
@@ -362,7 +399,7 @@ const Dashboard: React.FC = () => {
                 className={`w-full text-left px-4 py-2 rounded flex items-center ${
                   activeTab === 'settings' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
                 }`}
-                onClick={() => setActiveTab('settings')}
+                onClick={() => handleTabClick('settings')}
               >
                 <FontAwesomeIcon icon={faCog} className="mr-2" />
                 設定
@@ -373,7 +410,7 @@ const Dashboard: React.FC = () => {
                 className={`w-full text-left px-4 py-2 rounded flex items-center ${
                   activeTab === 'help' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
                 }`}
-                onClick={() => setActiveTab('help')}
+                onClick={() => handleTabClick('help')}
               >
                 <FontAwesomeIcon icon={faQuestionCircle} className="mr-2" />
                 ヘルプ

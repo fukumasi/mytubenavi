@@ -2,10 +2,10 @@
 import { useEffect, useState } from 'react';
 import { Bell, MessageSquare, Star, Mail, Smartphone, AlertCircle, Heart, UserPlus, Trophy, Crown } from 'lucide-react';
 import ProfileLayout from './ProfileLayout';
-import { NotificationPreference } from '../../types/notification';
-import { useNotifications } from '../../hooks/useNotifications';
-import { useAuth } from '../../contexts/AuthContext';
-import LoadingSpinner from '../ui/LoadingSpinner';
+import { NotificationPreference } from '@/types/notification';
+import { useNotifications } from '@/hooks/useNotifications';
+import { useAuth } from '@/contexts/AuthContext';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface NotificationSetting {
   id: keyof NotificationPreference;

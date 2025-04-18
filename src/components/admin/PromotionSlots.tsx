@@ -1,13 +1,13 @@
 // src/components/admin/PromotionSlots.tsx
 
 import React, { useState, useEffect, useContext } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrash, faPlus, faSync, faMoneyBillWave } from '@fortawesome/free-solid-svg-icons';
-import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import CreateSlotModal from './CreateSlotModal';
 import EditSlotModal from './EditSlotModal';
-import { PromotionSlot } from '../../types/promotion';
+import { PromotionSlot } from '@/types/promotion';
 import { AdminContext } from './Dashboard';
 
 const PromotionSlots: React.FC = () => {
@@ -22,7 +22,7 @@ const PromotionSlots: React.FC = () => {
   const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('info');
   
   // AdminContextからの状態とメソッドを取得
-  const { refreshData, handleTabChange } = useContext(AdminContext);
+  const { handleTabChange } = useContext(AdminContext);
 
   useEffect(() => {
     fetchPromotionSlots();

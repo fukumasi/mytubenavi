@@ -1,7 +1,7 @@
 // src/components/home/PremiumPromotion.tsx
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 const PremiumPromotion: React.FC = () => {
   const { isPremium, premiumStatus } = useAuth();

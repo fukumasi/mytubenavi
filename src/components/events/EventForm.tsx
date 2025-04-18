@@ -2,10 +2,10 @@ import { useState, useCallback } from 'react';
 import { Tab } from '@headlessui/react';
 import { Calendar, Clock, MapPin, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import EventPreview from './EventPreview';
-import type { Event } from '../../types';
+import type { Event } from '@/types';
 import ErrorMessage from './ErrorMessage';
 
 interface EventFormData {

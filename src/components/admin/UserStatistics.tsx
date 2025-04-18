@@ -1,12 +1,14 @@
 // src/components/admin/UserStatistics.tsx
 
+// src/components/admin/UserStatistics.tsx
+
 import React, { useState, useEffect, useContext, useMemo } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area
 } from 'recharts';
-import { AdminContext } from '../../pages/AdminDashboardPage';
+import { AdminContext } from '@/pages/AdminDashboardPage';
 
 // 色の定義
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];

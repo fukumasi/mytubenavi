@@ -13,24 +13,92 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  RefreshCw
+  RefreshCw,
+  Calendar
 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
-import type { Profile, PromotionSlot } from '../../types';
-import type { SlotBooking } from '../../types/promotion';
-import { formatDate } from "../../utils/dateUtils";
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import type { Profile, PromotionSlot } from '@/types';
+import type { SlotBookingWithPayment } from '@/types/promotion';
+import { formatDate } from "@/utils/dateUtils";
 import CreateSlotModal from './CreateSlotModal';
 import EditSlotModal from './EditSlotModal';
+import BookingForm from './BookingForm';
+import { getActiveBookings, cancelBooking, updateExpiredBookings } from '@/services/paymentService';
+import { toast } from 'react-toastify';
+import AnalyticsDashboard from './AnalyticsDashboard'; // 追加: AnalyticsDashboardのインポート
+
+// 拡張型の定義を追加
+interface ExtendedPromotionSlot extends PromotionSlot {
+  bookings?: { count: number }[];
+}
+
+// キャンセル確認モーダルのプロパティ型
+interface CancelModalProps {
+  isOpen: boolean;
+  booking: SlotBookingWithPayment | null;
+  onClose: () => void;
+  onConfirm: (bookingId: string, reason: string) => void;
+}
+
+// キャンセル確認モーダルコンポーネント
+const CancelBookingModal: React.FC<CancelModalProps> = ({ isOpen, booking, onClose, onConfirm }) => {
+  const [reason, setReason] = useState<string>('');
+  
+  if (!isOpen || !booking) return null;
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+        <h3 className="text-lg font-semibold mb-4">予約をキャンセルしますか？</h3>
+        <p className="mb-4 text-gray-700">
+          掲載枠「{booking.slot?.name}」の予約をキャンセルします。この操作は取り消せません。
+        </p>
+        <div className="mb-4">
+          <label htmlFor="cancel-reason" className="block text-sm font-medium text-gray-700 mb-1">
+            キャンセル理由（任意）
+          </label>
+          <textarea
+            id="cancel-reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="キャンセル理由を入力してください"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            rows={3}
+          />
+        </div>
+        <div className="flex justify-end space-x-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded"
+          >
+            キャンセル
+          </button>
+          <button
+            onClick={() => onConfirm(booking.id, reason)}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+          >
+            予約をキャンセルする
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function PromotionDashboard() {
   const { user, youtuberProfile } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [promotionSlots, setPromotionSlots] = useState<PromotionSlot[]>([]);
-  const [bookings, setBookings] = useState<SlotBooking[]>([]);
+  // 型をExtendedPromotionSlotに変更
+  const [promotionSlots, setPromotionSlots] = useState<ExtendedPromotionSlot[]>([]);
+  const [bookings, setBookings] = useState<SlotBookingWithPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'slots' | 'bookings' | 'analytics'>('slots');
+  
+  // 追加: 分析タブのサブタブ状態を管理する
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cost' | 'performance'>('cost');
+  
   const [analyticsData, setAnalyticsData] = useState({
     totalRevenue: 0,
     totalBookings: 0,
@@ -38,73 +106,131 @@ export default function PromotionDashboard() {
     completedBookings: 0
   });
 
+  // キャンセルモーダル用の状態
+  const [cancelModalOpen, setCancelModalOpen] = useState<boolean>(false);
+  const [selectedBooking, setSelectedBooking] = useState<SlotBookingWithPayment | null>(null);
+
   // モーダル制御のための状態
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState<PromotionSlot | null>(null);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  // こちらも型を変更
+  const [selectedSlot, setSelectedSlot] = useState<ExtendedPromotionSlot | null>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!user?.id) return;
-      
-      setLoading(true);
-      setError(null);
-
-      try {
-        if (!youtuberProfile) {
-          setError('YouTuberプロフィールが未登録です');
-          return;
-        }
-
-        const [profileResult, slotsResult, bookingsResult] = await Promise.all([
-          supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single(),
-          supabase
-            .from('promotion_slots')
-            .select(`
-              *,
-              bookings:slot_bookings(
-                count
-              )
-            `), 
-          supabase
-            .from('slot_bookings')
-            .select('*')  // videosの関連付けを一時的に削除
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-        ]);
-        
-        if (profileResult.error) throw profileResult.error;
-        if (slotsResult.error) throw slotsResult.error;
-        if (bookingsResult.error) throw bookingsResult.error;
-        
-        setProfile(profileResult.data);
-        setPromotionSlots(slotsResult.data);
-        setBookings(bookingsResult.data);
-        
-        // Analytics データの計算
-        const completedBookings = bookingsResult.data.filter(b => b.status === 'completed');
-        const activeBookings = bookingsResult.data.filter(b => b.status === 'active');
-        
-        setAnalyticsData({
-          totalRevenue: completedBookings.reduce((sum, booking) => sum + (booking.amount || 0), 0),
-          totalBookings: bookingsResult.data.length,
-          activeBookings: activeBookings.length,
-          completedBookings: completedBookings.length
-        });
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('データの取得に失敗しました');
-      } finally {
-        setLoading(false);
-      }
+    // 期限切れの予約を自動的に更新
+    const updateExpired = async () => {
+      await updateExpiredBookings();
     };
-
+    
+    updateExpired();
     fetchData();
   }, [user, youtuberProfile]);
+
+  const fetchData = async () => {
+    if (!user?.id) return;
+    
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (!youtuberProfile) {
+        setError('YouTuberプロフィールが未登録です');
+        return;
+      }
+
+      // プロフィールと掲載枠を取得
+      const [profileResult, slotsResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single(),
+        supabase
+          .from('promotion_slots')
+          .select(`
+            *,
+            bookings:slot_bookings(
+              count
+            )
+          `)
+          .eq('is_active', true)
+      ]);
+      
+      if (profileResult.error) throw profileResult.error;
+      if (slotsResult.error) throw slotsResult.error;
+      
+      setProfile(profileResult.data);
+      setPromotionSlots(slotsResult.data);
+
+      // 有効な予約のみを取得
+      const bookingResult = await getActiveBookings(youtuberProfile.id);
+      
+      if (!bookingResult.success) {
+        throw new Error(bookingResult.error || '予約データの取得に失敗しました');
+      }
+
+      // APIレスポンスをSlotBookingWithPayment型に変換
+      const formattedBookings: SlotBookingWithPayment[] = bookingResult.data.map((item: any) => {
+        // まず各プロパティを取得
+        const slotData = item.promotion_slots || {};
+
+        // PromotionSlot型に変換
+        const slot: PromotionSlot = {
+          id: slotData.id || '',
+          name: slotData.name || '不明な掲載枠',
+          type: (slotData.type as any) || 'premium', // 型キャスト
+          price: slotData.price || 0,
+        };
+
+        // 日数を計算（必要な場合）
+        const startDate = new Date(item.start_date);
+        const endDate = new Date(item.end_date);
+        const durationDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        // SlotBookingWithPayment型に整形
+        return {
+          id: item.id,
+          user_id: youtuberProfile.id,
+          youtuber_id: youtuberProfile.id,
+          slot_id: item.slot_id,
+          video_id: item.video_id,
+          start_date: item.start_date,
+          end_date: item.end_date,
+          duration: durationDays || 1,
+          status: item.status as any,
+          amount: item.amount_paid || 0,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          payment_status: item.payment_status as any,
+          payment_intent_id: item.payment_intent_id,
+          // スロット情報とビデオ情報
+          slot: slot,
+          video: item.video,
+          // 追加プロパティ
+          amount_paid: item.amount_paid
+        };
+      });
+      
+      setBookings(formattedBookings);
+      
+      // Analytics データの計算
+      const completedBookings = formattedBookings.filter(b => b.status === 'completed');
+      const activeBookings = formattedBookings.filter(b => b.status === 'active');
+      
+      setAnalyticsData({
+        totalRevenue: formattedBookings.reduce((sum, booking) => sum + (booking.amount_paid || 0), 0),
+        totalBookings: formattedBookings.length,
+        activeBookings: activeBookings.length,
+        completedBookings: completedBookings.length
+      });
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError('データの取得に失敗しました');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCreateSlot = () => {
     setSelectedSlot(null);
@@ -119,6 +245,10 @@ export default function PromotionDashboard() {
     }
   };
 
+  const handleCreateBooking = () => {
+    setShowBookingModal(true);
+  };
+
   const handleDeleteSlot = async (slotId: string) => {
     const slot = promotionSlots.find(s => s.id === slotId);
     const bookingsCount = slot?.bookings?.[0]?.count ?? 0;
@@ -131,17 +261,79 @@ export default function PromotionDashboard() {
     if (!window.confirm('この掲載枠を削除してもよろしいですか？')) return;
 
     try {
-      const { error } = await supabase
+      console.log('削除を開始: slotId =', slotId);
+      
+      // 直接削除処理を実行
+      const { data, error } = await supabase
         .from('promotion_slots')
         .delete()
+        .eq('id', slotId)
+        .select();
+
+      console.log('削除の結果:', { data, error });
+      
+      if (error) {
+        console.error('削除エラー詳細:', error);
+        
+        // エラーの内容に応じて処理を変更
+        if (error.code === '42501') { // パーミッションエラー
+          console.log('削除の権限がありません。論理削除を試みます。');
+          
+          // 論理削除を試みる
+          const { error: updateError } = await supabase
+            .from('promotion_slots')
+            .update({ is_active: false })
+            .eq('id', slotId);
+            
+          if (updateError) {
+            console.error('論理削除エラー:', updateError);
+            throw updateError;
+          }
+          
+          console.log('論理削除が成功しました');
+        } else {
+          // その他のエラー
+          throw error;
+        }
+      }
+      
+      // 削除確認
+      const { data: checkData, error: checkError } = await supabase
+        .from('promotion_slots')
+        .select('id, is_active')
         .eq('id', slotId);
+        
+      console.log('削除確認:', { stillExists: checkData && checkData.length > 0, checkData, checkError });
+      
+      if (checkData && checkData.length > 0) {
+        // 物理削除に失敗した場合、データが残っている
+        console.log('物理削除に失敗したようです。データが依然として存在します。');
+        
+        // 論理削除を試みる
+        const { error: updateError } = await supabase
+          .from('promotion_slots')
+          .update({ is_active: false })
+          .eq('id', slotId);
+          
+        if (updateError) {
+          console.error('論理削除エラー:', updateError);
+          throw updateError;
+        }
+        
+        console.log('論理削除が成功しました');
+      } else {
+        console.log('物理削除が成功しました。データが存在しません。');
+      }
 
-      if (error) throw error;
-
+      // UIからの削除
       setPromotionSlots(slots => slots.filter(slot => slot.id !== slotId));
+      
+      // 最新データの再取得
+      refreshData();
+      
     } catch (err) {
       console.error('Error deleting slot:', err);
-      alert('削除に失敗しました');
+      alert('削除に失敗しました: ' + (err instanceof Error ? err.message : String(err)));
     }
   };
 
@@ -174,6 +366,24 @@ export default function PromotionDashboard() {
     }
   };
 
+  const getPaymentStatusLabel = (paymentStatus?: string) => {
+    switch (paymentStatus) {
+      case 'succeeded':
+      case 'paid':
+        return <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">支払済</span>;
+      case 'pending':
+        return <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">未払い</span>;
+      case 'processing':
+        return <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">処理中</span>;
+      case 'refunded':
+        return <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">返金済</span>;
+      case 'cancelled':
+        return <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">キャンセル</span>;
+      default:
+        return <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">不明</span>;
+    }
+  };
+
   // 現在の予約をCSV形式でエクスポート
   const handleExportCSV = () => {
     const headers = ['予約ID', '掲載枠', '動画タイトル', '金額', '状態', '予約日', '開始日', '終了日'];
@@ -184,7 +394,7 @@ export default function PromotionDashboard() {
         booking.id,
         booking.slot?.name || '',
         booking.video?.title || '',
-        booking.amount ? `¥${booking.amount.toLocaleString()}` : '¥0',
+        booking.amount_paid ? `¥${booking.amount_paid.toLocaleString()}` : '¥0',
         booking.status,
         formatDate(booking.created_at),
         formatDate(booking.start_date),
@@ -208,7 +418,7 @@ export default function PromotionDashboard() {
   const refreshData = async () => {
     setLoading(true);
     try {
-      // 掲載枠データも更新
+      // 掲載枠データを更新
       const { data: slotsData, error: slotsError } = await supabase
         .from('promotion_slots')
         .select(`
@@ -216,34 +426,78 @@ export default function PromotionDashboard() {
           bookings:slot_bookings(
             count
           )
-        `);  // youtuber_idの条件を削除
+        `)
+        .eq('is_active', true);  // アクティブな掲載枠のみに限定
         
       if (slotsError) throw slotsError;
       setPromotionSlots(slotsData);
   
-      // 予約データを更新
-      const { data, error } = await supabase
-        .from('slot_bookings')
-        .select('*')  // 関連テーブルの取得を一時的に削除
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
+      // 予約データを更新（有効なもののみ）
+      if (youtuberProfile?.id) {
+        const bookingResult = await getActiveBookings(youtuberProfile.id);
         
-      if (error) throw error;
-      setBookings(data);
+        if (!bookingResult.success) {
+          throw new Error(bookingResult.error || '予約データの取得に失敗しました');
+        }
+        
+        // APIレスポンスをSlotBookingWithPayment型に変換
+        const formattedBookings: SlotBookingWithPayment[] = bookingResult.data.map((item: any) => {
+          // まず各プロパティを取得
+          const slotData = item.promotion_slots || {};
   
-      // Analytics データの再計算
-      const completedBookings = data.filter(b => b.status === 'completed');
-      const activeBookings = data.filter(b => b.status === 'active');
-      
-      setAnalyticsData({
-        totalRevenue: completedBookings.reduce((sum, booking) => sum + (booking.amount || 0), 0),
-        totalBookings: data.length,
-        activeBookings: activeBookings.length,
-        completedBookings: completedBookings.length
-      });
+          // PromotionSlot型に変換
+          const slot: PromotionSlot = {
+            id: slotData.id || '',
+            name: slotData.name || '不明な掲載枠',
+            type: (slotData.type as any) || 'premium', // 型キャスト
+            price: slotData.price || 0,
+          };
+  
+          // 日数を計算（必要な場合）
+          const startDate = new Date(item.start_date);
+          const endDate = new Date(item.end_date);
+          const durationDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  
+          // SlotBookingWithPayment型に整形
+          return {
+            id: item.id,
+            user_id: youtuberProfile.id,
+            youtuber_id: youtuberProfile.id,
+            slot_id: item.slot_id,
+            video_id: item.video_id,
+            start_date: item.start_date,
+            end_date: item.end_date,
+            duration: durationDays || 1,
+            status: item.status as any,
+            amount: item.amount_paid || 0,
+            created_at: item.created_at,
+            updated_at: item.updated_at,
+            payment_status: item.payment_status as any,
+            payment_intent_id: item.payment_intent_id,
+            // スロット情報とビデオ情報
+            slot: slot,
+            video: item.video,
+            // 追加プロパティ
+            amount_paid: item.amount_paid
+          };
+        });
+        
+        setBookings(formattedBookings);
+  
+        // Analytics データの再計算
+        const completedBookings = formattedBookings.filter(b => b.status === 'completed');
+        const activeBookings = formattedBookings.filter(b => b.status === 'active');
+        
+        setAnalyticsData({
+          totalRevenue: formattedBookings.reduce((sum, booking) => sum + (booking.amount_paid || 0), 0),
+          totalBookings: formattedBookings.length,
+          activeBookings: activeBookings.length,
+          completedBookings: completedBookings.length
+        });
+      }
     } catch (err) {
       console.error('Error refreshing data:', err);
-      alert('データの更新に失敗しました');
+      toast.error('データの更新に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -252,6 +506,59 @@ export default function PromotionDashboard() {
   // モーダルが成功した後の処理
   const handleSlotSuccess = () => {
     refreshData();
+  };
+
+  // 予約モーダルが成功した後の処理
+  const handleBookingSuccess = () => {
+    refreshData();
+    setShowBookingModal(false);
+    setActiveTab('bookings');
+  };
+
+  // 予約キャンセルモーダルを開く
+  const handleOpenCancelModal = (booking: SlotBookingWithPayment) => {
+    setSelectedBooking(booking);
+    setCancelModalOpen(true);
+  };
+  
+  // 予約キャンセルモーダルを閉じる
+  const handleCloseCancelModal = () => {
+    setSelectedBooking(null);
+    setCancelModalOpen(false);
+  };
+  
+  // 予約キャンセルを確定する
+  const handleConfirmCancel = async (bookingId: string, reason: string) => {
+    try {
+      setLoading(true);
+      
+      const result = await cancelBooking(bookingId, reason);
+      
+      if (result.success) {
+        toast.success('予約がキャンセルされました');
+        // リストを更新
+        refreshData();
+      } else {
+        toast.error(result.error || 'キャンセルに失敗しました');
+      }
+    } catch (err) {
+      console.error('予約キャンセル中にエラーが発生しました:', err);
+      toast.error('予約キャンセル中にエラーが発生しました');
+    } finally {
+      handleCloseCancelModal();
+      setLoading(false);
+    }
+  };
+
+  // 支払いが必要な予約の支払いを完了させる
+  const handleCompletePayment = (bookingId: string, paymentIntentId?: string) => {
+    if (!paymentIntentId) {
+      toast.error('支払い情報が見つかりません。管理者にお問い合わせください。');
+      return;
+    }
+    
+    // Stripe決済の確認ページに遷移
+    window.location.href = `/youtuber/payment/confirm?payment_intent=${paymentIntentId}&booking_id=${bookingId}`;
   };
 
   if (error) {
@@ -311,6 +618,25 @@ export default function PromotionDashboard() {
         </div>
       </div>
 
+      {/* 動画掲載予約ボタン (常に表示) */}
+      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg p-6">
+        <div className="flex flex-col md:flex-row justify-between items-center">
+          <div className="mb-4 md:mb-0">
+            <h3 className="text-xl font-bold text-white">動画掲載を開始しましょう</h3>
+            <p className="text-blue-100 mt-1">
+              作成した掲載枠に動画を掲載して、視聴者層を拡大しましょう
+            </p>
+          </div>
+          <button
+            onClick={handleCreateBooking}
+            className="px-6 py-3 bg-white text-blue-600 font-medium rounded-lg shadow hover:bg-blue-50 transition-colors"
+          >
+            <Calendar className="inline-block w-5 h-5 mr-2 align-text-bottom" />
+            動画掲載を予約する
+          </button>
+        </div>
+      </div>
+
       {/* アナリティクスカード（常に表示） */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow-sm p-6">
@@ -320,7 +646,7 @@ export default function PromotionDashboard() {
             </div>
             <div>
               <p className="text-sm font-medium text-gray-500">
-                総収益
+                総掲載費
               </p>
               <h3 className="text-xl font-bold text-gray-900">
                 ¥{analyticsData.totalRevenue.toLocaleString()}
@@ -368,8 +694,7 @@ export default function PromotionDashboard() {
             </div>
             <div>
               <p className="text-sm font-medium text-gray-500">
-                完了した予約
-              </p>
+                完了した予約</p>
               <h3 className="text-xl font-bold text-gray-900">
                 {analyticsData.completedBookings}件
               </h3>
@@ -378,8 +703,8 @@ export default function PromotionDashboard() {
         </div>
       </div>
 
-      {/* メインコンテンツ */}
-      <div className="flex flex-col lg:flex-row gap-8">
+  {/* メインコンテンツ */}
+  <div className="flex flex-col lg:flex-row gap-8">
         {activeTab === 'slots' && (
           <>
             {/* サイドバー */}
@@ -527,6 +852,13 @@ export default function PromotionDashboard() {
               </div>
               <div className="flex items-center space-x-2">
                 <button
+                  onClick={handleCreateBooking}
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+                >
+                  <Calendar className="h-4 w-4 mr-1" />
+                  新規予約
+                </button>
+                <button
                   onClick={refreshData}
                   className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
                 >
@@ -577,6 +909,9 @@ export default function PromotionDashboard() {
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             決済情報
                           </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            アクション
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -612,7 +947,10 @@ export default function PromotionDashboard() {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">
-                                ¥{booking.amount?.toLocaleString() || 0}
+                                ¥{booking.amount_paid?.toLocaleString() || 0}
+                              </div>
+                              <div className="text-xs">
+                                {getPaymentStatusLabel(booking.payment_status)}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -640,6 +978,28 @@ export default function PromotionDashboard() {
                                 '未決済'
                               )}
                             </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex space-x-2">
+                                {(booking.payment_status === 'pending' || booking.payment_status === 'processing') && (
+                                  <button
+                                    onClick={() => handleCompletePayment(booking.id, booking.payment_intent_id)}
+                                    className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded"
+                                  >
+                                    支払う
+                                  </button>
+                                )}
+                                
+                                {(booking.status === 'active' || booking.status === 'pending') && (
+                                  <button
+                                    onClick={() => handleOpenCancelModal(booking)}
+                                    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded flex items-center"
+                                  >
+                                    <Trash2 className="h-3 w-3 mr-1" />
+                                    キャンセル
+                                  </button>
+                                )}
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -653,168 +1013,198 @@ export default function PromotionDashboard() {
 
         {activeTab === 'analytics' && (
           <div className="w-full">
-            <div className="flex items-center mb-4">
-              <BarChart2 className="h-6 w-6 text-indigo-600 mr-2" />
-              <h2 className="text-2xl font-bold text-gray-900">収益分析</h2>
+            {/* 分析タブのサブタブナビゲーション */}
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center">
+                <BarChart2 className="h-6 w-6 text-indigo-600 mr-2" />
+                <h2 className="text-2xl font-bold text-gray-900">分析</h2>
+              </div>
+              
+              {/* 追加: サブタブナビゲーション */}
+              <div className="flex items-center space-x-2 bg-white rounded-lg shadow-sm p-1">
+                <button 
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                    analyticsSubTab === 'cost' 
+                      ? 'bg-indigo-100 text-indigo-700' 
+                      : 'hover:bg-gray-100 text-gray-600'
+                  }`}
+                  onClick={() => setAnalyticsSubTab('cost')}
+                >
+                  <DollarSign className="inline-block w-4 h-4 mr-1 align-text-bottom" />
+                  費用分析
+                </button>
+                <button 
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                    analyticsSubTab === 'performance' 
+                      ? 'bg-indigo-100 text-indigo-700' 
+                      : 'hover:bg-gray-100 text-gray-600'
+                  }`}
+                  onClick={() => setAnalyticsSubTab('performance')}
+                >
+                  <BarChart2 className="inline-block w-4 h-4 mr-1 align-text-bottom" />
+                  掲載効果分析
+                </button>
+              </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">収益サマリー</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-gray-500 mb-2">総収益</h4>
-                    <p className="text-3xl font-bold text-gray-900">
-                      ¥{analyticsData.totalRevenue.toLocaleString()}
-                    </p>
-                  </div>
+            {/* 条件分岐: 費用分析または掲載効果分析を表示 */}
+            {analyticsSubTab === 'cost' ? (
+              <>
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">費用サマリー</h3>
                   
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-gray-500 mb-2">総予約数</h4>
-                    <p className="text-3xl font-bold text-gray-900">{analyticsData.totalBookings}件</p>
-                  </div>
-                </div>
-                
-                <div>
-                <div className="mb-6">
-                  <h4 className="text-sm font-medium text-gray-500 mb-2">ステータス別予約</h4>
-                    <div className="mt-2 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">アクティブ</span>
-                        <div className="flex items-center">
-                          <div className="w-32 h-2 bg-gray-200 rounded-full mr-2">
-                            <div 
-                              className="h-full bg-green-500 rounded-full" 
-                              style={{ 
-                                width: `${analyticsData.totalBookings 
-                                  ? (analyticsData.activeBookings / analyticsData.totalBookings * 100) 
-                                  : 0}%` 
-                              }}
-                            ></div>
-                          </div>
-                          <span className="text-sm font-medium text-gray-900">
-                            {analyticsData.activeBookings}件
-                          </span>
-                        </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                    <div className="mb-6">
+                        <h4 className="text-sm font-medium text-gray-500 mb-2">総予約数</h4>
+                        <p className="text-3xl font-bold text-gray-900">{analyticsData.totalBookings}件</p>
                       </div>
-                      <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">完了</span>
-                        <div className="flex items-center">
-                          <div className="w-32 h-2 bg-gray-200 rounded-full mr-2">
-                            <div 
-                              className="h-full bg-blue-500 rounded-full" 
-                              style={{ 
-                                width: `${analyticsData.totalBookings 
-                                  ? (analyticsData.completedBookings / analyticsData.totalBookings * 100) 
-                                  : 0}%` 
-                              }}
-                            ></div>
+                    </div>
+                    
+                    <div>
+                    <div className="mb-6">
+                      <h4 className="text-sm font-medium text-gray-500 mb-2">ステータス別予約</h4>
+                        <div className="mt-2 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">アクティブ</span>
+                            <div className="flex items-center">
+                              <div className="w-32 h-2 bg-gray-200 rounded-full mr-2">
+                                <div 
+                                  className="h-full bg-green-500 rounded-full" 
+                                  style={{ 
+                                    width: `${analyticsData.totalBookings 
+                                      ? (analyticsData.activeBookings / analyticsData.totalBookings * 100) 
+                                      : 0}%` 
+                                  }}
+                                ></div>
+                              </div>
+                              <span className="text-sm font-medium text-gray-900">
+                                {analyticsData.activeBookings}件
+                              </span>
+                            </div>
                           </div>
-                          <span className="text-sm font-medium text-gray-900">
-                            {analyticsData.completedBookings}件
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">その他</span>
-                        <div className="flex items-center">
-                          <div className="w-32 h-2 bg-gray-200 rounded-full mr-2">
-                            <div 
-                              className="h-full bg-gray-500 rounded-full" 
-                              style={{ 
-                                width: `${analyticsData.totalBookings 
-                                  ? ((analyticsData.totalBookings - analyticsData.activeBookings - analyticsData.completedBookings) / analyticsData.totalBookings * 100) 
-                                  : 0}%` 
-                              }}
-                            ></div>
+                          <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600">完了</span>
+                            <div className="flex items-center">
+                              <div className="w-32 h-2 bg-gray-200 rounded-full mr-2">
+                                <div 
+                                  className="h-full bg-blue-500 rounded-full" 
+                                  style={{ 
+                                    width: `${analyticsData.totalBookings 
+                                      ? (analyticsData.completedBookings / analyticsData.totalBookings * 100) 
+                                      : 0}%` 
+                                  }}
+                                ></div>
+                              </div>
+                              <span className="text-sm font-medium text-gray-900">
+                                {analyticsData.completedBookings}件
+                              </span>
+                            </div>
                           </div>
-                          <span className="text-sm font-medium text-gray-900">
-                            {analyticsData.totalBookings - analyticsData.activeBookings - analyticsData.completedBookings}件
-                          </span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">その他</span>
+                            <div className="flex items-center">
+                              <div className="w-32 h-2 bg-gray-200 rounded-full mr-2">
+                                <div 
+                                  className="h-full bg-gray-500 rounded-full" 
+                                  style={{ 
+                                    width: `${analyticsData.totalBookings 
+                                      ? ((analyticsData.totalBookings - analyticsData.activeBookings - analyticsData.completedBookings) / analyticsData.totalBookings * 100) 
+                                      : 0}%` 
+                                  }}
+                                ></div>
+                              </div>
+                              <span className="text-sm font-medium text-gray-900">
+                                {analyticsData.totalBookings - analyticsData.activeBookings - analyticsData.completedBookings}件
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
+                  
+                  <div className="mt-8">
+                    <h4 className="text-sm font-medium text-gray-500 mb-4">予約データ詳細</h4>
+                    <p className="text-sm text-gray-500 mb-4">
+                      詳細な費用データと分析はCSVをエクスポートして確認できます。
+                    </p>
+                    <button
+                      onClick={handleExportCSV}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      予約データCSVをエクスポート
+                    </button>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="mt-8">
-                <h4 className="text-sm font-medium text-gray-500 mb-4">予約データ詳細</h4>
-                <p className="text-sm text-gray-500 mb-4">
-                  詳細な収益データと分析はCSVをエクスポートして確認できます。
-                </p>
-                <button
-                  onClick={handleExportCSV}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  予約データCSVをエクスポート
-                </button>
-              </div>
-            </div>
-            
-            <div className="mt-6 bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">決済履歴</h3>
-              
-              {bookings.filter(b => b.payment_intent_id).length === 0 ? (
-                <div className="text-center py-6 text-gray-500">
-                  決済データがありません
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          日時
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          ID
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          掲載枠
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          金額
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          状態
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {bookings
-                        .filter(b => b.payment_intent_id)
-                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                        .map((booking) => (
-                          <tr key={booking.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {formatDate(booking.created_at)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-xs text-gray-900">
-                                {booking.payment_intent_id?.substring(0, 12)}...
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{booking.slot?.name || "不明"}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">
-                                ¥{booking.amount?.toLocaleString() || 0}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {getStatusBadge(booking.status)}
-                            </td>
+                
+                <div className="mt-6 bg-white rounded-lg shadow-sm p-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">決済履歴</h3>
+                  
+                  {bookings.filter(b => b.payment_intent_id).length === 0 ? (
+                    <div className="text-center py-6 text-gray-500">
+                      決済データがありません
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              日時
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              ID
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              掲載枠
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              金額
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              状態
+                            </th>
                           </tr>
-                        ))}
-                    </tbody>
-                  </table>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {bookings
+                            .filter(b => b.payment_intent_id)
+                            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                            .map((booking) => (
+                              <tr key={booking.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {formatDate(booking.created_at)}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-xs text-gray-900">
+                                    {booking.payment_intent_id?.substring(0, 12)}...
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900">{booking.slot?.name || "不明"}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    ¥{booking.amount_paid?.toLocaleString() || 0}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  {getStatusBadge(booking.status)}
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            ) : (
+              // 掲載効果分析タブの内容：AnalyticsDashboardコンポーネントを表示
+              <AnalyticsDashboard />
+            )}
           </div>
         )}
       </div>
@@ -835,6 +1225,37 @@ export default function PromotionDashboard() {
           slot={selectedSlot}
         />
       )}
+
+      {/* 動画掲載予約モーダル */}
+      {showBookingModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+              <h2 className="text-lg font-medium text-gray-900">動画掲載予約</h2>
+              <button 
+                onClick={() => setShowBookingModal(false)}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <XCircle className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="p-4">
+              <BookingForm 
+                onSuccess={handleBookingSuccess}
+                onCancel={() => setShowBookingModal(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* キャンセル確認モーダル */}
+      <CancelBookingModal
+        isOpen={cancelModalOpen}
+        booking={selectedBooking}
+        onClose={handleCloseCancelModal}
+        onConfirm={handleConfirmCancel}
+      />
     </div>
   );
 }

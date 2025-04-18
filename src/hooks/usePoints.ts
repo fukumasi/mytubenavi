@@ -1,9 +1,10 @@
 // src/hooks/usePoints.ts
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
-import { TransactionType, PointTransaction as MatchingPointTransaction } from '../types/matching';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { TransactionType, PointTransaction as MatchingPointTransaction } from '@/types/matching';
+import { pointService } from '@/services/pointService';
 
 // ポイント取引の型（ローカルでの使用）
 export type PointTransaction = MatchingPointTransaction;
@@ -32,6 +33,7 @@ export const usePoints = () => {
   const [transactionsLoading, setTransactionsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPremium, setIsPremium] = useState<boolean>(false);
+  const [lifetimeEarned, setLifetimeEarned] = useState<number>(0);
 
   /**
    * ユーザーがプレミアム会員かどうかを確認
@@ -45,51 +47,29 @@ export const usePoints = () => {
         .from('profiles')
         .select('is_premium, premium_expiry')
         .eq('id', user.id)
-        .single();
+        .limit(1); // single()の代わりにlimit(1)を使用
       
       if (error) {
         console.error('Error checking premium status:', error);
         return false;
       }
       
+      if (!data || data.length === 0) {
+        return false;
+      }
+      
       // プレミアム期限がまだ有効か確認（premium_expiryに変更）
-      if (data?.is_premium && data?.premium_expiry) {
-        const premiumExpiry = new Date(data.premium_expiry);
+      if (data[0]?.is_premium && data[0]?.premium_expiry) {
+        const premiumExpiry = new Date(data[0].premium_expiry);
         const now = new Date();
         
         return premiumExpiry > now;
       }
       
       // is_premiumフラグのみで判断（expiry日がなくてもフラグがtrueなら有効とみなす）
-      return !!data?.is_premium;
+      return !!data[0]?.is_premium;
     } catch (err) {
       console.error('Error in checkPremiumStatus:', err);
-      return false;
-    }
-  }, [user]);
-
-  /**
-   * テーブルの作成を試みる（フロントエンドからの作成は理想的ではないが、
-   * 今回はフォールバック対応として実装。本来はマイグレーションで対応すべき）
-   */
-  const createDefaultUserPoint = useCallback(async (): Promise<boolean> => {
-    if (!user) return false;
-    
-    try {
-      // ユーザーポイントテーブルが存在することを前提に、レコードの作成を試みる
-      const { error } = await supabase
-        .from('user_points')
-        .insert({
-          user_id: user.id,
-          balance: 100,  // デフォルト初期ポイント
-          lifetime_earned: 0,
-          last_updated: new Date().toISOString()
-        });
-      
-      // エラーがなければ作成成功
-      return !error;
-    } catch (err) {
-      console.error('Error creating default user point:', err);
       return false;
     }
   }, [user]);
@@ -100,6 +80,7 @@ export const usePoints = () => {
   const fetchBalance = useCallback(async (): Promise<number | null> => {
     if (!user) {
       setBalance(null);
+      setLifetimeEarned(0);
       setLoading(false);
       return null;
     }
@@ -112,39 +93,17 @@ export const usePoints = () => {
       const premium = await checkPremiumStatus();
       setIsPremium(premium);
       
-      // テーブルの存在確認は行わず、直接ポイント取得を試みる
+      // ポイントサービスを使用してポイント情報を取得
       try {
-        // user_pointsテーブルからユーザーのポイントを取得
-        const { data, error } = await supabase
-          .from('user_points')
-          .select('balance, lifetime_earned')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (error) {
-          // テーブルが存在しないか、ユーザーのレコードがない可能性
-          // デフォルトのポイントレコードを作成
-          const created = await createDefaultUserPoint();
-          
-          if (created) {
-            // 作成成功したら、デフォルト値をセット
-            setBalance(100);
-            return 100;
-          } else {
-            // 失敗した場合も、UI表示のためにデフォルト値を使用
-            setBalance(100);
-            console.warn('ポイントシステムが初期化されていません。デフォルト値を使用します。');
-            return 100;
-          }
-        } else {
-          // データが取得できた場合
-          setBalance(data?.balance || 0);
-          return data?.balance || 0;
-        }
+        const pointData = await pointService.getUserPoints(user.id);
+        setBalance(pointData.balance);
+        setLifetimeEarned(pointData.lifetimeEarned);
+        return pointData.balance;
       } catch (err) {
         console.error('Error fetching points:', err);
         // エラー時もデフォルト値を設定して表示する
         setBalance(100);
+        setLifetimeEarned(0);
         return 100;
       }
     } catch (err) {
@@ -152,11 +111,12 @@ export const usePoints = () => {
       setError('ポイント残高の取得中にエラーが発生しました');
       // エラー時もUIに表示できるようデフォルト値を設定
       setBalance(100);
+      setLifetimeEarned(0);
       return 100;
     } finally {
       setLoading(false);
     }
-  }, [user, checkPremiumStatus, createDefaultUserPoint]);
+  }, [user, checkPremiumStatus]);
 
   /**
    * ポイント残高を更新する（refreshBalance）
@@ -179,7 +139,7 @@ export const usePoints = () => {
     setError(null);
 
     try {
-      // テーブルの存在確認は行わず、直接取得を試みる
+      // 直接取得を試みる
       try {
         const { data, error } = await supabase
           .from('point_transactions')
@@ -190,7 +150,7 @@ export const usePoints = () => {
 
         if (error) {
           // テーブルが存在しない可能性
-          console.warn('トランザクション履歴が取得できません。テーブルが初期化されていない可能性があります。');
+          console.warn('トランザクション履歴が取得できません。テーブルが初期化されていない可能性があります。:', error);
           setTransactions([]);
         } else {
           setTransactions(data || []);
@@ -228,77 +188,36 @@ export const usePoints = () => {
       return false;
     }
 
-    // プレミアム会員はポイント消費をスキップ（bypassPremiumがtrueの場合を除く）
-    if (isPremium && !bypassPremium) {
-      // プレミアム会員は常に成功として扱う
-      return true;
-    }
-
     try {
-      // ポイント残高チェック
-      if (balance === null || balance < amount) {
-        setError('ポイントが不足しています');
-        return false;
+      // ポイントサービスを使用してポイント消費
+      const success = await pointService.consumePoints(
+        user.id,
+        amount,
+        transactionType,
+        isPremium,
+        referenceId,
+        description,
+        bypassPremium
+      );
+      
+      if (success) {
+        // 成功したら状態を更新
+        if (isPremium && !bypassPremium) {
+          // プレミアム会員で消費をスキップした場合は残高を変更しない
+        } else {
+          setBalance(prev => prev !== null ? prev - amount : null);
+        }
+      } else {
+        setError('ポイントが不足しているか、消費に失敗しました');
       }
       
-      try {
-        // user_pointsテーブルの更新
-        const { error: updateError } = await supabase
-          .from('user_points')
-          .update({
-            balance: balance - amount,
-            last_updated: new Date().toISOString()
-          })
-          .eq('user_id', user.id);
-        
-        if (updateError) {
-          // 更新に失敗した場合、レコードが存在しない可能性があるため作成を試みる
-          const { error: insertError } = await supabase
-            .from('user_points')
-            .insert({
-              user_id: user.id,
-              balance: 100 - amount, // デフォルト100から消費
-              lifetime_earned: 0,
-              last_updated: new Date().toISOString()
-            });
-          
-          if (insertError) {
-            console.error('Error creating user points record:', insertError);
-            setError('ポイント消費に失敗しました');
-            return false;
-          }
-        }
-        
-        // トランザクション記録の追加を試みる
-        try {
-          await supabase
-            .from('point_transactions')
-            .insert({
-              user_id: user.id,
-              amount: -amount, // 消費なのでマイナス
-              transaction_type: transactionType,
-              reference_id: referenceId,
-              description: description || getDefaultTransactionDescription(transactionType, amount)
-            });
-        } catch (txError) {
-          console.warn('トランザクション記録の追加に失敗しましたが、ポイント消費は成功しました:', txError);
-        }
-        
-        // 成功したら状態を更新
-        setBalance(prev => prev !== null ? prev - amount : null);
-        
-        return true;
-      } catch (err) {
-        console.error('Error updating points:', err);
-        setError('ポイント消費に失敗しました');
-        return false;
-      }
+      return success;
     } catch (err) {
       console.error('Error in consumePoints:', err);
       setError('ポイント消費中にエラーが発生しました');
       return false;
     }
-  }, [user, balance, isPremium]);
+  }, [user, isPremium]);
 
   /**
    * ポイントを追加
@@ -324,64 +243,67 @@ export const usePoints = () => {
     }
 
     try {
-      try {
-        // user_pointsテーブルの更新
-        const { error: updateError } = await supabase
-          .from('user_points')
-          .update({
-            balance: (balance || 0) + amount,
-            last_updated: new Date().toISOString()
-          })
-          .eq('user_id', user.id);
-        
-        if (updateError) {
-          // 更新に失敗した場合、レコードが存在しない可能性があるため作成を試みる
-          const { error: insertError } = await supabase
-            .from('user_points')
-            .insert({
-              user_id: user.id,
-              balance: 100 + amount, // デフォルト100にポイント追加
-              lifetime_earned: amount,
-              last_updated: new Date().toISOString()
-            });
-          
-          if (insertError) {
-            console.error('Error creating user points record:', insertError);
-            setError('ポイント追加に失敗しました');
-            return false;
-          }
-        }
-        
-        // トランザクション記録の追加を試みる
-        try {
-          await supabase
-            .from('point_transactions')
-            .insert({
-              user_id: user.id,
-              amount: amount, // 追加なのでプラス
-              transaction_type: transactionType,
-              reference_id: referenceId,
-              description: description || getDefaultTransactionDescription(transactionType, amount, true)
-            });
-        } catch (txError) {
-          console.warn('トランザクション記録の追加に失敗しましたが、ポイント追加は成功しました:', txError);
-        }
-        
+      // ポイントサービスを使用してポイント追加
+      const success = await pointService.addPoints(
+        user.id,
+        amount,
+        transactionType,
+        referenceId,
+        description
+      );
+      
+      if (success) {
         // 成功したら状態を更新
         setBalance(prev => prev !== null ? prev + amount : amount);
-        
-        return true;
-      } catch (err) {
-        console.error('Error updating points:', err);
+        setLifetimeEarned(prev => prev + amount);
+      } else {
         setError('ポイント追加に失敗しました');
-        return false;
       }
+      
+      return success;
     } catch (err) {
       console.error('Error in addPoints:', err);
       setError('ポイント追加中にエラーが発生しました');
       return false;
     }
-  }, [user, balance]);
+  }, [user]);
+
+  /**
+   * レビュー投稿に対するポイント報酬を処理
+   * @param reviewContent レビュー内容
+   * @param reviewId レビューID
+   * @returns 獲得したポイント数
+   */
+  const processReviewReward = useCallback(async (
+    reviewContent: string,
+    reviewId: string
+  ): Promise<number> => {
+    if (!user) {
+      setError('ユーザーがログインしていません');
+      return 0;
+    }
+    
+    try {
+      // ポイントサービスを使用してレビュー報酬を処理
+      const points = await pointService.processReviewReward(
+        user.id,
+        reviewContent,
+        reviewId,
+        isPremium
+      );
+      
+      if (points > 0) {
+        // 成功したら状態を更新（ポイントサービス内でaddPointsは実行済み）
+        await refreshBalance();
+      }
+      
+      return points;
+    } catch (err) {
+      console.error('Error in processReviewReward:', err);
+      setError('レビュー報酬の処理中にエラーが発生しました');
+      return 0;
+    }
+  }, [user, isPremium, refreshBalance]);
 
   /**
    * ポイントを獲得するためのログインボーナスを処理
@@ -396,6 +318,9 @@ export const usePoints = () => {
       yesterday.setDate(yesterday.getDate() - 1);
       yesterday.setHours(0, 0, 0, 0);
       
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
       // ログインテーブルが存在しない可能性があるため、エラー処理を追加
       try {
         // 連続ログイン記録を確認
@@ -406,18 +331,13 @@ export const usePoints = () => {
           .order('login_date', { ascending: false })
           .limit(1);
 
-        if (!error && data) {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          
+        if (!error && data && data.length > 0) {
           // 今日すでにログイン済みの場合はスキップ
-          if (data.length > 0) {
-            const lastLogin = new Date(data[0].login_date);
-            lastLogin.setHours(0, 0, 0, 0);
-            
-            if (lastLogin.getTime() === today.getTime()) {
-              return 0; // 今日はすでにボーナス獲得済み
-            }
+          const lastLogin = new Date(data[0].login_date);
+          lastLogin.setHours(0, 0, 0, 0);
+          
+          if (lastLogin.getTime() === today.getTime()) {
+            return 0; // 今日はすでにボーナス獲得済み
           }
 
           // 基本ログインボーナス
@@ -426,19 +346,14 @@ export const usePoints = () => {
           let isStreak = false;
           
           // 連続ログインの確認
-          if (data.length > 0) {
-            const lastLogin = new Date(data[0].login_date);
-            lastLogin.setHours(0, 0, 0, 0);
+          // 昨日ログインしていた場合は連続ログイン
+          if (lastLogin.getTime() === yesterday.getTime()) {
+            streakCount = (data[0].streak_count || 0) + 1;
+            isStreak = true;
             
-            // 昨日ログインしていた場合は連続ログイン
-            if (lastLogin.getTime() === yesterday.getTime()) {
-              streakCount = (data[0].streak_count || 0) + 1;
-              isStreak = true;
-              
-              // 7日ごとに追加ボーナス
-              if (streakCount % 7 === 0) {
-                bonusPoints += 5;
-              }
+            // 7日ごとに追加ボーナス
+            if (streakCount % 7 === 0) {
+              bonusPoints += 5;
             }
           }
           
@@ -467,6 +382,22 @@ export const usePoints = () => {
             console.error('ログインボーナスの付与に失敗しました:', addError);
             return 0;
           }
+        } else {
+          // 最初のログインの場合またはエラーの場合
+          // ログイン記録保存を試みる
+          try {
+            await supabase.from('user_logins').insert({
+              user_id: user.id,
+              login_date: today.toISOString(),
+              streak_count: 1
+            });
+          } catch (loginError) {
+            console.warn('ログイン記録の保存に失敗しました:', loginError);
+          }
+          
+          // 基本ボーナス付与
+          const success = await addPoints(1, 'login_bonus', undefined, 'ログインボーナス（初回）');
+          return success ? 1 : 0;
         }
       } catch (err) {
         console.warn('ログイン履歴の確認に失敗しました:', err);
@@ -499,50 +430,6 @@ export const usePoints = () => {
   }, [balance, isPremium, fetchBalance]);
 
   /**
-   * デフォルトのトランザクション説明文を生成
-   */
-  const getDefaultTransactionDescription = (
-    transactionType: TransactionType, 
-    amount: number,
-    isAddition: boolean = false
-  ): string => {
-    const absAmount = Math.abs(amount);
-    
-    switch (transactionType) {
-      case 'review':
-        return isAddition 
-          ? `レビュー投稿で${absAmount}ポイント獲得` 
-          : `レビュー取り消しで${absAmount}ポイント減少`;
-      case 'purchase':
-        return `${absAmount}ポイント購入`;
-      case 'message':
-        return !isAddition 
-          ? `メッセージ送信で${absAmount}ポイント消費` 
-          : `メッセージ関連で${absAmount}ポイント獲得`;
-      case 'profile_view':
-        return `プロフィール閲覧で${absAmount}ポイント消費`;
-      case 'refund':
-        return `返金で${absAmount}ポイント獲得`;
-      case 'login_bonus':
-        return `ログインボーナスで${absAmount}ポイント獲得`;
-      case 'streak_bonus':
-        return `継続ログインボーナスで${absAmount}ポイント獲得`;
-      case 'like':
-        return `いいねで${absAmount}ポイント消費`;
-      case 'match_bonus':
-        return `マッチングボーナスで${absAmount}ポイント獲得`;
-      case 'message_activity':
-        return `メッセージ活動で${absAmount}ポイント獲得`;
-      case 'filter_usage':
-        return `検索フィルター使用で${absAmount}ポイント消費`;
-      default:
-        return isAddition
-          ? `${absAmount}ポイント獲得`
-          : `${absAmount}ポイント消費`;
-    }
-  };
-
-  /**
    * ポイント履歴の詳細説明を取得
    */
   const getTransactionDescription = useCallback((transaction: PointTransaction): string => {
@@ -550,7 +437,7 @@ export const usePoints = () => {
       return transaction.description;
     }
     
-    return getDefaultTransactionDescription(
+    return pointService.getDefaultDescription(
       transaction.transaction_type, 
       transaction.amount, 
       transaction.amount > 0
@@ -564,16 +451,18 @@ export const usePoints = () => {
 
   return {
     balance,
+    lifetimeEarned,
     loading,
     error,
     transactions,
     transactionsLoading,
     isPremium,
     fetchBalance,
-    refreshBalance, // 新しく追加したメソッド
+    refreshBalance,
     fetchTransactions,
     consumePoints,
     addPoints,
+    processReviewReward, // 新しく追加したメソッド
     processLoginBonus,
     hasEnoughPoints,
     getTransactionDescription,

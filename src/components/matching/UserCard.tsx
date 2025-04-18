@@ -18,9 +18,10 @@ import {
  faUserPlus, // 接続リクエスト用アイコン追加
  faCheck, // 承認済みアイコン追加
  faHourglass, // 保留中アイコン追加
- faTimes // 拒否アイコン追加
+ faTimes, // 拒否アイコン追加
+ faVenus // 女性アイコン追加
 } from '@fortawesome/free-solid-svg-icons';
-import { MatchingUser, VideoDetails, OnlineStatus, ActivityLevel, ConnectionStatus } from '../../types/matching';
+import { MatchingUser, VideoDetails, OnlineStatus, ActivityLevel, ConnectionStatus } from '@/types/matching';
 import { formatDistance } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
@@ -36,6 +37,8 @@ interface UserCardProps {
  hasDetailedView?: boolean;
  similarityScore?: number;
  showYouTubeLink?: boolean;
+ userGender?: string | null; // 追加：現在のユーザーの性別
+ isPhoneVerified?: boolean; // 追加：電話番号認証済みかどうか
 }
 
 // インターフェース名を反映させる
@@ -49,7 +52,9 @@ const UserCard: React.FC<UserCardProps> = ({
  isPremium = false,
  hasDetailedView = false,
  similarityScore,
- showYouTubeLink = false
+ showYouTubeLink = false,
+ userGender = null, // 追加：現在のユーザーの性別
+ isPhoneVerified = false // 追加：電話番号認証済みかどうか
 }) => {
  const defaultAvatar = '/default-avatar.jpg';
  const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -64,6 +69,9 @@ const UserCard: React.FC<UserCardProps> = ({
      setConnectionStatus(user.connection_status || ConnectionStatus.NONE);
    }
  }, [user.connection_status, connectionStatus]);
+
+ // 性別に基づいて詳細プロフィール表示が無料かどうかを判定
+ const isFreeProfileView = isPremium || (userGender === 'female' && isPhoneVerified);
 
  // マッチングスコアを視覚的に分かりやすくするための関数
  const getMatchScoreColor = (score: number) => {
@@ -428,6 +436,22 @@ const UserCard: React.FC<UserCardProps> = ({
    );
  };
 
+ // ユーザーの性別に応じたステータスバッジを表示
+ const renderUserStatusBadge = () => {
+   if (!userGender) return null;
+   
+   if (userGender === 'female' && isPhoneVerified) {
+     return (
+       <div className="absolute top-2 left-14 bg-pink-400 text-white px-2 py-1 rounded-full text-xs flex items-center">
+         <FontAwesomeIcon icon={faVenus} className="mr-1" />
+         認証済み女性
+       </div>
+     );
+   }
+   
+   return null;
+ };
+
  // 接続状態に基づいてアニメーション効果を追加
  const getCardClasses = () => {
    let classes = "w-full max-w-md bg-white rounded-xl shadow-lg overflow-hidden";
@@ -468,6 +492,17 @@ const UserCard: React.FC<UserCardProps> = ({
            プレミアム
          </div>
        )}
+       
+       {/* いいね済みバッジ - 新規追加 */}
+       {user.is_liked && (
+         <div className="absolute top-2 left-2 bg-rose-500 text-white px-2 py-1 rounded-full text-xs flex items-center">
+           <FontAwesomeIcon icon={faHeart} className="mr-1" />
+           いいね済み
+         </div>
+       )}
+       
+       {/* ユーザーステータスバッジ - 追加 */}
+       {renderUserStatusBadge()}
        
        <div className="absolute inset-0 flex items-center justify-center">
          <img
@@ -626,7 +661,7 @@ const UserCard: React.FC<UserCardProps> = ({
          </div>
        )}
        
-       {/* 詳細プロフィールボタン */}
+       {/* 詳細プロフィールボタン - 性別に応じたテキスト表示 */}
        {hasDetailedView && onViewProfile && !showDetails && (
          <div className="mt-4">
            <button
@@ -636,11 +671,12 @@ const UserCard: React.FC<UserCardProps> = ({
                isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
              }`}
            >
-             {isProcessing ? '読込中...' : '詳細プロフィールを見る (5ポイント)'}
+             {isProcessing ? '読込中...' : 
+              isFreeProfileView ? '詳細プロフィールを見る' : '詳細プロフィールを見る (5ポイント)'}
            </button>
-           {isPremium && (
+           {isFreeProfileView && (
              <p className="text-xs text-center mt-1 text-indigo-600">
-               プレミアム会員はポイント消費なし
+               {isPremium ? 'プレミアム会員' : '認証済み女性'} - ポイント消費なし
              </p>
            )}
          </div>
@@ -649,8 +685,8 @@ const UserCard: React.FC<UserCardProps> = ({
        {/* 接続ボタン表示 - 新規追加 */}
        {renderConnectionButton()}
        
-       {/* アクションボタン */}
-       <div className="mt-6 flex justify-between">
+  {/* アクションボタン */}
+  <div className="mt-6 flex justify-between">
          <button
            onClick={handleSkip}
            disabled={isProcessing}
@@ -658,25 +694,30 @@ const UserCard: React.FC<UserCardProps> = ({
              isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'
            }`}
          >
-           <FontAwesomeIcon icon={faForward} className="mr-2" />
-           スキップ
+           <FontAwesomeIcon icon={faForward} className="mr-2" />スキップ
          </button>
          <button
            onClick={handleLike}
-           disabled={isProcessing}
-           className={`flex items-center px-6 py-2 bg-rose-500 text-white font-semibold rounded-lg transition-colors ${
-             isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-rose-600'
+           disabled={isProcessing || user.is_liked}
+           className={`flex items-center px-6 py-2 ${
+             user.is_liked 
+               ? 'bg-rose-300 text-white' 
+               : 'bg-rose-500 text-white hover:bg-rose-600'
+           } font-semibold rounded-lg transition-colors ${
+             isProcessing ? 'opacity-50 cursor-not-allowed' : ''
            }`}
          >
            <FontAwesomeIcon icon={faThumbsUp} className="mr-2" />
-           {isProcessing ? '処理中...' : 'いいね！'}
+           {isProcessing ? '処理中...' : user.is_liked ? 'いいね済み' : 'いいね！'}
          </button>
        </div>
        
-       {/* プレミアム会員への案内（非プレミアム会員向け） */}
-       {!isPremium && (
+       {/* プレミアム会員や認証案内 - 性別によって表示を変更 */}
+       {!isFreeProfileView && (
          <div className="mt-4 p-2 bg-yellow-50 text-sm text-amber-700 rounded-lg">
-           プレミアム会員になると、ポイント消費なしでマッチングできます。
+           {userGender === 'female' ? 
+             '電話番号認証を完了すると、全機能を無料で利用できます。' : 
+             'プレミアム会員になると、ポイント消費なしでマッチングできます。'}
          </div>
        )}
      </div>

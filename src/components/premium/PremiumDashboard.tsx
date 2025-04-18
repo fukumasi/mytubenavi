@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import PremiumBadge from '../profile/PremiumBadge';
 import PremiumFeatures from './PremiumFeatures';
 
@@ -47,36 +47,74 @@ const PremiumDashboard: React.FC = () => {
       setError(null);
 
       try {
-        // プロフィールからプレミアムステータスを取得
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('is_premium, premium_plan, premium_expiry')
-          .eq('id', user.id)
-          .single();
+        // Promise.allを使用して、並列にデータを取得
+        const [
+          profileResponse,
+          matchesViewedResponse,
+          matchesConnectedResponse,
+          savedVideosResponse,
+          notificationsResponse
+        ] = await Promise.all([
+          // プロフィールからプレミアムステータスを取得
+          supabase
+            .from('profiles')
+            .select('is_premium, premium_plan, premium_expiry')
+            .eq('id', user.id)
+            .single(),
+          
+          // マッチング候補表示数の取得（user_matching_scoresの件数）
+          supabase
+            .from('user_matching_scores')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id),
+          
+          // 成立したマッチング数の取得（user_matchesの件数）
+          supabase
+            .from('user_matches')
+            .select('id', { count: 'exact', head: true })
+            .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`),
+          
+          // 保存した動画数の取得（favoritesの件数）
+          supabase
+            .from('favorites')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id),
+          
+          // 受信した通知数の取得（notificationsの件数）
+          supabase
+            .from('notifications')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+        ]);
         
-        if (profileError) throw profileError;
+        // エラーチェック
+        if (profileResponse.error) throw profileResponse.error;
+        if (matchesViewedResponse.error) throw matchesViewedResponse.error;
+        if (matchesConnectedResponse.error) throw matchesConnectedResponse.error;
+        if (savedVideosResponse.error) throw savedVideosResponse.error;
+        if (notificationsResponse.error) throw notificationsResponse.error;
         
-        if (profileData) {
-          const expiryDate = new Date(profileData.premium_expiry);
+        // プレミアムステータスの設定
+        if (profileResponse.data) {
+          const expiryDate = new Date(profileResponse.data.premium_expiry);
           const today = new Date();
           const diffTime = expiryDate.getTime() - today.getTime();
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           
           setPremiumStatus({
-            plan: profileData.premium_plan || 'monthly',
-            expiry: profileData.premium_expiry,
-            isActive: profileData.is_premium && diffDays > 0,
+            plan: profileResponse.data.premium_plan || 'monthly',
+            expiry: profileResponse.data.premium_expiry,
+            isActive: profileResponse.data.is_premium && diffDays > 0,
             daysRemaining: diffDays
           });
         }
 
-        // 利用統計データの取得（例示用のモックデータ）
-        // 実際の実装では、各種テーブルからの集計データを使用
+        // 利用統計データの設定
         setUsageStats({
-          matchesViewed: 24,
-          matchesConnected: 5,
-          savedVideos: 42,
-          notificationsReceived: 78
+          matchesViewed: matchesViewedResponse.count || 0,
+          matchesConnected: matchesConnectedResponse.count || 0,
+          savedVideos: savedVideosResponse.count || 0,
+          notificationsReceived: notificationsResponse.count || 0
         });
       } catch (err) {
         console.error('プレミアムデータの取得中にエラーが発生しました:', err);

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { useAuth } from '../../contexts/AuthContext';
-import { useStripeContext } from '../../contexts/StripeContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useStripeContext } from '@/contexts/StripeContext';
 import { 
   createSubscription, 
   STRIPE_PLANS,
   updatePremiumStatus
-} from '../../services/stripeService';
-import LoadingSpinner from '../ui/LoadingSpinner';
+} from '@/services/stripeService';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface PremiumPaymentFormProps {
   selectedPlan: 'monthly' | 'quarterly' | 'yearly';

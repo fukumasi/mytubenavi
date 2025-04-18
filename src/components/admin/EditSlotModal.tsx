@@ -1,10 +1,10 @@
 // src/components/admin/EditSlotModal.tsx
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes } from '@fortawesome/free-solid-svg-icons';
-import { PromotionSlot } from '../../types/promotion';
+import { PromotionSlot } from '@/types/promotion';
 
 interface EditSlotModalProps {
   isOpen: boolean;

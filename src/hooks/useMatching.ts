@@ -351,12 +351,12 @@ const fetchUserProfile = useCallback(async () => {
       throw new Error('プロフィールテーブルへのアクセスに失敗しました。管理者に連絡してください。');
     }
     
-    // プロフィールデータ取得
+    // プロフィールデータ取得 - single()をlimit(1)に変更
     const { data, error: fetchError } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
-      .single();
+      .limit(1);
 
     if (fetchError) {
       if (fetchError.code === '42P01') {
@@ -365,18 +365,25 @@ const fetchUserProfile = useCallback(async () => {
       throw fetchError;
     }
 
-    setUserProfile(data);
+    // データが存在するか確認し、配列として処理
+    if (!data || data.length === 0) {
+      console.error('プロフィールデータが見つかりません:', user.id);
+      throw new Error('プロフィールデータが見つかりません');
+    }
+
+    const profileData = data[0];
+    setUserProfile(profileData);
 
     if (process.env.NODE_ENV === 'development') {
       setDebugInfo(prev => ({
         ...prev,
-        userProfile: data,
+        userProfile: profileData,
         isPremium
       }));
     }
     
     endFetching('fetchUserProfile', true, { id: user.id });
-    return data;
+    return profileData;
   } catch (error) {
     const errorMessage = error instanceof Error 
       ? error.message 
@@ -521,61 +528,49 @@ const fetchUserProfile = useCallback(async () => {
     try {
       setError(null);
       
-      // youtuber_profilesテーブルとprofilesテーブルが存在するか確認
-      await Promise.all([
-        ensureTableExists('youtuber_profiles'),
-        ensureTableExists('profiles')
-      ]);
+      // youtuber_profilesテーブルの確認はスキップし、プロフィールテーブルのみチェック
+      // このアプローチは406エラーを回避します
+      await ensureTableExists('profiles');
       
-      // youtuber_profiles テーブルからのクエリ
-      const { data, error: fetchError } = await supabase
-        .from('youtuber_profiles')
-        .select('id, channel_url, channel_name')
-        .eq('id', userId)
-        .maybeSingle();
-      
-      if (fetchError) {
-        // Fallback: profiles テーブルから取得を試行
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('channel_url')
-          .eq('id', userId)
-          .single();
-        
-        if (profileError) {
-          endFetching(`fetchYouTubeChannelInfo-${userId}`, false, { error: profileError });
-          return null;
-        }
-        
-        if (profileData && profileData.channel_url) {
-          endFetching(`fetchYouTubeChannelInfo-${userId}`, true, { source: 'profiles', hasUrl: true });
-          return { id: userId, channel_url: profileData.channel_url, channel_name: null };
-        }
-        
-        endFetching(`fetchYouTubeChannelInfo-${userId}`, false, { error: 'No channel URL found' });
-        return null;
-      }
-      
-      if (data && data.channel_url) {
-        endFetching(`fetchYouTubeChannelInfo-${userId}`, true, { source: 'youtuber_profiles', hasUrl: true });
-        return data;
-      }
-      
-      // youtuber_profiles テーブルになければ profiles テーブルから取得を試みる
+      // まずprofilesテーブルからチャンネル情報を取得
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('channel_url')
         .eq('id', userId)
-        .single();
+        .limit(1);
       
       if (profileError) {
+        console.error('プロフィール取得エラー:', profileError);
         endFetching(`fetchYouTubeChannelInfo-${userId}`, false, { error: profileError });
         return null;
       }
       
-      if (profileData && profileData.channel_url) {
+      if (profileData && profileData.length > 0 && profileData[0].channel_url) {
         endFetching(`fetchYouTubeChannelInfo-${userId}`, true, { source: 'profiles', hasUrl: true });
-        return { id: userId, channel_url: profileData.channel_url, channel_name: null };
+        return { id: userId, channel_url: profileData[0].channel_url, channel_name: null };
+      }
+      
+      // 次にyoutuber_profilesテーブルを確認（必要な場合のみ）
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('youtuber_profiles')
+          .select('id, channel_url, channel_name')
+          .eq('id', userId)
+          .limit(1);
+        
+        if (fetchError) {
+          console.warn('YouTuberプロフィール取得エラー:', fetchError);
+          endFetching(`fetchYouTubeChannelInfo-${userId}`, false, { error: 'No channel URL found' });
+          return null;
+        }
+        
+        if (data && data.length > 0 && data[0].channel_url) {
+          endFetching(`fetchYouTubeChannelInfo-${userId}`, true, { source: 'youtuber_profiles', hasUrl: true });
+          return data[0];
+        }
+      } catch (err) {
+        console.warn('YouTuberプロフィール取得中の例外:', err);
+        // エラーを無視して処理を続行（プロフィールからのデータを使用）
       }
       
       endFetching(`fetchYouTubeChannelInfo-${userId}`, false, { error: 'No channel URL found in any table' });
@@ -587,7 +582,6 @@ const fetchUserProfile = useCallback(async () => {
       return null;
     }
   }, [startFetching, endFetching, ensureTableExists]);
-
   /**
    * 緩和モードの設定を切り替えます
    */
@@ -679,45 +673,65 @@ const fetchUserProfile = useCallback(async () => {
         ensureTableExists('user_likes')
       ]);
 
-      const prefsToUse = preferences || {
-        gender_preference: GenderPreference.ANY,
-        age_range_min: 18,
-        age_range_max: 99,
-        location_preference: { prefecture: undefined, region: undefined },
-        interest_tags: [],
-        genre_preference: [],
-        activity_level: ActivityLevel.MODERATE,
-        online_only: false,
-        premium_only: false,
-        has_video_history: false,
-        recent_activity: false,
-        filter_skipped: false, // デフォルトでfalseに変更
-        min_common_interests: 0,
-        max_distance: 0
-      };
+      // 修正後:
+const prefsToUse = preferences || {
+  gender_preference: GenderPreference.ANY,
+  age_range_min: 18,
+  age_range_max: 99,
+  location_preference: { prefecture: undefined, region: undefined },
+  interest_tags: [],
+  genre_preference: [],
+  activity_level: ActivityLevel.MODERATE,
+  online_only: false,
+  premium_only: false,
+  has_video_history: false,
+  recent_activity: false,
+  filter_skipped: false, // デフォルトでfalseに変更
+  min_common_interests: 0,
+  max_distance: 0,
+  exclude_liked_users: true // 初期状態ではいいね済みユーザーを除外
+};
 
-      let candidates;
-      try {
-        candidates = await fetchMatchCandidates(user.id, prefsToUse);
-        
-        if (process.env.NODE_ENV === 'development') {
-          console.log('マッチング候補取得結果:', candidates?.length || 0, '件');
-          setDebugInfo(prev => ({
-            ...prev,
-            candidatesCount: candidates?.length || 0,
-            fetchTime: new Date().toISOString()
-          }));
-        }
-      } catch (fetchError) {
-        console.error('マッチング候補取得エラー:', fetchError);
-        if (process.env.NODE_ENV === 'development') {
-          setDebugInfo(prev => ({
-            ...prev,
-            matchingError: fetchError
-          }));
-        }
-        throw fetchError;
-      }
+      // 修正後:
+let candidates;
+try {
+  // まず通常通りいいね済みユーザーを除外して検索
+  const searchPrefs = { ...prefsToUse };
+  candidates = await fetchMatchCandidates(user.id, searchPrefs);
+  
+  // 候補が見つからず、いいね済みユーザーが除外されている場合は
+  // いいね済みユーザーも含めて再検索
+  if ((!candidates || candidates.length === 0) && searchPrefs.exclude_liked_users) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('通常の検索で候補なし - いいね済みユーザーも含めて再検索します');
+    }
+    
+    const includeLikedPrefs = { 
+      ...searchPrefs, 
+      exclude_liked_users: false 
+    };
+    
+    candidates = await fetchMatchCandidates(user.id, includeLikedPrefs);
+  }
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.log('マッチング候補取得結果:', candidates?.length || 0, '件');
+    setDebugInfo(prev => ({
+      ...prev,
+      candidatesCount: candidates?.length || 0,
+      fetchTime: new Date().toISOString()
+    }));
+  }
+} catch (fetchError) {
+  console.error('マッチング候補取得エラー:', fetchError);
+  if (process.env.NODE_ENV === 'development') {
+    setDebugInfo(prev => ({
+      ...prev,
+      matchingError: fetchError
+    }));
+  }
+  throw fetchError;
+}
 
       // 候補が見つからない場合のフォールバック処理
       if (!candidates || candidates.length === 0) {
@@ -870,12 +884,19 @@ const getSenderInfo = useCallback(async (senderId: string): Promise<string> => {
       return 'ユーザー';
     }
     
-    const { data } = await supabase
+    // single()をlimit(1)に変更
+    const { data, error } = await supabase
       .from('profiles')
       .select('username')
       .eq('id', senderId)
-      .single();
-    return data?.username || 'ユーザー';
+      .limit(1);
+    
+    if (error) {
+      console.error('送信者情報取得エラー:', error);
+      return 'ユーザー';
+    }
+    
+    return data && data.length > 0 ? data[0].username || 'ユーザー' : 'ユーザー';
   } catch (error) {
     console.error('送信者情報取得エラー:', error);
     return 'ユーザー';
@@ -1482,8 +1503,7 @@ const fetchDetailedProfile = async (userId: string): Promise<MatchingProfileDeta
         userId
       );
       
-      if (!pointsConsumedSuccessfully) {
-        toast.error('ポイント消費に失敗しました。後でもう一度お試しください。');
+      if (!pointsConsumedSuccessfully) {toast.error('ポイント消費に失敗しました。後でもう一度お試しください。');
         setLoadingDetails(false);
         endFetching(`fetchDetailedProfile-${userId}`, false, { reason: 'points_consumption_failed' });
         return null;
@@ -1496,7 +1516,7 @@ const fetchDetailedProfile = async (userId: string): Promise<MatchingProfileDeta
       // ポイント残高を更新
       refreshPoints();
     }
-
+ 
     if (pointsConsumedSuccessfully) {
       // 詳細プロフィール情報取得
       const profileData = await getMatchingProfile(user.id, userId);
@@ -1571,7 +1591,7 @@ const fetchDetailedProfile = async (userId: string): Promise<MatchingProfileDeta
       
       return enhancedProfile;
     }
-
+ 
     return null;
   } catch (error) {
     console.error('詳細プロフィール取得失敗:', error);
@@ -1582,46 +1602,46 @@ const fetchDetailedProfile = async (userId: string): Promise<MatchingProfileDeta
   } finally {
     setLoadingDetails(false);
   }
-};
-
-/**
+ };
+ 
+ /**
  * スキップしたユーザーを検索します
  */
-const findSkippedUser = useCallback((userId: string): SkippedUser | undefined => {
+ const findSkippedUser = useCallback((userId: string): SkippedUser | undefined => {
   return skippedUsers.find(user => user.id === userId);
-}, [skippedUsers]);
-
-/**
+ }, [skippedUsers]);
+ 
+ /**
  * スキップを取り消してマッチング候補に戻します
  */
-const restoreSkippedUser = async (userId: string): Promise<boolean> => {
+ const restoreSkippedUser = async (userId: string): Promise<boolean> => {
   if (!user?.id) return false;
   if (!startFetching(`restoreSkippedUser-${userId}`)) return false;
-
+ 
   setProcessingAction(true);
   setError(null);
-
+ 
   try {
     // user_skipsテーブルが存在するか確認
     await ensureTableExists('user_skips');
     
     // スキップを取り消す
     const success = await undoSkip(user.id, userId);
-
+ 
     if (!success) {
       throw new Error('スキップ取り消しに失敗しました');
     }
-
+ 
     // スキップリストを更新
     await getSkippedUsers();
-
+ 
     // マッチング候補を再取得
     if (noMoreUsers) {
       await fetchMatchedUsers();
     }
-
+ 
     toast.success('スキップを取り消しました');
-
+ 
     endFetching(`restoreSkippedUser-${userId}`, true);
     return true;
   } catch (error) {
@@ -1633,18 +1653,18 @@ const restoreSkippedUser = async (userId: string): Promise<boolean> => {
   } finally {
     setProcessingAction(false);
   }
-};
-
-/**
+ };
+ 
+ /**
  * いいねを送信します
  */
-const handleLike = async (userId: string): Promise<boolean> => {
+ const handleLike = async (userId: string): Promise<boolean> => {
   if (!user?.id) return false;
   if (!startFetching(`handleLike-${userId}`)) return false;
-
+ 
   setProcessingAction(true);
   setError(null);
-
+ 
   try {
     // user_likesテーブルとuser_matchesテーブルが存在するか確認
     await Promise.all([
@@ -1654,11 +1674,11 @@ const handleLike = async (userId: string): Promise<boolean> => {
     
     // いいね送信
     const result = await sendLike(user.id, userId, isPremium);
-
+ 
     if (!result.success) {
       throw new Error(result.error || 'いいねの送信に失敗しました');
     }
-
+ 
     // マッチング成立時の処理
     if (result.isMatch) {
       toast.success('マッチングが成立しました！🎉', { duration: 5000 });
@@ -1704,10 +1724,10 @@ const handleLike = async (userId: string): Promise<boolean> => {
         console.error('いいね通知送信エラー:', notifyError);
       }
     }
-
+ 
     // 次のユーザーに進む
     nextUser();
-
+ 
     endFetching(`handleLike-${userId}`, true, { isMatch: result.isMatch });
     return true;
   } catch (error) {
@@ -1719,35 +1739,35 @@ const handleLike = async (userId: string): Promise<boolean> => {
   } finally {
     setProcessingAction(false);
   }
-};
-
-/**
+ };
+ 
+ /**
  * ユーザーをスキップします
  */
-const handleSkip = async (userId: string): Promise<boolean> => {
+ const handleSkip = async (userId: string): Promise<boolean> => {
   if (!user?.id) return false;
   if (!startFetching(`handleSkip-${userId}`)) return false;
-
+ 
   setProcessingAction(true);
   setError(null);
-
+ 
   try {
     // user_skipsテーブルが存在するか確認
     await ensureTableExists('user_skips');
     
     // スキップ処理
     const success = await skipUser(user.id, userId);
-
+ 
     if (!success) {
       throw new Error('スキップ処理に失敗しました');
     }
-
+ 
     // スキップ成功時は次のユーザーへ
     nextUser();
-
+ 
     // スキップリスト更新（バックグラウンドで）
     getSkippedUsers().catch(err => console.error('スキップリスト更新エラー:', err));
-
+ 
     endFetching(`handleSkip-${userId}`, true);
     return true;
   } catch (error) {
@@ -1759,28 +1779,28 @@ const handleSkip = async (userId: string): Promise<boolean> => {
   } finally {
     setProcessingAction(false);
   }
-};
-
-/**
+ };
+ 
+ /**
  * いいね送信（MatchingSystem.tsx用）
  */
-const likeUser = async (userId: string): Promise<boolean> => {
+ const likeUser = async (userId: string): Promise<boolean> => {
   return handleLike(userId);
-};
-
-/**
+ };
+ 
+ /**
  * 接続リクエスト送信
  */
-const sendConnectionRequest = async (userId: string): Promise<boolean> => {
+ const sendConnectionRequest = async (userId: string): Promise<boolean> => {
   if (!user?.id || !isPremium) {
     if (!isPremium) toast.error("接続リクエストの送信はプレミアム会員限定です。");
     return false;
   }
   if (!startFetching(`sendConnectionRequest-${userId}`)) return false;
-
+ 
   setProcessingAction(true);
   setError(null);
-
+ 
   try {
     // connectionsテーブルが存在するか確認
     await ensureTableExists('connections');
@@ -1792,13 +1812,13 @@ const sendConnectionRequest = async (userId: string): Promise<boolean> => {
       getCurrentUser()?.matching_score || 0,
       'connection_request'
     );
-
+ 
     if (!notification) {
       throw new Error('接続リクエスト送信に失敗しました');
     }
-
+ 
     toast.success('接続リクエストを送信しました!');
-
+ 
     // 状態を更新
     updateConnectionStatusInState(
       user.id,
@@ -1806,7 +1826,7 @@ const sendConnectionRequest = async (userId: string): Promise<boolean> => {
       ConnectionStatus.PENDING,
       notification.id
     );
-
+ 
     endFetching(`sendConnectionRequest-${userId}`, true);
     return true;
   } catch (error) {
@@ -1818,21 +1838,21 @@ const sendConnectionRequest = async (userId: string): Promise<boolean> => {
   } finally {
     setProcessingAction(false);
   }
-};
-
-/**
+ };
+ 
+ /**
  * 接続リクエストの応答
  */
-const respondToConnectionRequest = async (
+ const respondToConnectionRequest = async (
   connectionId: string,
   status: ConnectionStatus.CONNECTED | ConnectionStatus.REJECTED
-): Promise<boolean> => {
+ ): Promise<boolean> => {
   if (!user?.id) return false;
   if (!startFetching(`respondToConnectionRequest-${connectionId}`)) return false;
-
+ 
   setProcessingAction(true);
   setError(null);
-
+ 
   try {
     // connectionsテーブルが存在するか確認
     await ensureTableExists('connections');
@@ -1843,13 +1863,13 @@ const respondToConnectionRequest = async (
     if (!response || !response.success) {
       throw new Error('接続リクエスト応答に失敗しました');
     }
-
+ 
     if (status === ConnectionStatus.CONNECTED) {
       toast.success('接続リクエストを承認しました！');
     } else {
       toast.success('接続リクエストを拒否しました');
     }
-
+ 
     endFetching(`respondToConnectionRequest-${connectionId}`, true, { status });
     return true;
   } catch (error) {
@@ -1861,23 +1881,23 @@ const respondToConnectionRequest = async (
   } finally {
     setProcessingAction(false);
   }
-};
-
-/**
+ };
+ 
+ /**
  * 表示件数を計算します
  */
-const calculateLimit = useCallback((customLimit?: number): number => {
+ const calculateLimit = useCallback((customLimit?: number): number => {
   if (customLimit) return customLimit;
   return isPremium ? 10 : 3;
-}, [isPremium]);
-
-/**
+ }, [isPremium]);
+ 
+ /**
  * マッチング設定が空の場合にデフォルト設定を初期化する関数
  */
-const initializeDefaultPreferences = async (): Promise<boolean> => {
+ const initializeDefaultPreferences = async (): Promise<boolean> => {
   if (!user?.id) return false;
   if (!startFetching('initializeDefaultPreferences')) return false;
-
+ 
   try {
     // user_matching_preferencesテーブルが存在するか確認
     await ensureTableExists('user_matching_preferences');
@@ -1898,15 +1918,15 @@ const initializeDefaultPreferences = async (): Promise<boolean> => {
       min_common_interests: 0,
       max_distance: 0
     };
-
+ 
     const success = await saveMatchingPreferencesService(user.id, defaultPrefs);
-
+ 
     if (!success) {
       throw new Error('デフォルト設定初期化に失敗しました');
     }
-
+ 
     setPreferences(defaultPrefs);
-
+ 
     endFetching('initializeDefaultPreferences', true);
     return true;
   } catch (error) {
@@ -1915,12 +1935,12 @@ const initializeDefaultPreferences = async (): Promise<boolean> => {
     endFetching('initializeDefaultPreferences', false, { error });
     return false;
   }
-};
-
-// フィルター使用状況をリセットする関数
-const checkFilterUsageReset = useCallback(async () => {
+ };
+ 
+ // フィルター使用状況をリセットする関数
+ const checkFilterUsageReset = useCallback(async () => {
   if (!user?.id) return;
-
+ 
   try {
     // 最終フィルター適用日を取得
     const lastAppliedDate = filterAppliedDate ? new Date(filterAppliedDate) : null;
@@ -1928,10 +1948,10 @@ const checkFilterUsageReset = useCallback(async () => {
       // 適用日がなければ何もしない
       return;
     }
-
+ 
     const now = new Date();
     const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
+ 
     // 最終適用日が今日より前の場合、リセット
     if (lastAppliedDate < todayMidnight) {
       setLastFilterCost(0);
@@ -1943,12 +1963,12 @@ const checkFilterUsageReset = useCallback(async () => {
   } catch (error) {
     console.error('フィルター使用状況のリセットチェック中にエラーが発生しました:', error);
   }
-}, [user?.id, filterAppliedDate]);
-
-/**
+ }, [user?.id, filterAppliedDate]);
+ 
+ /**
  * 検証レベルを取得します
  */
-const fetchVerificationLevel = useCallback(async () => {
+ const fetchVerificationLevel = useCallback(async () => {
   if (!user?.id) return 1; // デフォルト値
   
   try {
@@ -2006,18 +2026,18 @@ const fetchVerificationLevel = useCallback(async () => {
     console.error('検証レベル取得例外:', error);
     return 1; // 例外時もデフォルト値
   }
-}, [user?.id]);
-
-// --- useEffect フック群 ---
-// ユーザーが変更されたときのデータ初期化
-useEffect(() => {
+ }, [user?.id]);
+ 
+ // --- useEffect フック群 ---
+ // ユーザーが変更されたときのデータ初期化
+ useEffect(() => {
   if (user?.id && !initializedRef.current) {
     if (process.env.NODE_ENV === 'development') {
       console.log("初期データ取得開始 (user 変更)");
     }
-
+ 
     initializedRef.current = true;
-
+ 
     // 複数の非同期処理を並列実行（データ初期化の高速化）
     Promise.all([
       fetchUserProfile().catch(error => {
@@ -2055,10 +2075,10 @@ useEffect(() => {
     // ユーザーがログアウトしたら初期化フラグをリセット
     initializedRef.current = false;
   }
-}, [user?.id, fetchUserProfile, fetchUserActivityLevel, fetchUserHistory, fetchPreferences, getSkippedUsers, fetchVerificationLevel]);
-
-// 設定取得後のマッチングユーザー取得
-useEffect(() => {
+ }, [user?.id, fetchUserProfile, fetchUserActivityLevel, fetchUserHistory, fetchPreferences, getSkippedUsers, fetchVerificationLevel]);
+ 
+ // 設定取得後のマッチングユーザー取得
+ useEffect(() => {
   // 設定が読み込まれた後、ユーザーがログインしている場合のみ実行
   if (user?.id && preferences && !isFetchingRef.current) {
     // マッチングユーザーがまだ取得されていない場合のみ実行
@@ -2077,41 +2097,41 @@ useEffect(() => {
       return () => clearTimeout(timer);
     }
   }
-}, [user?.id, preferences, fetchMatchedUsers]);
-
-// 接続状態変更の監視セットアップ
-useEffect(() => {
+ }, [user?.id, preferences, fetchMatchedUsers]);
+ 
+ // 接続状態変更の監視セットアップ
+ useEffect(() => {
   if (user?.id && !channelInitializedRef.current) {
     if (process.env.NODE_ENV === 'development') {
       console.log("接続状態変更の監視セットアップ");
     }
-
+ 
     // 監視をセットアップして、クリーンアップ関数を取得
     const cleanup = subscribeToConnectionChanges();
-
+ 
     // コンポーネントのアンマウント時にクリーンアップを実行
     return cleanup;
   }
-}, [user?.id, subscribeToConnectionChanges]);
-
-// 日付変更チェックのインターバル設定
-useEffect(() => {
+ }, [user?.id, subscribeToConnectionChanges]);
+ 
+ // 日付変更チェックのインターバル設定
+ useEffect(() => {
   // 初回実行
   checkFilterUsageReset();
-
+ 
   // 60分ごとにチェック
   const interval = setInterval(() => {
     checkFilterUsageReset();
   }, 60 * 60 * 1000);
-
+ 
   // クリーンアップ関数を返す
   return () => {
     clearInterval(interval);
   };
-}, [checkFilterUsageReset]);
-
-// ページアンロード時の処理
-useEffect(() => {
+ }, [checkFilterUsageReset]);
+ 
+ // ページアンロード時の処理
+ useEffect(() => {
   const handleBeforeUnload = () => {
     // 必要に応じて購読解除などのクリーンアップ
     if (connectionSubscriptionRef.current) {
@@ -2122,16 +2142,16 @@ useEffect(() => {
       }
     }
   };
-
+ 
   window.addEventListener('beforeunload', handleBeforeUnload);
-
+ 
   return () => {
     window.removeEventListener('beforeunload', handleBeforeUnload);
   };
-}, []);
-
-// デバッグ情報の制限（メモリリーク防止）
-useEffect(() => {
+ }, []);
+ 
+ // デバッグ情報の制限（メモリリーク防止）
+ useEffect(() => {
   if (process.env.NODE_ENV === 'development' && debugInfo) {
     const operationLog = debugInfo.operationLog;
     if (operationLog && operationLog.length > MAX_DEBUG_LOGS * 1.5) {
@@ -2145,10 +2165,10 @@ useEffect(() => {
       });
     }
   }
-}, [debugInfo]);
-
-// --- フックの戻り値 ---
-return {
+ }, [debugInfo]);
+ 
+ // --- フックの戻り値 ---
+ return {
   loading,
   loadingPreferences,
   loadingDetails,
@@ -2207,7 +2227,8 @@ return {
   endFetching,
   checkFilterUsageReset,
   fetchVerificationLevel
-};
-};
-
-export default useMatching;
+ };
+ };
+ 
+ export default useMatching;
+        

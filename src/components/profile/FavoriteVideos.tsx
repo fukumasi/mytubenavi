@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Star, Eye, Clock } from 'lucide-react';
 import ProfileLayout from './ProfileLayout';
-import { supabase } from '../../lib/supabase';
-import type { Video } from '../../types';
+import { supabase } from '@/lib/supabase';
+import type { Video } from '@/types';
 
 interface FavoriteVideoCardProps {
     video: Video;

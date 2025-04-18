@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useVideoRating } from '../../hooks/useVideoRating';
+import { useVideoRating } from '@/hooks/useVideoRating';
 import { StarRating } from '../search/review/StarRating';
 import { HelpCircle } from 'lucide-react';
 import { RatingCategory } from '@/types';

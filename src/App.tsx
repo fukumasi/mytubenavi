@@ -2,37 +2,37 @@
 
 import React, { Suspense, lazy, useEffect, useState, useCallback } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import Header from './components/layout/Header';
-import Footer from './components/layout/Footer';
-import { useAuth } from './contexts/AuthContext';
-import LoadingSpinner from './components/ui/LoadingSpinner';
-import MatchingSystem from './components/matching/MatchingSystem';
-import NotificationSound from './components/layout/NotificationSound';
-import { NotificationProvider } from './contexts/NotificationContext';
-import PremiumGuard from './components/premium/PremiumGuard';
-import PremiumExpired from './components/premium/PremiumExpired';
-import StripeContextProvider from './contexts/StripeContext';
+import Header from '@/components/layout/Header';
+import Footer from '@/components/layout/Footer';
+import { useAuth } from '@/contexts/AuthContext';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import MatchingSystem from '@/components/matching/MatchingSystem';
+import NotificationSound from '@/components/layout/NotificationSound';
+import { NotificationProvider } from '@/contexts/NotificationContext';
+import PremiumGuard from '@/components/premium/PremiumGuard';
+import PremiumExpired from '@/components/premium/PremiumExpired';
+import StripeContextProvider from '@/contexts/StripeContext';
 
-const HomePage = lazy(() => import('./pages/HomePage'));
+const HomePage = lazy(() => import('@/pages/HomePage'));
 // インポートパスを修正
-const SignUp = lazy(() => import('./components/events/auth/SignUp'));
-const Login = lazy(() => import('./components/events/auth/Login'));
-const ProfileRoutes = lazy(() => import('./components/profile/ProfileRoutes'));
-const Register = lazy(() => import('./components/youtuber/Register'));
-const GenreVideoList = lazy(() => import('./components/genre/GenreVideoList'));
-const VideoDetail = lazy(() => import('./components/video/VideoDetail'));
-const SearchPage = lazy(() => import('./pages/SearchPage'));
-const EventList = lazy(() => import('./components/events/EventList'));
-const EventForm = lazy(() => import('./components/events/EventForm'));
-const EventDetail = lazy(() => import('./components/events/EventDetail'));
-const EventEditForm = lazy(() => import('./components/events/EventEditForm'));
-const ActivePromotions = lazy(() => import('./components/youtuber/ActivePromotions'));
-const PremiumDashboardPage = lazy(() => import('./pages/PremiumDashboardPage'));
-const PremiumUpgradePage = lazy(() => import('./pages/PremiumUpgradePage'));
-const YouTuberDashboardPage = lazy(() => import('./pages/YouTuberDashboardPage'));
-const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage')); // 追加: Admin管理者ダッシュボード
-const MatchingPage = lazy(() => import('./pages/MatchingPage')); // 追加: 新しいマッチングページ
-const MessagingPage = lazy(() => import('./pages/MessagingPage')); // 追加: メッセージングページ
+const SignUp = lazy(() => import('@/components/events/auth/SignUp'));
+const Login = lazy(() => import('@/components/events/auth/Login'));
+const ProfileRoutes = lazy(() => import('@/components/profile/ProfileRoutes'));
+const Register = lazy(() => import('@/components/youtuber/Register'));
+const GenreVideoList = lazy(() => import('@/components/genre/GenreVideoList'));
+const VideoDetail = lazy(() => import('@/components/video/VideoDetail'));
+const SearchPage = lazy(() => import('@/pages/SearchPage'));
+const EventList = lazy(() => import('@/components/events/EventList'));
+const EventForm = lazy(() => import('@/components/events/EventForm'));
+const EventDetail = lazy(() => import('@/components/events/EventDetail'));
+const EventEditForm = lazy(() => import('@/components/events/EventEditForm'));
+const ActivePromotions = lazy(() => import('@/components/youtuber/ActivePromotions'));
+const PremiumDashboardPage = lazy(() => import('@/pages/PremiumDashboardPage'));
+const PremiumUpgradePage = lazy(() => import('@/pages/PremiumUpgradePage'));
+const YouTuberDashboardPage = lazy(() => import('@/pages/YouTuberDashboardPage'));
+const AdminDashboardPage = lazy(() => import('@/pages/AdminDashboardPage')); // 追加: Admin管理者ダッシュボード
+const MatchingPage = lazy(() => import('@/pages/MatchingPage')); // 追加: 新しいマッチングページ
+const MessagingPage = lazy(() => import('@/pages/MessagingPage')); // 追加: メッセージングページ
 
 // 一時的なプレミアム会員関連コンポーネント（後で実装予定）
 const PremiumPlaceholder = ({ title, message }: { title: string; message: string }) => (
@@ -75,7 +75,7 @@ React.useEffect(() => {
 
     try {
       // 遅延インポートではなく、最初からインポートされたsupabaseモジュールを使用
-      const { supabase } = await import('./lib/supabase');
+      const { supabase } = await import('@/lib/supabase');
       
       if (!supabase) {
         console.error('Supabase client is not initialized');
@@ -139,7 +139,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 
      try {
        // 遅延インポートではなく、最初からインポートされたsupabaseモジュールを使用
-       const { supabase } = await import('./lib/supabase');
+       const { supabase } = await import('@/lib/supabase');
        
        if (!supabase) {
          console.error('Supabase client is not initialized');
@@ -195,8 +195,8 @@ return <PremiumGuard>{children}</PremiumGuard>;
 // Supabaseクライアントと Stripe のインスタンスを一度だけロードするための関数
 const loadDependencies = async () => {
   try {
-    const { supabase } = await import('./lib/supabase');
-    const { getStripe } = await import('./lib/stripe');
+    const { supabase } = await import('@/lib/supabase');
+    const { getStripe } = await import('@/lib/stripe');
     
     let stripeInstance = null;
     if (getStripe) {
@@ -257,7 +257,8 @@ const App = () => {
           <Header />
           <NotificationSound volume={0.5} enabled={true} />
           
-          <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* メインコンテンツにpt-16（ヘッダーの高さ分）を追加 */}
+          <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-20">
             <Suspense fallback={
               <div className="flex justify-center items-center h-64">
                 <LoadingSpinner />

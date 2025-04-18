@@ -1,173 +1,168 @@
 // src/components/home/PromotedVideos.tsx
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { promotionService } from '@/services/promotionService';
 import { Video } from '@/types/video';
 import { SlotBooking } from '@/types/promotion';
 import PromotionCard from '@/components/shared/PromotionCard';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface PromotedVideosProps {
- limit?: number;
- className?: string;
- title?: string;
- showIfEmpty?: boolean;
+  limit?: number;
+  className?: string;
+  title?: string;
+  showIfEmpty?: boolean;
 }
 
 type PromotedVideo = {
- video: Video;
- booking: SlotBooking;
+  video: Video;
+  booking: SlotBooking;
 };
 
 const PromotedVideos = ({
- limit = 4,
- className = "",
- title = "おすすめ動画",
- showIfEmpty = false,
+  limit = 4,
+  className = "",
+  title = "おすすめ動画",
+  showIfEmpty = false,
 }: PromotedVideosProps) => {
- const [promotedVideos, setPromotedVideos] = useState<PromotedVideo[]>([]);
- const [loading, setLoading] = useState<boolean>(true);
- const [error, setError] = useState<string | null>(null);
- const [retryCount, setRetryCount] = useState(0);
+  const [promotedVideos, setPromotedVideos] = useState<PromotedVideo[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
- useEffect(() => {
-   const fetchPromotedVideos = async () => {
-     try {
-       setLoading(true);
-       setError(null);
-       
-       // 現在アクティブな予約を取得
-       const now = new Date().toISOString();
-       const { data: bookings, error: bookingError } = await supabase
-         .from('slot_bookings')
-         .select('*, promotion_slots(id, name, type, price)')
-         .eq('status', 'active')
-         .lt('start_date', now)
-         .gt('end_date', now)
-         .order('price', { ascending: false, foreignTable: 'promotion_slots' })
-         .limit(limit);
+  useEffect(() => {
+    const fetchPromotedVideos = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        console.log('掲載動画を取得しています...');
+        // 更新したpromotionServiceを使用
+        const bookings = await promotionService.getAllActiveBookings();
+        
+        console.log(`取得した予約数: ${bookings.length}`, bookings);
 
-       if (bookingError) throw bookingError;
+        if (!bookings || bookings.length === 0) {
+          console.log('アクティブな予約がありません');
+          setPromotedVideos([]);
+          setLoading(false);
+          return;
+        }
 
-       if (!bookings || bookings.length === 0) {
-         setPromotedVideos([]);
-         setLoading(false);
-         return;
-       }
+        // 動画情報が取得済みかチェック
+        const videosWithData = bookings.filter(booking => booking.video);
+        console.log(`動画情報が含まれている予約: ${videosWithData.length}`);
+        
+        if (videosWithData.length === 0) {
+          console.log('動画情報を含む予約がありません');
+          setPromotedVideos([]);
+          setLoading(false);
+          return;
+        }
 
-       // 予約に関連する動画を取得
-       const videoIds = bookings
-         .filter(booking => booking.video_id)
-         .map(booking => booking.video_id);
-         
-       if (videoIds.length === 0) {
-         setPromotedVideos([]);
-         setLoading(false);
-         return;
-       }
+        // 動画と予約データをマージ
+        const mergedData = videosWithData
+          .map(booking => {
+            return booking.video ? { 
+              video: booking.video, 
+              booking 
+            } : null;
+          })
+          .filter(Boolean) as PromotedVideo[];
 
-       const { data: videos, error: videoError } = await supabase
-         .from('videos')
-         .select('*')
-         .in('id', videoIds);
+        console.log(`マージされたデータ: ${mergedData.length}件`, mergedData);
 
-       if (videoError) throw videoError;
+        // 重複チェック - 同じ動画が複数回表示されないようにする
+        const uniqueVideos = mergedData.reduce((acc: PromotedVideo[], current) => {
+          const isDuplicate = acc.some(item => item.video.id === current.video.id);
+          if (!isDuplicate) {
+            acc.push(current);
+          }
+          return acc;
+        }, []);
 
-       // 動画と予約データをマージ
-       const mergedData = bookings
-         .map(booking => {
-           const video = videos?.find(v => v.id === booking.video_id);
-           return video ? { video, booking } : null;
-         })
-         .filter(Boolean) as PromotedVideo[];
+        // 表示数を制限
+        const limitedVideos = uniqueVideos.slice(0, limit);
+        console.log(`表示する掲載動画: ${limitedVideos.length}件`);
+        
+        setPromotedVideos(limitedVideos);
+      } catch (err: any) {
+        console.error('掲載動画の取得に失敗しました:', err);
+        setError(`プロモーション動画の読み込みに失敗しました: ${err.message || 'Unknown error'}`);
+        
+        // 最大3回までリトライ
+        if (retryCount < 3) {
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+          }, 1000 * (retryCount + 1)); // 指数バックオフ: 1秒、2秒、3秒
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
 
-       // 重複チェック - 同じ動画が複数回表示されないようにする
-       const uniqueVideos = mergedData.reduce((acc: PromotedVideo[], current) => {
-         const isDuplicate = acc.some(item => item.video.id === current.video.id);
-         if (!isDuplicate) {
-           acc.push(current);
-         }
-         return acc;
-       }, []);
+    fetchPromotedVideos();
+  }, [retryCount, limit]);
 
-       setPromotedVideos(uniqueVideos);
-     } catch (err: any) {
-       console.error('Failed to fetch promoted videos:', err);
-       setError(`プロモーション動画の読み込みに失敗しました: ${err.message || 'Unknown error'}`);
-       
-       // 最大3回までリトライ
-       if (retryCount < 3) {
-         setTimeout(() => {
-           setRetryCount(prev => prev + 1);
-         }, 1000 * (retryCount + 1)); // 指数バックオフ: 1秒、2秒、3秒
-       }
-     } finally {
-       setLoading(false);
-     }
-   };
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center p-6">
+        <LoadingSpinner />
+      </div>
+    );
+  }
 
-   fetchPromotedVideos();
- }, [retryCount, limit]);
+  if (error) {
+    return (
+      <div className="text-red-500 p-4 bg-red-50 rounded-lg border border-red-100 mb-6">
+        <p className="font-medium">エラーが発生しました</p>
+        <p className="text-sm">{error}</p>
+        <button 
+          onClick={() => setRetryCount(prev => prev + 1)}
+          className="mt-2 text-xs bg-white border border-red-200 hover:bg-red-50 text-red-600 px-3 py-1 rounded transition-colors"
+        >
+          再試行
+        </button>
+      </div>
+    );
+  }
 
- if (loading) {
-   return (
-     <div className="flex justify-center items-center p-6">
-       <LoadingSpinner />
-     </div>
-   );
- }
+  if (promotedVideos.length === 0 && !showIfEmpty) {
+    return null; // 表示するプロモーション動画がなく、空表示フラグがfalseの場合は何も表示しない
+  }
 
- if (error) {
-   return (
-     <div className="text-red-500 p-4 bg-red-50 rounded-lg border border-red-100 mb-6">
-       <p className="font-medium">エラーが発生しました</p>
-       <p className="text-sm">{error}</p>
-       <button 
-         onClick={() => setRetryCount(prev => prev + 1)}
-         className="mt-2 text-xs bg-white border border-red-200 hover:bg-red-50 text-red-600 px-3 py-1 rounded transition-colors"
-       >
-         再試行
-       </button>
-     </div>
-   );
- }
-
- if (promotedVideos.length === 0 && !showIfEmpty) {
-   return null; // 表示するプロモーション動画がなく、空表示フラグがfalseの場合は何も表示しない
- }
-
- return (
-   <div className={`mb-8 bg-gradient-to-r from-blue-50 to-white p-4 rounded-lg border border-blue-100 ${className}`}>
-     <div className="flex justify-between items-center mb-4">
-       <h2 className="text-xl font-semibold text-blue-900">{title}</h2>
-       <span className="text-xs text-blue-500 bg-blue-50 px-2 py-1 rounded">スポンサード</span>
-     </div>
-     
-     {promotedVideos.length > 0 ? (
-       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-         {promotedVideos.map((item) => (
-           <PromotionCard
-             key={item.booking.id}
-             bookingId={item.booking.id}
-             videoId={item.video.id}
-             youtubeId={item.video.youtube_id}
-             title={item.video.title}
-             channelName={item.video.channel_title}
-             thumbnailUrl={item.video.thumbnail}
-             position="featured"
-             promoted={true}
-             duration={item.video.duration}
-             viewCount={item.video.view_count}
-             description={item.video.description?.substring(0, 120)}
-           />
-         ))}
-       </div>
-     ) : (
-       <div className="text-center p-8 bg-white rounded border border-blue-50 text-blue-400">
-         現在表示できるスポンサー動画はありません
-       </div>
-     )}
-   </div>
- );
+  return (
+    <div className={`mb-8 bg-gradient-to-r from-blue-50 to-white p-4 rounded-lg border border-blue-100 ${className}`}>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold text-blue-900">{title}</h2>
+        <span className="text-xs text-blue-500 bg-blue-50 px-2 py-1 rounded">スポンサード</span>
+      </div>
+      
+      {promotedVideos.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {promotedVideos.map((item) => (
+            <PromotionCard
+              key={item.booking.id}
+              bookingId={item.booking.id}
+              videoId={item.video.id}
+              youtubeId={item.video.youtube_id}
+              title={item.video.title}
+              channelName={item.video.channel_title}
+              thumbnailUrl={item.video.thumbnail}
+              position="featured"
+              promoted={true}
+              duration={item.video.duration}
+              viewCount={item.video.view_count}
+              description={item.video.description?.substring(0, 120)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center p-8 bg-white rounded border border-blue-50 text-blue-400">
+          現在表示できるスポンサー動画はありません
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default PromotedVideos;

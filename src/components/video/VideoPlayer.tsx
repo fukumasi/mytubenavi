@@ -1,7 +1,7 @@
 // src/components/video/VideoPlayer.tsx
 import React, { useEffect, useRef } from 'react';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface YouTubeEventData {
   data: number;

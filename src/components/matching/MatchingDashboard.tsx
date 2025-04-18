@@ -1,11 +1,9 @@
-// src/components/matching/MatchingDashboard.tsx（修正版）
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import LoadingSpinner from '../ui/LoadingSpinner';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import MatchPreferences from './MatchPreferences';
 import UserCard from './UserCard';
 import { toast, Toaster } from 'react-hot-toast';
-import useMatching from '../../hooks/useMatching';
+import useMatching from '@/hooks/useMatching';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faCoins, 
@@ -24,14 +22,21 @@ import {
   faExclamationTriangle,
   faSliders,
   faFilter,
-  faSearch
+  faSearch,
+  faIdCard, // 追加：電話番号認証アイコン
+  faCrown // 追加：プレミアム会員アイコン
 } from '@fortawesome/free-solid-svg-icons';
-import { SkippedUser, VideoDetails, OnlineStatus, ActivityLevel } from '../../types/matching';
+import { SkippedUser, VideoDetails, OnlineStatus, ActivityLevel } from '@/types/matching';
 import { formatDistanceToNow } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import usePoints from '../../hooks/usePoints'; // ポイント管理のフックをインポート
+import usePoints from '@/hooks/usePoints'; // ポイント管理のフックをインポート
+import { getUserGender } from '@/services/matchingService'; // 追加：ユーザー性別取得関数
+import { Link } from 'react-router-dom'; // 追加：リンク用
+import { verificationService } from '@/services/verificationService'; // 修正：正しいインポート
+import { supabase } from '@/lib/supabase'; // 追加：ユーザーID取得用
 
 const MatchingDashboard: React.FC = () => {
+  // 既存のステート
   const [showPreferences, setShowPreferences] = useState<boolean>(false);
   const [showDetailedView, setShowDetailedView] = useState<boolean>(false);
   const [commonVideos, setCommonVideos] = useState<VideoDetails[]>([]);
@@ -39,6 +44,13 @@ const MatchingDashboard: React.FC = () => {
   const [showSkippedUsers, setShowSkippedUsers] = useState<boolean>(false);
   const [similarityScore, setSimilarityScore] = useState<number | undefined>(undefined);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  
+  // 追加：性別と認証状態のステート
+  const [userGender, setUserGender] = useState<string | null>(null);
+  const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(false);
+  const [showVerificationWarning, setShowVerificationWarning] = useState<boolean>(false);
+  const [showPremiumWarning, setShowPremiumWarning] = useState<boolean>(false);
+  const [userId, setUserId] = useState<string | null>(null); // 追加：ユーザーIDステート
   
   const detailsRef = useRef<HTMLDivElement>(null);
   
@@ -64,12 +76,54 @@ const MatchingDashboard: React.FC = () => {
     error: matchingError // 追加: useMatchingのエラー状態も監視
   } = useMatching();
 
+  // 追加：ユーザーIDを取得する
+  useEffect(() => {
+    const getCurrentUserId = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      }
+    };
+    
+    getCurrentUserId();
+  }, []);
+
   // エラー監視を追加
   useEffect(() => {
     if (matchingError) {
       setFetchError(matchingError);
     }
   }, [matchingError]);
+  
+  // 追加：ユーザーの性別と認証状態を取得する
+  useEffect(() => {
+    const checkUserEligibility = async () => {
+      if (!userId) return;
+      
+      try {
+        // 性別を取得
+        const gender = await getUserGender(userId);
+        setUserGender(gender);
+        
+        // 認証状態を取得
+        const verificationState = await verificationService.getVerificationState(userId);
+        setIsPhoneVerified(Boolean(verificationState?.phoneVerified));
+        
+        // 警告表示の設定
+        if (gender === 'female' && !verificationState?.phoneVerified) {
+          setShowVerificationWarning(true);
+        } else if (gender === 'male' && !isPremium) {
+          setShowPremiumWarning(true);
+        }
+      } catch (error) {
+        console.error('ユーザー情報取得エラー:', error);
+      }
+    };
+    
+    checkUserEligibility();
+  }, [userId, isPremium]);
+  
+  // 以下、残りのコード...}, [userId, isPremium]);
   
   // 初回レンダリング時にマッチング候補を取得
   useEffect(() => {
@@ -283,6 +337,47 @@ const MatchingDashboard: React.FC = () => {
     );
   };
 
+  // 追加：性別に基づく利用条件警告表示
+  const renderEligibilityWarning = () => {
+    if (showVerificationWarning) {
+      return (
+        <div className="bg-yellow-50 border-yellow-200 border rounded-lg p-4 mb-4">
+          <h3 className="font-bold text-yellow-700 flex items-center">
+            <FontAwesomeIcon icon={faIdCard} className="mr-2" />
+            電話番号認証が必要です
+          </h3>
+          <p className="text-sm text-yellow-600 mt-2">
+            女性ユーザーはマッチング機能を無料で利用できますが、電話番号認証が必要です。
+            認証を完了すると、すべての機能を無料でご利用いただけます。
+          </p>
+          <Link to="/profile/verification" className="mt-3 inline-block text-sm bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition">
+            認証ページへ進む
+          </Link>
+        </div>
+      );
+    }
+
+    if (showPremiumWarning) {
+      return (
+        <div className="bg-indigo-50 border-indigo-200 border rounded-lg p-4 mb-4">
+          <h3 className="font-bold text-indigo-700 flex items-center">
+            <FontAwesomeIcon icon={faCrown} className="mr-2" />
+            プレミアム会員になりませんか？
+          </h3>
+          <p className="text-sm text-indigo-600 mt-2">
+            プレミアム会員になると、ポイント消費なしですべてのマッチング機能を利用できます。
+            月額980円で、メッセージ送信やプロフィール閲覧が使い放題になります。
+          </p>
+          <Link to="/premium" className="mt-3 inline-block text-sm bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg transition">
+            プレミアム会員登録を確認する
+          </Link>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   // 緩和モードの切り替え
   const handleToggleRelaxedMode = useCallback(() => {
     // isRelaxedModeの現在の状態と反対の値を渡す
@@ -444,6 +539,29 @@ const MatchingDashboard: React.FC = () => {
     );
   };
 
+  // 追加：性別と認証状態に基づくステータスバッジ表示
+  const renderAccountStatusBadge = () => {
+    if (userGender === 'female' && isPhoneVerified) {
+      return (
+        <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full flex items-center text-sm">
+          <FontAwesomeIcon icon={faIdCard} className="mr-1.5" />
+          認証済み女性（無料利用）
+        </div>
+      );
+    }
+    
+    if (isPremium) {
+      return (
+        <div className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full flex items-center text-sm">
+          <FontAwesomeIcon icon={faCrown} className="mr-1.5" />
+          プレミアム会員
+        </div>
+      );
+    }
+    
+    return null;
+  };
+
   if (loading) {
     return <LoadingSpinner />;
   }
@@ -488,7 +606,8 @@ const MatchingDashboard: React.FC = () => {
           {renderRelaxedModeBadge()}
         </div>
         <div className="flex items-center space-x-4">
-          {!isPremium && (
+          {renderAccountStatusBadge()}
+          {!isPremium && userGender !== 'female' && (
             <span className="text-sm flex items-center">
               <FontAwesomeIcon icon={faCoins} className="mr-1 text-yellow-500" />
               残りポイント: <strong className="ml-1">{remainingPoints}</strong>
@@ -504,6 +623,9 @@ const MatchingDashboard: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* 性別に基づく警告メッセージ表示 */}
+      {renderEligibilityWarning()}
 
       {/* 常に表示される機能ボタン */}
       {renderMainActionButtons()}
@@ -545,7 +667,7 @@ const MatchingDashboard: React.FC = () => {
                       alt={user.username || '名前なし'} 
                       className="w-12 h-12 rounded-full object-cover mr-3"
                     />
-                    <div>
+                   <div>
                       <h3 className="font-semibold flex items-center">
                         {user.username || '名前なし'}
                         {user.is_premium && (
@@ -592,16 +714,18 @@ const MatchingDashboard: React.FC = () => {
           {currentUser ? (
             <div className="w-full max-w-4xl">
               <UserCard 
-                user={currentUser} 
-                onLike={handleLike}
-                onSkip={handleSkip}
-                isPremium={isPremium}
-                hasDetailedView={true}
-                onViewProfile={toggleDetailedView}
-                commonVideos={commonVideos}
-                similarityScore={similarityScore}
-                showYouTubeLink={currentUser.channel_url ? true : false}
-              />
+  user={currentUser} 
+  onLike={handleLike}
+  onSkip={handleSkip}
+  isPremium={isPremium}
+  hasDetailedView={true}
+  onViewProfile={toggleDetailedView}
+  commonVideos={commonVideos}
+  similarityScore={similarityScore}
+  showYouTubeLink={currentUser.channel_url ? true : false}
+  userGender={userGender} // 追加：現在のユーザーの性別
+  isPhoneVerified={isPhoneVerified} // 追加：電話番号認証状態
+/>
               
               {showDetailedView && (
                 <div className="bg-white rounded-xl shadow-md p-6 mt-4 animate-fadeIn">

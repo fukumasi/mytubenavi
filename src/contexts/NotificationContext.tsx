@@ -1,14 +1,14 @@
 // src/contexts/NotificationContext.tsx
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
-import { useAuth } from './AuthContext';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Notification,
   NotificationType,
   NotificationPreference
-} from '../types/notification';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
+} from '@/types/notification';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 // NotificationPriorityの型を定義
 type NotificationPriority = 'high' | 'medium' | 'low';

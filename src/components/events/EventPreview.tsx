@@ -1,5 +1,5 @@
 import { Calendar, Clock, MapPin, Users } from 'lucide-react';
-import type { Event } from '../../types';
+import type { Event } from '@/types';
 
 interface EventPreviewProps {
   event: Partial<Event>;

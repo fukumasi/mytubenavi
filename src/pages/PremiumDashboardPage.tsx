@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
-import PremiumDashboard from '../components/premium/PremiumDashboard';
-import ProfileLayout from '../components/profile/ProfileLayout';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
-import PremiumExpired from '../components/premium/PremiumExpired';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import PremiumDashboard from '@/components/premium/PremiumDashboard';
+import ProfileLayout from '@/components/profile/ProfileLayout';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import PremiumExpired from '@/components/premium/PremiumExpired';
 
 // プレミアムユーザー情報の型定義
 export type PremiumInfo = {

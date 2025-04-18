@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import PremiumExpired from './PremiumExpired';
-import LoadingSpinner from '../ui/LoadingSpinner';
+import { useAuth } from '@/contexts/AuthContext';
+import PremiumExpired from '@/components/premium/PremiumExpired';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface PremiumGuardProps {
   children: React.ReactNode;

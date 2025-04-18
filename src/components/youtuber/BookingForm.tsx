@@ -1,7 +1,6 @@
 // src/components/youtuber/BookingForm.tsx
-
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faCalendarAlt, 
@@ -11,18 +10,19 @@ import {
   faCheckCircle, 
   faInfoCircle
 } from '@fortawesome/free-solid-svg-icons';
-import LoadingSpinner from '../ui/LoadingSpinner';
-import { PromotionSlot } from '../../types/promotion';
-import { Video } from '../../types/video';
-import { formatDate } from '../../utils/dateUtils';
-import { useStripeContext } from '../../contexts/StripeContext';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { PromotionSlot } from '@/types/promotion';
+import { Video } from '@/types/video';
+import { formatDate } from '@/utils/dateUtils';
+import { useStripeContext } from '@/contexts/StripeContext';
+import YoutubeSyncButton from '@/components/youtuber/YoutubeSyncButton';
 
 interface BookingFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
-type AlertType = 'error' | 'success' | 'info' | null;
+type AlertType = 'error' | 'success' | 'info' | 'warning' | null;
 
 interface AlertState {
   type: AlertType;
@@ -42,8 +42,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
   const [alert, setAlert] = useState<AlertState>({ type: null, message: '' });
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [slotDetails, setSlotDetails] = useState<PromotionSlot | null>(null);
+  const [youtuberId, setYoutuberId] = useState<number | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
-  const { initiatePayment } = useStripeContext();
+  const { initiatePayment, clientSecret, setClientSecret } = useStripeContext();
 
   // フォームフィールドの検証状態
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -51,6 +52,22 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // クライアントシークレットが設定されたら、決済成功と判断
+  useEffect(() => {
+    if (clientSecret) {
+      setAlert({ 
+        type: 'success', 
+        message: '予約が作成されました。お支払い処理に進みます。'
+      });
+      
+      setTimeout(() => {
+        if (onSuccess) {
+          onSuccess();
+        }
+      }, 1500);
+    }
+  }, [clientSecret, onSuccess]);
 
   useEffect(() => {
     // 選択された掲載枠と期間に基づいて合計価格を計算
@@ -100,7 +117,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
         return;
       }
 
-      // ユーザーがアップロードした動画を取得
+      // ユーザー情報を取得
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -111,39 +128,71 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
         return;
       }
 
-      const { data: videosData, error: videosError } = await supabase
-        .from('videos')
-        .select('*')
-        .eq('youtuber_id', user.id)
-        .order('title');
+      // ユーザーIDからyoutuberプロファイルを検索して、そのIDを取得する
+      const { data: youtuberProfile, error: profileError } = await supabase
+        .from('youtubers')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
 
-      if (videosError) {
-        console.error('動画情報の取得に失敗しました:', videosError);
+      if (profileError) {
+        console.error('YouTuberプロファイルの取得に失敗しました:', profileError);
         setAlert({ 
           type: 'error', 
-          message: '動画情報の取得に失敗しました。YouTubeとの同期を確認してください。' 
+          message: 'YouTuberプロファイルの取得に失敗しました。プロファイル設定を確認してください。' 
         });
         return;
       }
 
+      // プロファイルを取得できた場合
+      if (youtuberProfile) {
+        // 数値型のyoutuber_idを保存
+        const youtuberId = youtuberProfile.id;
+        setYoutuberId(youtuberId);
+        
+        console.log('取得したYouTuber ID:', youtuberId);
+
+        // 数値型のyoutuber_idを使って動画を取得
+        const { data: videosData, error: videosError } = await supabase
+          .from('videos')
+          .select('*')
+          .eq('youtuber_id', youtuberId)
+          .order('title');
+
+        if (videosError) {
+          console.error('動画情報の取得に失敗しました:', videosError);
+          setAlert({ 
+            type: 'error', 
+            message: '動画情報の取得に失敗しました。YouTubeとの同期を確認してください。' 
+          });
+        } else {
+          setVideos(videosData || []);
+          
+          // 動画データのログ
+          console.log('取得した動画数:', videosData?.length || 0);
+          
+          // 動画が見つからない場合は警告メッセージを表示
+          if ((videosData?.length || 0) === 0) {
+            setAlert({
+              type: 'warning',
+              message: '表示できる動画がありません。まずはYouTubeと同期してください。右上の「YouTube同期」ボタンをクリックして動画データを取得してください。'
+            });
+          }
+        }
+      }
+
       setSlots(slotsData || []);
-      setVideos(videosData || []);
 
       // 明日の日付をデフォルトの開始日に設定
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       setStartDate(tomorrow.toISOString().split('T')[0]);
 
-      // 初期データが空の場合のアラート
+      // 掲載枠がない場合のアラート
       if ((slotsData?.length || 0) === 0) {
         setAlert({
           type: 'info',
           message: '現在、予約可能な掲載枠がありません。また後でお試しください。'
-        });
-      } else if ((videosData?.length || 0) === 0) {
-        setAlert({
-          type: 'info',
-          message: '表示できる動画がありません。まずはYouTubeと同期してください。'
         });
       }
 
@@ -156,6 +205,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // YouTube同期が完了したときの処理
+  const handleSyncComplete = () => {
+    // 動画データを再取得
+    fetchData();
   };
 
   // フィールドがフォーカスを失った時の処理
@@ -247,6 +302,15 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
       return;
     }
 
+    // YouTuber ID が取得できていない場合
+    if (!youtuberId) {
+      setAlert({
+        type: 'error',
+        message: 'YouTuberプロファイル情報が不足しています。ページを更新するか、管理者にお問い合わせください。'
+      });
+      return;
+    }
+
     try {
       setSubmitting(true);
 
@@ -279,17 +343,17 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
       // 予約データを作成
       const bookingData = {
         user_id: user.id,
-        youtuber_id: user.id,
         slot_id: selectedSlot,
         video_id: selectedVideo,
         start_date: start.toISOString(),
         end_date: end.toISOString(),
-        duration: duration,
-        amount: totalPrice,
+        amount_paid: totalPrice,
         status: 'pending',
-        payment_status: 'pending',
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        position: slot.type || 'default' // スロットのタイプを位置情報として使用
       };
+
+      console.log('送信する予約データ:', bookingData);
 
       // 予約データをデータベースに挿入
       const { data: bookingResult, error: bookingError } = await supabase
@@ -317,16 +381,25 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
         return;
       }
 
-      // 決済処理を開始
-      const paymentResult = await initiatePayment({
+      // 決済処理パラメータ
+      const paymentParams = {
         amount: totalPrice,
         bookingId: bookingId,
         description: `掲載枠予約: ${slot.name} (${duration}日間)`,
         successUrl: `${window.location.origin}/youtuber/dashboard?payment=success`,
         cancelUrl: `${window.location.origin}/youtuber/dashboard?payment=canceled`
-      });
+      };
+      
+      console.log('決済処理パラメータ:', paymentParams);
+
+      // 決済処理を開始
+      const paymentResult = await initiatePayment(paymentParams);
+      
+      // デバッグ用：決済初期化の結果をログに出力
+      console.log('決済初期化の結果:', paymentResult);
 
       if (paymentResult.error) {
+        console.error('決済処理の初期化に失敗しました:', paymentResult.error);
         setAlert({ 
           type: 'error', 
           message: '決済処理の初期化に失敗しました: ' + paymentResult.error 
@@ -336,19 +409,27 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
 
       // 決済ページにリダイレクト
       if (paymentResult.redirectUrl) {
+        console.log('リダイレクト先:', paymentResult.redirectUrl);
         window.location.href = paymentResult.redirectUrl;
-      } else {
-        // リダイレクトURLがない場合は成功コールバックを実行
+      } else if (paymentResult.clientSecret) {
+        console.log('クライアントシークレットを取得:', paymentResult.clientSecret);
+        // クライアントシークレットがある場合の処理
+        // StripeContextに設定（StripeProviderがクライアントシークレットを使用する）
+        setClientSecret(paymentResult.clientSecret);
+        
+        // ユーザーに処理中であることを伝える
         setAlert({ 
           type: 'success', 
-          message: '予約が作成されました。お支払い処理に進みます。'
+          message: '予約が作成されました。お支払い処理を開始します。このまましばらくお待ちください。'
         });
         
-        setTimeout(() => {
-          if (onSuccess) {
-            onSuccess();
-          }
-        }, 1500);
+        // clientSecretの設定はuseEffectでハンドリング
+      } else {
+        console.warn('リダイレクトURLもクライアントシークレットも取得できませんでした');
+        setAlert({ 
+          type: 'error', 
+          message: '決済処理の初期化中に問題が発生しました。管理者にお問い合わせください。'
+        });
       }
 
     } catch (err: any) {
@@ -385,6 +466,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
         return <FontAwesomeIcon icon={faCheckCircle} className="text-green-500 mr-2" />;
       case 'info':
         return <FontAwesomeIcon icon={faInfoCircle} className="text-blue-500 mr-2" />;
+      case 'warning':
+        return <FontAwesomeIcon icon={faExclamationCircle} className="text-yellow-500 mr-2" />;
       default:
         return null;
     }
@@ -395,12 +478,15 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
 
     const bgColor = alert.type === 'error' ? 'bg-red-50' : 
                    alert.type === 'success' ? 'bg-green-50' : 
+                   alert.type === 'warning' ? 'bg-yellow-50' :
                    'bg-blue-50';
     const textColor = alert.type === 'error' ? 'text-red-700' : 
                      alert.type === 'success' ? 'text-green-700' : 
+                     alert.type === 'warning' ? 'text-yellow-700' :
                      'text-blue-700';
     const borderColor = alert.type === 'error' ? 'border-red-200' : 
                        alert.type === 'success' ? 'border-green-200' : 
+                       alert.type === 'warning' ? 'border-yellow-200' :
                        'border-blue-200';
 
     return (
@@ -484,7 +570,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
 
   return (
     <div className="bg-white p-6 rounded-lg shadow" aria-labelledby="booking-form-title">
-      <h2 id="booking-form-title" className="text-xl font-bold mb-6">掲載枠予約</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 id="booking-form-title" className="text-xl font-bold">掲載枠予約</h2>
+        <YoutubeSyncButton onSyncComplete={handleSyncComplete} />
+      </div>
 
       {renderAlert()}
 
@@ -536,6 +625,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
             aria-required="true"
             aria-describedby={validationErrors.selectedVideo ? "video-error" : undefined}
             aria-invalid={touched.selectedVideo && !!validationErrors.selectedVideo}
+            disabled={videos.length === 0}
           >
             <option value="">動画を選択してください</option>
             {videos.map((video) => (
@@ -546,10 +636,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
           </select>
           {renderFieldError('selectedVideo')}
           {videos.length === 0 && (
-            <p className="mt-2 text-sm text-yellow-600">
-              <FontAwesomeIcon icon={faFilm} className="mr-1" aria-hidden="true" />
-              表示できる動画がありません。まずはYouTubeと同期してください。
-            </p>
+            <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+              <p className="text-sm text-yellow-700 font-medium flex items-center">
+                <FontAwesomeIcon icon={faFilm} className="mr-2" aria-hidden="true" />
+                表示できる動画がありません
+              </p>
+              <p className="text-xs text-yellow-600 mt-1">
+                YouTube同期を実行して、YouTubeチャンネルから動画データを取得してください。
+                同期が完了すると、このページが自動的に更新されます。
+              </p>
+            </div>
           )}
         </div>
 
@@ -623,7 +719,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
             </div>
           </div>
           <p className="text-sm text-blue-600 mt-2">
-            このまま予約すると、安全な決済ページに移動します。キャンセルは予約開始の72時間前まで可能です。
+          このまま予約すると、安全な決済ページに移動します。キャンセルは予約開始の72時間前まで可能です。
           </p>
         </div>
 
@@ -640,8 +736,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
           <button
             type="submit"
             className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300 disabled:cursor-not-allowed"
-            disabled={submitting || Object.keys(validationErrors).length > 0}
-            aria-disabled={submitting || Object.keys(validationErrors).length > 0}
+            disabled={submitting || Object.keys(validationErrors).length > 0 || videos.length === 0}
+            aria-disabled={submitting || Object.keys(validationErrors).length > 0 || videos.length === 0}
           >
             {submitting ? (
               <>

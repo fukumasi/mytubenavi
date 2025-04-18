@@ -2,9 +2,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Bell, Check, Crown, Star, ChevronRight, Clock, UserPlus, CheckCircle, XCircle } from 'lucide-react';
-import { useNotifications } from '../../hooks/useNotifications';
-import { Notification, NotificationType } from '../../types/notification';
-import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '@/hooks/useNotifications';
+import { Notification, NotificationType } from '@/types/notification';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 
 interface NotificationBellProps {}

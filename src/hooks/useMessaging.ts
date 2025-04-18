@@ -1,22 +1,30 @@
 // src/hooks/useMessaging.ts
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import messagingService from '../services/messagingService';
-import { Message, ConversationWithProfile } from '../types/matching';
-import usePoints from './usePoints';
+import { useAuth } from '@/contexts/AuthContext';
+import messagingService from '@/services/messagingService';
+import { Message, ConversationWithProfile } from '@/types/matching';
+import usePoints from '@/hooks/usePoints';
+import verificationService, { VerificationLevel } from '@/services/verificationService';
 
 /**
  * メッセージング機能を扱うためのカスタムフック
  */
 export const useMessaging = () => {
-  const { user } = useAuth();
+  const { user, isPremium } = useAuth();
   const { consumePoints, hasEnoughPoints } = usePoints();
   const [conversations, setConversations] = useState<ConversationWithProfile[]>([]);
   const [currentConversation, setCurrentConversation] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [verificationState, setVerificationState] = useState<{
+    level: VerificationLevel;
+    loading: boolean;
+  }>({
+    level: VerificationLevel.EMAIL_ONLY,
+    loading: true
+  });
   
   // useRefを使用してサブスクリプションを管理
   const conversationSubscriptionRef = useRef<(() => void) | null>(null);
@@ -25,6 +33,29 @@ export const useMessaging = () => {
   // 購読状態を追跡するフラグ
   const isConversationSubscribedRef = useRef<boolean>(false);
   const isMessageSubscribedRef = useRef<boolean>(false);
+
+  // 認証レベルを取得
+  useEffect(() => {
+    const fetchVerificationLevel = async () => {
+      if (!user) return;
+      
+      try {
+        const state = await verificationService.getVerificationState();
+        setVerificationState({
+          level: state?.verificationLevel || VerificationLevel.EMAIL_ONLY,
+          loading: false
+        });
+      } catch (err) {
+        console.error('認証レベル取得エラー:', err);
+        setVerificationState({
+          level: VerificationLevel.EMAIL_ONLY,
+          loading: false
+        });
+      }
+    };
+
+    fetchVerificationLevel();
+  }, [user]);
 
   // 会話一覧を取得
   const fetchConversations = useCallback(async () => {
@@ -89,6 +120,12 @@ export const useMessaging = () => {
   const createConversation = useCallback(async (otherUserId: string) => {
     if (!user) return null;
     
+    // 認証レベルチェック
+    if (verificationState.level < VerificationLevel.PHONE_VERIFIED) {
+      setError('メッセージの送受信には電話番号認証が必要です');
+      return null;
+    }
+    
     try {
       console.log(`ユーザーID: ${otherUserId} との会話を作成します`);
       const conversation = await messagingService.createConversation(user.id, otherUserId);
@@ -101,7 +138,7 @@ export const useMessaging = () => {
       setError('会話の作成に失敗しました');
       return null;
     }
-  }, [user, fetchConversations]);
+  }, [user, fetchConversations, verificationState.level]);
 
   // メッセージを送信
   const sendMessage = useCallback(async (
@@ -112,12 +149,21 @@ export const useMessaging = () => {
   ) => {
     if (!user) return false;
     
-    // ポイントチェック
-    const pointCost = isHighlighted ? 10 : 1; // ハイライトは10ポイント、通常は1ポイント
-    
-    if (!await hasEnoughPoints(pointCost)) {
-      setError('ポイントが足りません');
+    // 認証レベルチェック
+    if (verificationState.level < VerificationLevel.PHONE_VERIFIED) {
+      setError('メッセージの送受信には電話番号認証が必要です');
       return false;
+    }
+    
+    // プレミアム会員はポイントチェックをスキップ
+    if (!isPremium) {
+      // ポイントチェック（ハイライトは10ポイント、通常は1ポイント）
+      const pointCost = isHighlighted ? 10 : 1;
+      
+      if (!await hasEnoughPoints(pointCost)) {
+        setError(`ポイントが足りません（必要: ${pointCost}ポイント）`);
+        return false;
+      }
     }
     
     try {
@@ -131,9 +177,16 @@ export const useMessaging = () => {
         isHighlighted
       );
       
-      // ポイント消費
-      await consumePoints(pointCost, 'message', conversationId, 
-        isHighlighted ? 'ハイライトメッセージ送信' : 'メッセージ送信');
+      // プレミアム会員でない場合のみポイント消費
+      if (!isPremium) {
+        const pointCost = isHighlighted ? 10 : 1;
+        await consumePoints(
+          pointCost, 
+          'message', 
+          conversationId, 
+          isHighlighted ? 'ハイライトメッセージ送信' : 'メッセージ送信'
+        );
+      }
       
       // 最新のメッセージを取得して表示に反映（リアルタイム購読していない場合のみ）
       if (currentConversation === conversationId && !isMessageSubscribedRef.current) {
@@ -151,7 +204,16 @@ export const useMessaging = () => {
       setError('メッセージの送信に失敗しました');
       return false;
     }
-  }, [user, currentConversation, fetchMessages, fetchConversations, hasEnoughPoints, consumePoints]);
+  }, [
+    user, 
+    currentConversation, 
+    fetchMessages, 
+    fetchConversations, 
+    hasEnoughPoints, 
+    consumePoints, 
+    isPremium,
+    verificationState.level
+  ]);
 
   // 会話を削除
   const deleteConversation = useCallback(async (conversationId: string) => {
@@ -292,6 +354,7 @@ export const useMessaging = () => {
     currentConversation,
     loading,
     error,
+    verificationState,
     fetchConversations,
     fetchMessages,
     createConversation,

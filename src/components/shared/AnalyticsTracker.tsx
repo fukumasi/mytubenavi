@@ -1,7 +1,8 @@
-// src/components/shared/AnalyticsTracker.tsx
+// src/components/shared/AnalyticsTracker.tsx（修正版）
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/contexts/AuthContext';
+// useAuthは使用されていないので削除
+// import { useAuth } from '@/contexts/AuthContext';
 
 interface AnalyticsTrackerProps {
   bookingId: string;
@@ -13,11 +14,6 @@ interface AnalyticsTrackerProps {
 
 /**
  * 広告インプレッションとクリックを追跡するコンポーネント
- * @param bookingId 追跡する予約ID
- * @param isVisible コンポーネントが視覚的に表示されているかどうか（デフォルトはtrue）
- * @param children 追跡する子要素（広告コンテンツ）
- * @param trackClicks クリック追跡を有効にするかどうか（デフォルトはtrue）
- * @param sessionTimeout 同一セッションと見なす時間（ミリ秒、デフォルトは30分）
  */
 export default function AnalyticsTracker({ 
   bookingId, 
@@ -26,26 +22,18 @@ export default function AnalyticsTracker({
   trackClicks = true,
   sessionTimeout = 30 * 60 * 1000 // デフォルトは30分
 }: AnalyticsTrackerProps) {
-  const { user } = useAuth();
+  // useAuthからuserを取得する行を削除
+  // const { user } = useAuth();
   const [impressionLogged, setImpressionLogged] = useState(false);
   const [lastImpressionTime, setLastImpressionTime] = useState<number>(0);
-  const [sessionId, setSessionId] = useState<string>('');
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [lastClickTime, setLastClickTime] = useState<number>(0);
   const [clickCooldown, setClickCooldown] = useState(false);
 
-  // セッションIDの生成
-  useEffect(() => {
-    if (!sessionId) {
-      const newSessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-      setSessionId(newSessionId);
-    }
-  }, [sessionId]);
-
   // インプレッションをログに記録する関数
   const logImpression = useCallback(async () => {
-    if (!bookingId || !isVisible || !user) return;
+    if (!bookingId || !isVisible) return;
 
     try {
       // 現在時刻を取得
@@ -60,7 +48,7 @@ export default function AnalyticsTracker({
       // 既存のレコードを検索
       const { data, error } = await supabase
         .from('slot_booking_analytics')
-        .select('id, impressions, unique_impressions, session_ids')
+        .select('id, impressions, clicks')
         .eq('booking_id', bookingId)
         .eq('date', today)
         .single();
@@ -70,34 +58,12 @@ export default function AnalyticsTracker({
         return;
       }
       
-      // セッションIDの配列を準備
-      let sessionIds: string[] = [];
-      let isUniqueImpression = true;
-      
-      if (data && data.session_ids) {
-        try {
-          sessionIds = Array.isArray(data.session_ids) ? data.session_ids : JSON.parse(data.session_ids);
-          // 既に同じセッションIDが記録されているかチェック
-          isUniqueImpression = !sessionIds.includes(sessionId);
-        } catch (e) {
-          console.error('Error parsing session_ids:', e);
-          sessionIds = [];
-        }
-      }
-      
-      // 新しいセッションIDを追加（重複しないように）
-      if (isUniqueImpression) {
-        sessionIds.push(sessionId);
-      }
-      
       if (data) {
         // 既存のレコードを更新
         const { error: updateError } = await supabase
           .from('slot_booking_analytics')
           .update({
             impressions: (data.impressions || 0) + 1,
-            unique_impressions: isUniqueImpression ? (data.unique_impressions || 0) + 1 : (data.unique_impressions || 0),
-            session_ids: sessionIds,
             updated_at: new Date().toISOString()
           })
           .eq('id', data.id);
@@ -115,10 +81,7 @@ export default function AnalyticsTracker({
               booking_id: bookingId,
               date: today,
               impressions: 1,
-              unique_impressions: 1,
-              session_ids: [sessionId],
-              clicks: 0,
-              unique_clicks: 0
+              clicks: 0
             }
           ]);
           
@@ -143,7 +106,7 @@ export default function AnalyticsTracker({
     } catch (err) {
       console.error('Error in logImpression:', err);
     }
-  }, [bookingId, isVisible, user, lastImpressionTime, sessionId, sessionTimeout]);
+  }, [bookingId, isVisible, lastImpressionTime, sessionTimeout]);
 
   // 表示状態が変わった時にインプレッションを記録
   useEffect(() => {
@@ -166,7 +129,7 @@ export default function AnalyticsTracker({
 
   // クリックを記録する関数
   const logClick = useCallback(async () => {
-    if (!bookingId || !user) return;
+    if (!bookingId) return;
     
     // クリックのクールダウン中なら記録しない（短時間での連打防止）
     const now = Date.now();
@@ -180,7 +143,7 @@ export default function AnalyticsTracker({
       // 既存のレコードを検索
       const { data, error } = await supabase
         .from('slot_booking_analytics')
-        .select('id, clicks, unique_clicks, click_session_ids')
+        .select('id, clicks')
         .eq('booking_id', bookingId)
         .eq('date', today)
         .single();
@@ -190,36 +153,12 @@ export default function AnalyticsTracker({
         return;
       }
       
-      // セッションIDの配列を準備（クリック用）
-      let clickSessionIds: string[] = [];
-      let isUniqueClick = true;
-      
-      if (data && data.click_session_ids) {
-        try {
-          clickSessionIds = Array.isArray(data.click_session_ids) 
-            ? data.click_session_ids 
-            : JSON.parse(data.click_session_ids);
-          // 既に同じセッションIDが記録されているかチェック
-          isUniqueClick = !clickSessionIds.includes(sessionId);
-        } catch (e) {
-          console.error('Error parsing click_session_ids:', e);
-          clickSessionIds = [];
-        }
-      }
-      
-      // 新しいセッションIDを追加（重複しないように）
-      if (isUniqueClick) {
-        clickSessionIds.push(sessionId);
-      }
-      
       if (data) {
         // 既存のレコードを更新
         const { error: updateError } = await supabase
           .from('slot_booking_analytics')
           .update({
             clicks: (data.clicks || 0) + 1,
-            unique_clicks: isUniqueClick ? (data.unique_clicks || 0) + 1 : (data.unique_clicks || 0),
-            click_session_ids: clickSessionIds,
             updated_at: new Date().toISOString()
           })
           .eq('id', data.id);
@@ -236,11 +175,7 @@ export default function AnalyticsTracker({
               booking_id: bookingId,
               date: today,
               impressions: 1, // クリックがあれば少なくとも1回表示されたとみなす
-              unique_impressions: 1,
-              session_ids: [sessionId],
-              clicks: 1,
-              unique_clicks: 1,
-              click_session_ids: [sessionId]
+              clicks: 1
             }
           ]);
           
@@ -265,9 +200,9 @@ export default function AnalyticsTracker({
     } catch (err) {
       console.error('Error in logClick:', err);
     }
-  }, [bookingId, user, lastClickTime, sessionId]);
+  }, [bookingId, lastClickTime]);
 
-  // クリックイベントハンドラ - 未使用引数を削除
+  // クリックイベントハンドラ
   const handleClick = () => {
     if (!trackClicks || clickCooldown) return;
     
@@ -283,18 +218,3 @@ export default function AnalyticsTracker({
     </div>
   );
 }
-
-/**
- * 使用例:
- * 
- * <AnalyticsTracker 
- *   bookingId="booking-id-here" 
- *   isVisible={isElementVisible}
- *   trackClicks={true}
- *   sessionTimeout={1800000} // 30分
- * >
- *   <AdContent>
- *     広告コンテンツ
- *   </AdContent>
- * </AnalyticsTracker>
- */

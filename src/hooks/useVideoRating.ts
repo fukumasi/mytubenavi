@@ -85,13 +85,16 @@ export const useVideoRating = (videoId?: string) => {
            .select('overall')
            .eq('video_id', effectiveVideoId)
            .eq('user_id', user.id)
-           .single();
+           .limit(1);
          
-         if (userRatingError && userRatingError.code !== 'PGRST116') {
-           throw userRatingError;
+         if (userRatingError) {
+           console.error('Error fetching user rating:', userRatingError);
+           // エラーがあっても処理は続行
+         } else if (userRatingData && userRatingData.length > 0) {
+           setUserRating(userRatingData[0].overall || null);
+         } else {
+           setUserRating(null);
          }
-         
-         setUserRating(userRatingData?.overall || null);
        }
      } catch (err) {
        console.error('Error fetching video ratings:', err);
@@ -142,14 +145,19 @@ export const useVideoRating = (videoId?: string) => {
 
    try {
      // 既存の評価を確認
-     const { data: existingRating, error: checkError } = await supabase
+     const { data: existingRatingData, error: checkError } = await supabase
        .from('video_ratings')
        .select('id')
        .eq('video_id', effectiveVideoId)
        .eq('user_id', user.id)
-       .single();
+       .limit(1);
      
-     if (checkError && checkError.code !== 'PGRST116') throw checkError;
+     if (checkError) {
+       console.error('Error checking existing rating:', checkError);
+       throw checkError;
+     }
+     
+     const existingRating = existingRatingData && existingRatingData.length > 0 ? existingRatingData[0] : null;
      
      const ratingPayload = {
        ...ratingData,
@@ -159,6 +167,7 @@ export const useVideoRating = (videoId?: string) => {
      };
 
      if (existingRating) {
+       console.log('Updating existing rating:', existingRating.id);
        // 既存の評価を更新
        const { error: updateError } = await supabase
          .from('video_ratings')
@@ -167,6 +176,7 @@ export const useVideoRating = (videoId?: string) => {
          
        if (updateError) throw updateError;
      } else {
+       console.log('Inserting new rating');
        // 新しい評価を挿入
        const { error: insertError } = await supabase
          .from('video_ratings')

@@ -2,13 +2,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { LogIn, UserPlus, Youtube, User, Menu, Search, Crown, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { useNotifications } from '../../contexts/NotificationContext';
-import { supabase } from '../../lib/supabase';
-import SearchBar from '../search/SearchBar';
-import NotificationBell from './NotificationBell';
-import NotificationSound from './NotificationSound';
-import MobileMenu from '../ui/MobileMenu';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNotifications } from '@/contexts/NotificationContext';
+import { supabase } from '@/lib/supabase';
+import SearchBar from '@/components/search/SearchBar';
+import NotificationBell from '@/components/layout/NotificationBell';
+import NotificationSound from '@/components/layout/NotificationSound';
+import MobileMenu from '@/components/ui/MobileMenu';
 
 export default function Header() {
  const { user, signOut, loading: authLoading, isPremium } = useAuth();

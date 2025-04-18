@@ -8,7 +8,7 @@ import UserManagement from '../components/admin/UserManagement';
 import UserStatistics from '../components/admin/UserStatistics';
 import AnalyticsDashboard from '../components/admin/AnalyticsDashboard';
 import PaymentHistory from '../components/admin/PaymentHistory';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 // 管理者ダッシュボードのコンテキスト
 export type AdminContextType = {

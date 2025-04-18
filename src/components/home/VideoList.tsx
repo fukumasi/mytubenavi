@@ -1,6 +1,6 @@
 // src/components/home/VideoList.tsx
 import React, { useState } from 'react';
-import { Table } from '../ui/table';
+import { Table } from '@/components/ui/table';
 import { Video } from '@/types';
 import VideoCard from './VideoCard';
 import { useTranslation } from 'react-i18next';

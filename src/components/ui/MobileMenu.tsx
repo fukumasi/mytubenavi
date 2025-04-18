@@ -1,7 +1,7 @@
 // src/components/ui/MobileMenu.tsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Crown, Sparkles, ThumbsUp, Bell, Home, Search, User, Heart, Youtube, LogOut, Users } from 'lucide-react';
 
 interface MobileMenuProps {

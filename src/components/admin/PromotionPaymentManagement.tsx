@@ -1,7 +1,9 @@
 // src/components/admin/PromotionPaymentManagement.tsx
 
+// src/components/admin/PromotionPaymentManagement.tsx
+
 import React, { useState, useEffect, useContext } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import RefundModal from './RefundModal';

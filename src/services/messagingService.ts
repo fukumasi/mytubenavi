@@ -1,7 +1,7 @@
 // src/services/messagingService.ts
 
-import { supabase } from '../lib/supabase';
-import { Message, Conversation, ConversationWithProfile, ConnectionStatus } from '../types/matching';
+import { supabase } from '@/lib/supabase';
+import { Message, Conversation, ConversationWithProfile, ConnectionStatus } from '@/types/matching';
 
 /**
  * メッセージングサービス

@@ -1,15 +1,15 @@
 // src/components/matching/MatchPreferences.tsx
 
 import React, { useState, useEffect } from 'react';
-import LoadingSpinner from '../ui/LoadingSpinner';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { toast, Toaster } from 'react-hot-toast';
-import useMatching from '../../hooks/useMatching';
-import usePoints from '../../hooks/usePoints';
+import useMatching from '@/hooks/useMatching';
+import usePoints from '@/hooks/usePoints';
 import { 
   MatchingPreferences, 
   ActivityLevel, 
   GenderPreference 
-} from '../../types/matching';
+} from '@/types/matching';
 
 interface MatchPreferencesProps {
   onClose: () => void;
@@ -88,6 +88,7 @@ const MatchPreferences: React.FC<MatchPreferencesProps> = ({ onClose, verificati
     has_video_history: false,
     recent_activity: false,
     filter_skipped: false,
+    exclude_liked_users: true, // デフォルトではいいね済みユーザーを除外
     min_common_interests: 0,
     max_distance: 0
   });
@@ -111,7 +112,8 @@ const MatchPreferences: React.FC<MatchPreferencesProps> = ({ onClose, verificati
         // デフォルト値が未設定の場合に設定
         min_common_interests: preferences.min_common_interests ?? 0,
         max_distance: preferences.max_distance ?? 0,
-        filter_skipped: preferences.filter_skipped ?? false
+        filter_skipped: preferences.filter_skipped ?? false,
+        exclude_liked_users: preferences.exclude_liked_users !== false
       });
       
       // 前回使用したフィルター設定を保存
@@ -119,7 +121,8 @@ const MatchPreferences: React.FC<MatchPreferencesProps> = ({ onClose, verificati
         ...preferences,
         min_common_interests: preferences.min_common_interests ?? 0,
         max_distance: preferences.max_distance ?? 0,
-        filter_skipped: preferences.filter_skipped ?? false
+        filter_skipped: preferences.filter_skipped ?? false,
+        exclude_liked_users: preferences.exclude_liked_users !== false
       });
       
       // 初期ロード時は変更フラグをリセット
@@ -243,6 +246,7 @@ const MatchPreferences: React.FC<MatchPreferencesProps> = ({ onClose, verificati
       has_video_history: false,
       recent_activity: false,
       filter_skipped: false,
+      exclude_liked_users: false, // 緩和モードではいいね済みユーザーも表示
       min_common_interests: 0,
       max_distance: 0
     }));
@@ -284,9 +288,9 @@ const MatchPreferences: React.FC<MatchPreferencesProps> = ({ onClose, verificati
         return;
       }
 
-      // 検証レベルが1の場合の制限
+      // 検証レベルチェック（テスト完了につき有効化）
       if (verificationLevel < 2) {
-        toast.error('電話番号認証が必要です。マッチング機能を利用するには、認証レベルをアップグレードしてください。');
+        toast.error('電話番号認証が必要です。マッチング機能を利用するには、プロフィール設定から認証レベルをアップグレードしてください。');
         setSaving(false);
         return;
       }
@@ -338,8 +342,8 @@ const MatchPreferences: React.FC<MatchPreferencesProps> = ({ onClose, verificati
     return <LoadingSpinner />;
   }
 
-  // 検証レベルに基づく警告
-  const showVerificationWarning = verificationLevel < 2;
+  // 検証レベルに基づく警告（テスト完了につき実際の条件に修正）
+  const showVerificationWarning = verificationLevel < 2; // 元の条件に戻す
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-lg max-w-3xl mx-auto">
@@ -585,19 +589,37 @@ const MatchPreferences: React.FC<MatchPreferencesProps> = ({ onClose, verificati
           </div>
         </div>
 
-        {/* スキップしたユーザーの扱い */}
-        <div className="mb-6">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              name="filter_skipped"
-              checked={localPreferences.filter_skipped || false}
-              onChange={handleCheckboxChange}
-              className="mr-2"
-              disabled={searchMode === 'relaxed'}
-            />
-            <span>以前スキップしたユーザーを表示しない</span>
+        {/* 表示ユーザーの追加設定 */}
+        <div className="mb-6 border-t pt-4">
+          <label className="block text-gray-700 font-semibold mb-2">
+            表示ユーザーの設定
           </label>
+          <div className="space-y-3">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                name="filter_skipped"
+                checked={localPreferences.filter_skipped || false}
+                onChange={handleCheckboxChange}
+                className="mr-2"
+                disabled={searchMode === 'relaxed'}
+              />
+              <span>以前スキップしたユーザーを表示しない</span>
+            </label>
+            
+            {/* 新規追加: いいね済みユーザーの設定 */}
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                name="exclude_liked_users"
+                checked={localPreferences.exclude_liked_users !== false}
+                onChange={handleCheckboxChange}
+                className="mr-2"
+                disabled={searchMode === 'relaxed'}
+              />
+              <span>既にいいねしたユーザーを表示しない</span>
+            </label>
+          </div>
         </div>
 
         {/* 興味・関心 */}
@@ -659,14 +681,15 @@ const MatchPreferences: React.FC<MatchPreferencesProps> = ({ onClose, verificati
           </div>
         )}
 
-        {/* 設定リセット警告 */}
-        {searchMode === 'relaxed' && (
+       {/* 設定リセット警告 */}
+       {searchMode === 'relaxed' && (
           <div className="mb-6 p-3 bg-green-50 border border-green-300 rounded-lg text-green-800">
             <div className="flex items-center">
               <svg className="w-5 h-5 mr-2" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                 <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
-              <span>条件緩和モードが適用されています。より多くのマッチング候補が表示されます。詳細フィルターは使用されません。</span>
+              <span>条件緩和モードが適用されています。より多くのマッチング候補が表示されます。詳細フィルターは使用されません。
+              <strong>いいね済みユーザーも表示されます。</strong></span>
             </div>
           </div>
         )}
@@ -677,8 +700,7 @@ const MatchPreferences: React.FC<MatchPreferencesProps> = ({ onClose, verificati
             type="button"
             onClick={handleCancel}
             className="px-4 py-2 mr-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100"
-            disabled={saving || processingAction}
-          >
+            disabled={saving || processingAction}>
             キャンセル
           </button>
           <button

@@ -174,7 +174,8 @@ export const StripeContextProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       // 金額の確認（不一致の場合はエラー）
-      if (bookingData.amount !== params.amount) {
+      // amount_paidフィールドを使用するように修正
+      if (bookingData.amount_paid !== params.amount) {
         const errorMessage = '予約金額に不一致があります。管理者にお問い合わせください。';
         setPaymentError(errorMessage);
         return { success: false, error: errorMessage };
@@ -253,15 +254,9 @@ export const StripeContextProvider: React.FC<{ children: React.ReactNode }> = ({
     initiatePayment
   };
 
-  // Elements用のオプション
-  const elementsOptions = clientSecret ? {
-    clientSecret,
-    appearance: customAppearance || defaultAppearance
-  } : {};
-
   return (
     <StripeContext.Provider value={value}>
-      <StripeProvider options={elementsOptions}>
+      <StripeProvider>
         {children}
       </StripeProvider>
     </StripeContext.Provider>

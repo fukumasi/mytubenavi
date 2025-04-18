@@ -1,9 +1,10 @@
 // src/components/search/review/ReviewForm.tsx
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, ThumbsUp, Trash2, RefreshCw, Star } from 'lucide-react';
+import { AlertCircle, ThumbsUp, Trash2, RefreshCw, Star, Award } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { usePoints } from '@/hooks/usePoints';
 import { StarRating } from './StarRating';
 import type { Review } from '@/types/review';
 
@@ -69,11 +70,12 @@ export function ReviewForm({
   showGuidelines = true,
   title
 }: ReviewFormProps) {
-  const { user } = useAuth(); // currentUser を user に変更
+  const { user } = useAuth();
+  const { processReviewReward } = usePoints();
   const navigate = useNavigate();
   const [rating, setRating] = useState(existingReview?.rating || 0);
   const [detailedRatings, setDetailedRatings] = useState<DetailedRatings>(
-    (existingReview as any)?.detailed_ratings || DEFAULT_DETAILED_RATINGS // 型アサーションを使用
+    (existingReview as any)?.detailed_ratings || DEFAULT_DETAILED_RATINGS
   );
   const [content, setContent] = useState(existingReview?.content || '');
   const [error, setError] = useState<string | null>(null);
@@ -83,19 +85,20 @@ export function ReviewForm({
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [earnedPoints, setEarnedPoints] = useState<number | null>(null);
 
   const MAX_CHARS = 1000;
   const MIN_CHARS = 10;
 
   useEffect(() => {
     const checkExistingReview = async () => {
-      if (user) { // currentUser を user に変更
+      if (user) {
         try {
           const { data, error } = await supabase
             .from('reviews')
             .select('*')
             .eq('video_id', videoId)
-            .eq('user_id', user.id) // currentUser を user に変更
+            .eq('user_id', user.id)
             .single();
 
           if (error && error.code !== 'PGRST116') {
@@ -113,7 +116,7 @@ export function ReviewForm({
     if (!existingReview) {
       checkExistingReview();
     }
-  }, [videoId, user, existingReview, retryCount]); // currentUser を user に変更
+  }, [videoId, user, existingReview, retryCount]);
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
@@ -219,11 +222,13 @@ export function ReviewForm({
       // レビュー情報の準備
       const reviewData = {
         video_id: videoId,
-        user_id: user?.id, // currentUser を user に変更
+        user_id: user?.id,
         rating,
         content: content.trim(),
         detailed_ratings: detailedRating ? detailedRatings : null
       };
+
+      let reviewId: string | undefined;
 
       if (existingReview) {
         // 既存レビューの更新
@@ -233,13 +238,33 @@ export function ReviewForm({
           .eq('id', existingReview.id);
           
         if (error) throw error;
+        
+        reviewId = existingReview.id;
       } else {
         // 新規レビューの投稿
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('reviews')
-          .insert(reviewData);
+          .insert(reviewData)
+          .select('id')
+          .single();
           
         if (error) throw error;
+        
+        reviewId = data?.id;
+        
+        // 新規レビュー投稿時のみポイント付与
+        if (reviewId && user) {
+          try {
+            // ポイント加算処理
+            const points = await processReviewReward(content.trim(), reviewId);
+            if (points > 0) {
+              setEarnedPoints(points);
+            }
+          } catch (pointsErr) {
+            console.error('ポイント付与エラー:', pointsErr);
+            // ポイント付与に失敗してもレビュー自体は投稿完了とする
+          }
+        }
       }
 
       // レビュー投稿・更新後にレビュー数を更新
@@ -259,7 +284,7 @@ export function ReviewForm({
           if (redirectAfterSubmit) {
             navigate(`/video/${videoId}`);
           }
-        }, 2000);
+        }, 3000); // ポイント獲得表示を見せるために少し長くした
       }
 
     } catch (err: any) {
@@ -301,7 +326,7 @@ export function ReviewForm({
     setRetryCount(prev => prev + 1);
   };
 
-  if (!user) { // currentUser を user に変更
+  if (!user) {
     return (
       <div className={`bg-white rounded-lg shadow-sm p-6 ${className}`}>
         <div className="text-center">
@@ -340,9 +365,18 @@ export function ReviewForm({
   return (
     <form onSubmit={handleSubmit} className={`bg-white rounded-lg shadow-sm p-6 ${className}`}>
       {submitSuccess ? (
-        <div className="flex items-center justify-center p-4 bg-green-50 text-green-700 rounded-md">
-          <ThumbsUp className="w-5 h-5 mr-2" />
-          レビューを{existingReview ? '更新' : '投稿'}しました
+        <div className="space-y-4">
+          <div className="flex items-center justify-center p-4 bg-green-50 text-green-700 rounded-md">
+            <ThumbsUp className="w-5 h-5 mr-2" />
+            レビューを{existingReview ? '更新' : '投稿'}しました
+          </div>
+          
+          {earnedPoints && earnedPoints > 0 && (
+            <div className="flex items-center justify-center p-4 bg-yellow-50 text-yellow-700 rounded-md">
+              <Award className="w-5 h-5 mr-2" />
+              レビュー投稿で{earnedPoints}ポイント獲得しました！
+            </div>
+          )}
         </div>
       ) : (
         <>
@@ -450,7 +484,6 @@ export function ReviewForm({
                         rating={detailedRatings[category.id as keyof DetailedRatings]}
                         onRatingChange={(value) => handleDetailedRatingChange(category.id, value)}
                         size="sm"
-                        // StarRating コンポーネントから id プロパティを削除
                       />
                       <span className="ml-2 text-sm font-medium text-gray-600">
                         {detailedRatings[category.id as keyof DetailedRatings] || '-'}
@@ -502,6 +535,9 @@ export function ReviewForm({
                 <li>投稿したレビューは公開され、他のユーザーが参照できます</li>
                 <li>不適切な内容は削除される場合があります</li>
                 <li>レビュー内容は{MIN_CHARS}文字以上、{MAX_CHARS}文字以内で入力してください</li>
+                {!existingReview && (
+                  <li className="text-primary-600 font-medium">レビュー投稿でポイントが獲得できます！（長文投稿でボーナスポイント）</li>
+                )}
               </ul>
             </div>
           )}

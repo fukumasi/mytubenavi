@@ -1,7 +1,7 @@
 // src/components/admin/AnalyticsDashboard.tsx
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import {
   LineChart,
   Line,
@@ -18,7 +18,7 @@ import {
   Cell,
 } from 'recharts';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
-import LoadingSpinner from '../ui/LoadingSpinner';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 // 統計情報の型定義
 type StatisticsData = {

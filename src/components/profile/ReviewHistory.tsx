@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Star } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ProfileLayout from './ProfileLayout';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 // シンプルな拡張型を定義
 interface ReviewItem {
@@ -15,6 +15,21 @@ interface ReviewItem {
   updated_at?: string;
   videoTitle: string;
 }
+
+// YouTube IDの妥当性チェック関数
+const isValidYoutubeId = (id: string): boolean => {
+  // YouTubeのIDは通常11文字の英数字
+  return /^[a-zA-Z0-9_-]{11}$/.test(id);
+};
+
+// サムネイルURLを取得する関数
+const getThumbnailUrl = (videoId: string): string => {
+  if (isValidYoutubeId(videoId)) {
+    return `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+  }
+  // 無効なIDの場合はデフォルト画像を返す
+  return '/placeholder.jpg';
+};
 
 const ReviewHistory = () => {
   const navigate = useNavigate();
@@ -176,7 +191,7 @@ const ReviewHistory = () => {
                       <div className="flex-shrink-0 h-14 w-20 overflow-hidden rounded">
                         <img 
                           className="h-full w-full object-cover" 
-                          src={`https://img.youtube.com/vi/${review.video_id}/mqdefault.jpg`} 
+                          src={getThumbnailUrl(review.video_id)} 
                           alt=""
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = '/placeholder.jpg';

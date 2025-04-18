@@ -1,7 +1,7 @@
 // src/components/layout/NotificationSound.tsx
 import { useEffect, useRef, useState } from 'react';
-import { useNotifications } from '../../hooks/useNotifications';
-import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '@/hooks/useNotifications';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NotificationSoundProps {
   volume?: number; // 0.0 から 1.0

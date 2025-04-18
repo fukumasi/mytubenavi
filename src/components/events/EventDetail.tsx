@@ -3,10 +3,11 @@ import { useParams, Link } from 'react-router-dom';
 import { Calendar, MapPin, Users, Video, ExternalLink, Clock, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import CancelEventModal from './CancelEventModal';
-import type { Event, Participant, DatabaseParticipant } from '../../types';
+import type { Event } from '@/types';
+import type { Participant, DatabaseParticipant } from '@/types/events';
 
 export default function EventDetail() {
   const { id } = useParams<{ id: string }>();

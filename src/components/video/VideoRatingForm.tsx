@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { VideoRating, RatingCategory, RatingValue } from '@/types';
-import { submitVideoRating, updateVideoReviewCount } from '@/lib/supabase';
+import { submitVideoRating, updateVideoReviewCount, getLatestReviewId } from '@/lib/supabase';
 import { StarRating } from '../search/review/StarRating';
-import { HelpCircle, AlertCircle } from 'lucide-react';
+import { HelpCircle, AlertCircle, Award } from 'lucide-react';
+import { usePoints } from '@/hooks/usePoints';
 
 const RATING_CATEGORY_LABELS: Record<RatingCategory, string> = {
  reliability: '信頼性',
@@ -44,6 +45,9 @@ export default function VideoRatingForm({
  className = "",
  showReset = true
 }: VideoRatingFormProps) {
+ // ポイント関連のフック追加
+ const { processReviewReward, isPremium } = usePoints();
+ 
  const defaultRatings = useMemo<Record<RatingCategory, RatingValue>>(() => ({
    reliability: 1 as RatingValue,
    entertainment: 1 as RatingValue,
@@ -68,6 +72,8 @@ export default function VideoRatingForm({
  const [tooltipCategory, setTooltipCategory] = useState<RatingCategory | null>(null);
  const [error, setError] = useState<string | null>(null);
  const [success, setSuccess] = useState<boolean>(false);
+ // ポイント獲得表示用の状態追加
+ const [earnedPoints, setEarnedPoints] = useState<number | null>(null);
 
  // オブジェクト比較用の文字列化
  const initialRatingsString = useMemo(() => 
@@ -89,6 +95,7 @@ export default function VideoRatingForm({
    setComment(initialRatings?.comment || '');
    setError(null);
    setSuccess(false);
+   setEarnedPoints(null);
  }, [initialRatingsString, defaultRatings]);
 
  // デバッグ用
@@ -128,6 +135,7 @@ export default function VideoRatingForm({
    setComment('');
    setError(null);
    setSuccess(false);
+   setEarnedPoints(null);
  };
 
  const handleSubmit = async (e: React.FormEvent) => {
@@ -141,6 +149,7 @@ export default function VideoRatingForm({
      console.log('Submitting ratings:', ratings);
      console.log('Submitting comment:', comment);
      
+     // レビューデータを送信
      await submitVideoRating(
        videoId,
        ratings.overall,
@@ -153,14 +162,38 @@ export default function VideoRatingForm({
        comment
      );
 
+     // ビデオレビュー数を更新
      await updateVideoReviewCount(videoId);
+     
+     // 最新のレビューIDを取得（ポイント付与用）
+     const reviewId = await getLatestReviewId(videoId);
+     console.log('レビューID取得:', reviewId);
+     
+     // ポイント付与処理（reviewIdが取得できた場合のみ）
+     if (reviewId && comment) {
+       try {
+         console.log('ポイント処理を開始します');
+         const points = await processReviewReward(comment, reviewId);
+         console.log(`ポイント付与結果: ${points}ポイント`);
+         
+         if (points > 0) {
+           setEarnedPoints(points);
+         }
+       } catch (pointsError) {
+         console.error('ポイント付与エラー:', pointsError);
+         // ポイント処理に失敗してもレビュー自体は成功とする
+       }
+     } else {
+       console.warn('レビューIDが取得できないか、コメントがないためポイント付与をスキップします');
+     }
      
      setSuccess(true);
      
-     // 成功メッセージを3秒後に消す
+     // 成功メッセージを5秒後に消す（ポイント表示のため少し長めに）
      setTimeout(() => {
        setSuccess(false);
-     }, 3000);
+       setEarnedPoints(null);
+     }, 5000);
      
      resetForm();
      console.log('Form reset, calling onSubmit');
@@ -231,6 +264,14 @@ export default function VideoRatingForm({
          </div>
        )}
        
+       {/* ポイント獲得表示の追加 */}
+       {earnedPoints && earnedPoints > 0 && (
+         <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md flex items-center">
+           <Award className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0" />
+           <p className="text-sm text-yellow-700">レビュー投稿で{earnedPoints}ポイント獲得しました！</p>
+         </div>
+       )}
+       
        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
          <div>
            {leftColumns.map(category => renderRatingItem(category))}
@@ -244,17 +285,23 @@ export default function VideoRatingForm({
        
        <div className="mt-4">
          <label htmlFor="review-comment" className="block text-sm font-medium text-gray-700 mb-2">
-           口コミコメント（任意）
+           口コミコメント
+           {isPremium && (
+             <span className="ml-1 text-xs text-blue-600">（プレミアム会員はポイント2倍！）</span>
+           )}
          </label>
          <textarea
            id="review-comment"
            rows={4}
            value={comment}
            onChange={(e) => setComment(e.target.value)}
-           placeholder="この動画について詳しく教えてください（任意）"
+           placeholder="この動画について詳しく教えてください（100文字以上でボーナスポイント！）"
            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-           aria-label="口コミコメント（任意）"
+           aria-label="口コミコメント"
          />
+         <div className="mt-1 text-xs text-gray-500">
+           コメントを書くとポイントがもらえます！ 100文字以上で追加ポイント獲得！
+         </div>
        </div>
      </div>
      

@@ -1,10 +1,14 @@
 // src/components/admin/PaymentHistory.tsx
 
+// src/components/admin/PaymentHistory.tsx
+
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import RefundModal from './RefundModal';
+
+// 残りの部分はそのまま
 
 // 決済履歴の型定義
 type PaymentRecord = {

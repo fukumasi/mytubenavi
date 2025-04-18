@@ -49,6 +49,7 @@ export interface YouTubeVideo {
   channel_title?: string;
   comment_count?: number;
   youtube_id?: string;
+  youtuber_id?: number | null; // nullも許容するように修正
   created_at?: string;
   updated_at?: string;
 }

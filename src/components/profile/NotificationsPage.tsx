@@ -4,9 +4,9 @@ import { useState, useCallback, useMemo } from 'react';
 import { Bell, MessageSquare, Star, Heart, Trash2, Check, UserPlus, Users, Calendar, Filter, XCircle, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import ProfileLayout from './ProfileLayout';
-import { useNotifications } from '../../hooks/useNotifications';
-import { Notification, NotificationType } from '../../types/notification';
-import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '@/hooks/useNotifications';
+import { Notification, NotificationType } from '@/types/notification';
+import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 // 有効な NotificationType を確保するための型拡張

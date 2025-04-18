@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Clock, MapPin, Users, Search } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
-import type { Event } from '../../types';
+import { supabase } from '@/lib/supabase';
+import type { Event } from '@/types';
 
 interface DatabaseEvent {
   id: string;

@@ -1,9 +1,13 @@
+// src/components/premium/PremiumUpgrade.tsx
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import PremiumPaymentForm from './PremiumPaymentForm';
-import { useStripeContext } from '../../contexts/StripeContext';
+import { useStripeContext } from '@/contexts/StripeContext';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 
 interface PlanOption {
   id: string;
@@ -22,6 +26,8 @@ const PremiumUpgrade: React.FC = () => {
   const [selectedPlan, setSelectedPlan] = useState<string>('monthly');
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const { resetPaymentState, paymentSuccess } = useStripeContext();
+  const [userGender, setUserGender] = useState<string | null>(null);
+  const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(false);
   
   const plans: PlanOption[] = [
     {
@@ -69,29 +75,39 @@ const PremiumUpgrade: React.FC = () => {
     // コンポーネントマウント時に決済状態をリセット
     resetPaymentState();
     
-    // ユーザーがすでにプレミアム会員かチェック
-    const checkPremiumStatus = async () => {
+    // ユーザー情報を取得（性別と電話番号認証状態を含む）
+    const fetchUserProfile = async () => {
       if (!user) return;
       
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('is_premium, premium_expiry')
+          .select('is_premium, premium_expiry, gender, is_phone_verified')
           .eq('id', user.id)
           .single();
         
         if (error) throw error;
         
-        if (data && data.is_premium && new Date(data.premium_expiry) > new Date()) {
+        if (data) {
+          setUserGender(data.gender);
+          setIsPhoneVerified(data.is_phone_verified || false);
+          
           // すでにプレミアム会員の場合はダッシュボードへリダイレクト
-          navigate('/premium/dashboard');
+          if (data.is_premium && new Date(data.premium_expiry) > new Date()) {
+            navigate('/premium/dashboard');
+          }
+          
+          // 女性ユーザーで電話番号認証済みの場合は自動的にプレミアム付与
+          if (data.gender === 'female' && data.is_phone_verified && !data.is_premium) {
+            await activateFemaleUserPremium();
+          }
         }
       } catch (err) {
-        console.error('プレミアムステータスの確認中にエラーが発生しました:', err);
+        console.error('ユーザープロフィール取得中にエラーが発生しました:', err);
       }
     };
     
-    checkPremiumStatus();
+    fetchUserProfile();
     
     // クリーンアップ関数
     return () => {
@@ -112,6 +128,73 @@ const PremiumUpgrade: React.FC = () => {
     }
   }, [paymentSuccess, navigate]);
 
+  // 女性ユーザー向けのプレミアム自動付与処理
+  const activateFemaleUserPremium = async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      
+      // 1年間の有効期限を設定
+      const expiry = new Date();
+      expiry.setFullYear(expiry.getFullYear() + 1);
+      
+      // プロフィールテーブルのプレミアムステータスを更新
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          is_premium: true,
+          premium_plan: 'female_free',
+          premium_expiry: expiry.toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+      
+      if (updateError) throw updateError;
+      
+      // 支払い履歴テーブルに記録を追加（金額0円の特別プラン）
+      const { error: insertError } = await supabase
+        .from('premium_payments')
+        .insert({
+          user_id: user.id,
+          plan: 'female_free',
+          amount: 0,
+          payment_method: 'gender_policy',
+          status: 'completed',
+          expires_at: expiry.toISOString()
+        });
+      
+      if (insertError) throw insertError;
+      
+      // プロフィール更新履歴に記録
+      const { error: profileUpdateError } = await supabase
+        .from('profile_updates')
+        .insert({
+          profile_id: user.id,
+          updated_by: user.id,
+          update_type: 'premium_status',
+          old_value: JSON.stringify({ is_premium: false }),
+          new_value: JSON.stringify({ is_premium: true, plan: 'female_free' }),
+          note: '女性ユーザー向け無料プレミアム特典が適用されました'
+        });
+      
+      if (profileUpdateError) throw profileUpdateError;
+      
+      // 成功したらプレミアムダッシュボードへリダイレクト
+      navigate('/premium/dashboard', {
+        state: {
+          success: true,
+          message: '電話番号認証が完了しました。女性ユーザー向け特典として、プレミアム機能が無料で有効化されました！'
+        }
+      });
+    } catch (err: any) {
+      console.error('女性ユーザーのプレミアム特典付与中にエラーが発生しました:', err);
+      setError('プレミアム特典の有効化に失敗しました。もう一度お試しいただくか、サポートにお問い合わせください。');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePlanSelect = (planId: string) => {
     setSelectedPlan(planId);
   };
@@ -122,8 +205,20 @@ const PremiumUpgrade: React.FC = () => {
       return;
     }
 
-    // Stripe決済画面を表示
-    setShowPaymentForm(true);
+    // 女性ユーザーで電話番号認証がまだの場合は認証画面へ
+    if (userGender === 'female' && !isPhoneVerified) {
+      navigate('/profile/verification', { 
+        state: { 
+          message: '電話番号認証を完了すると、プレミアム機能が無料で利用できます。' 
+        } 
+      });
+      return;
+    }
+
+    // 男性ユーザーの場合はStripe決済画面を表示
+    if (userGender === 'male' || userGender === null) {
+      setShowPaymentForm(true);
+    }
   };
 
   const handlePaymentSuccess = (subscriptionId: string) => {
@@ -188,6 +283,23 @@ const PremiumUpgrade: React.FC = () => {
 
       if (insertError) throw insertError;
 
+      // プロフィール更新履歴に記録
+      const { error: profileUpdateError } = await supabase
+        .from('profile_updates')
+        .insert({
+          profile_id: user.id,
+          updated_by: user.id,
+          update_type: 'premium_status',
+          old_value: JSON.stringify({ is_premium: false }),
+          new_value: JSON.stringify({ is_premium: true, plan: selectedPlan }),
+          note: 'テスト決済によるプレミアム会員登録'
+        });
+
+      if (profileUpdateError) {
+        console.error('プロフィール更新履歴の記録中にエラーが発生しました:', profileUpdateError);
+        // ここではエラーをスローせず、プロフィール更新の失敗はログのみにする
+      }
+
       // 成功したらプレミアムダッシュボードへリダイレクト
       navigate('/premium/dashboard', { 
         state: { 
@@ -248,6 +360,45 @@ const PremiumUpgrade: React.FC = () => {
     );
   };
 
+  // 女性ユーザー向けの特別メッセージ表示
+  const renderFemaleUserMessage = () => {
+    if (userGender !== 'female') return null;
+    
+    return (
+      <div className="bg-green-50 border-l-4 border-green-500 p-6 rounded-lg mb-8">
+        <h2 className="text-xl font-bold text-green-800 mb-2">
+          <FontAwesomeIcon icon={faInfoCircle} className="mr-2" />
+          女性ユーザー向け特別特典
+        </h2>
+        {isPhoneVerified ? (
+          <div>
+            <p className="text-green-700 mb-2">
+              電話番号認証が完了しています。プレミアム機能をすべて無料でご利用いただけます！
+            </p>
+            <button
+              className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow transition-all text-sm"
+              onClick={() => navigate('/premium/dashboard')}
+            >
+              プレミアムダッシュボードへ
+            </button>
+          </div>
+        ) : (
+          <div>
+            <p className="text-green-700 mb-2">
+              女性ユーザーは電話番号認証を完了するだけで、すべてのプレミアム機能を無料でご利用いただけます。
+            </p>
+            <button
+              className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow transition-all text-sm"
+              onClick={() => navigate('/profile/verification')}
+            >
+              電話番号認証へ進む
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // 決済フォーム表示モードの場合
   if (showPaymentForm) {
     return (
@@ -290,84 +441,92 @@ const PremiumUpgrade: React.FC = () => {
           {error}
         </div>
       )}
+      
+      {/* 女性ユーザー向け特別メッセージ */}
+      {renderFemaleUserMessage()}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        {plans.map(renderPlanCard)}
-      </div>
+      {/* 男性ユーザーまたは性別未設定の場合のみプラン表示 */}
+      {(userGender === 'male' || userGender === null) && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            {plans.map(renderPlanCard)}
+          </div>
 
-      <div className="bg-gray-50 rounded-lg p-8 mb-12">
-        <h2 className="text-2xl font-bold mb-6">プレミアム会員の特典</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="flex">
-            <div className="flex-shrink-0 mr-4">
-              <span className="text-2xl text-blue-600">👥</span>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-2">マッチング機能フル利用</h3>
-              <p className="text-gray-600">趣味や興味が合うユーザーとつながり、YouTube体験を共有できます。</p>
+          <div className="bg-gray-50 rounded-lg p-8 mb-12">
+            <h2 className="text-2xl font-bold mb-6">プレミアム会員の特典</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="flex">
+                <div className="flex-shrink-0 mr-4">
+                  <span className="text-2xl text-blue-600">👥</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">マッチング機能フル利用</h3>
+                  <p className="text-gray-600">趣味や興味が合うユーザーとつながり、YouTube体験を共有できます。</p>
+                </div>
+              </div>
+              <div className="flex">
+                <div className="flex-shrink-0 mr-4">
+                  <span className="text-2xl text-blue-600">🔔</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">すべての通知</h3>
+                  <p className="text-gray-600">重要な更新やお気に入りチャンネルの新着動画をリアルタイムで受け取れます。</p>
+                </div>
+              </div>
+              <div className="flex">
+                <div className="flex-shrink-0 mr-4">
+                  <span className="text-2xl text-blue-600">🔍</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">高度な検索機能</h3>
+                  <p className="text-gray-600">詳細な条件で動画を検索し、あなたが求めるコンテンツを素早く見つけられます。</p>
+                </div>
+              </div>
+              <div className="flex">
+                <div className="flex-shrink-0 mr-4">
+                  <span className="text-2xl text-blue-600">⭐</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">広告表示の削減</h3>
+                  <p className="text-gray-600">サイト内の広告が減少し、よりクリーンな体験を楽しめます。</p>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="flex">
-            <div className="flex-shrink-0 mr-4">
-              <span className="text-2xl text-blue-600">🔔</span>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-2">すべての通知</h3>
-              <p className="text-gray-600">重要な更新やお気に入りチャンネルの新着動画をリアルタイムで受け取れます。</p>
-            </div>
-          </div>
-          <div className="flex">
-            <div className="flex-shrink-0 mr-4">
-              <span className="text-2xl text-blue-600">🔍</span>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-2">高度な検索機能</h3>
-              <p className="text-gray-600">詳細な条件で動画を検索し、あなたが求めるコンテンツを素早く見つけられます。</p>
-            </div>
-          </div>
-          <div className="flex">
-            <div className="flex-shrink-0 mr-4">
-              <span className="text-2xl text-blue-600">⭐</span>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-2">広告表示の削減</h3>
-              <p className="text-gray-600">サイト内の広告が減少し、よりクリーンな体験を楽しめます。</p>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <div className="text-center">
-        <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-          <button
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={handleUpgrade}
-            disabled={loading}
-          >
-            {loading ? '処理中...' : `Stripeで支払う (¥${plans.find(p => p.id === selectedPlan)?.price.toLocaleString()})`}
-          </button>
-          
-          <button
-            className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-8 rounded-lg shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={handleTempUpgrade}
-            disabled={loading}
-          >
-            {loading ? '処理中...' : `テスト登録 (実際の決済なし)`}
-          </button>
-        </div>
-        
-        <div className="mt-4 bg-yellow-50 border-l-4 border-yellow-500 p-4 text-yellow-800 rounded-r text-left">
-          <p>
-            <strong>開発中の機能：</strong> Stripe決済システムはテスト段階です。実際の決済を行う前に、テスト登録ボタンでプレミアム機能をお試しいただけます。
-          </p>
-        </div>
-        
-        <p className="mt-4 text-gray-600 text-sm">
-          登録することで、<a href="/terms-of-service" className="text-blue-600 hover:underline">利用規約</a>と
-          <a href="/privacy-policy" className="text-blue-600 hover:underline">プライバシーポリシー</a>に同意したものとみなされます。
-          いつでもキャンセル可能です。
-        </p>
-      </div>
+          <div className="text-center">
+            <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+              <button
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleUpgrade}
+                disabled={loading}
+              >
+                {loading ? '処理中...' : `Stripeで支払う (¥${plans.find(p => p.id === selectedPlan)?.price.toLocaleString()})`}
+              </button>
+              
+              <button
+                className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-8 rounded-lg shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleTempUpgrade}
+                disabled={loading}
+              >
+                {loading ? '処理中...' : `テスト登録 (実際の決済なし)`}
+              </button>
+            </div>
+            
+            <div className="mt-4 bg-yellow-50 border-l-4 border-yellow-500 p-4 text-yellow-800 rounded-r text-left">
+              <p>
+                <strong>開発中の機能：</strong> Stripe決済システムはテスト段階です。実際の決済を行う前に、テスト登録ボタンでプレミアム機能をお試しいただけます。
+              </p>
+            </div>
+            
+            <p className="mt-4 text-gray-600 text-sm">
+              登録することで、<a href="/terms-of-service" className="text-blue-600 hover:underline">利用規約</a>と
+              <a href="/privacy-policy" className="text-blue-600 hover:underline">プライバシーポリシー</a>に同意したものとみなされます。
+              いつでもキャンセル可能です。
+            </p>
+          </div>
+        </>
+      )}
     </div>
   );
 };
