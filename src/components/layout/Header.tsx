@@ -79,6 +79,9 @@ export default function Header() {
    setIsSearchOpen(!isSearchOpen);
  };
 
+ // マッチングリンク先の決定 - プレミアムユーザーは /premium/matching へ
+ const matchingPath = isPremium ? "/premium/matching" : "/matching";
+
  return (
    <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-50">
      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -93,7 +96,7 @@ export default function Header() {
              <Link to="/genres" className="text-gray-600 hover:text-indigo-600">
                ジャンル
              </Link>
-             <Link to="/matching" className="flex items-center text-gray-600 hover:text-indigo-600">
+             <Link to={matchingPath} className="flex items-center text-gray-600 hover:text-indigo-600">
                <Users className="h-4 w-4 mr-1" />
                マッチング
              </Link>
@@ -180,7 +183,7 @@ export default function Header() {
                        )}
                      </Link>
                      <Link
-                       to="/matching"
+                       to={matchingPath}
                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                        onClick={() => setIsUserMenuOpen(false)}
                      >

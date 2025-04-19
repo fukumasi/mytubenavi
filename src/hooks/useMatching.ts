@@ -32,7 +32,7 @@ import {
   createTableIfNotExists,
 } from '../services/matchingService';
 import { notificationService } from '../services/notificationService';
-import { usePoints } from '../hooks/usePoints';
+import { usePoints } from './usePoints';
 import { consumePoints, addPoints } from '../utils/pointsUtils';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
@@ -124,7 +124,10 @@ interface UseMatchingReturn {
   error: string | null;
   isRelaxedMode: boolean;
   debugInfo: DebugInfo | null;
-  fetchMatchedUsers: () => Promise<void>;
+  isMatchedMode: boolean; // 追加: マッチング済みモードフラグ
+  fetchMatchedUsers: (isMatched?: boolean) => Promise<void>; // 修正: isMatchedパラメータを追加
+  fetchMatchedOnlyUsers: () => Promise<void>; // 追加: マッチング済みユーザーのみ取得関数
+  setIsMatchedMode: (mode: boolean) => void; // 追加: モード切替関数
   fetchPreferences: () => Promise<MatchingPreferences | null>;
   fetchDetailedProfile: (userId: string) => Promise<MatchingProfileDetails | null>;
   getCommonVideos: (targetUserId: string) => Promise<VideoDetails[]>;
@@ -203,6 +206,9 @@ export const useMatching = (): UseMatchingReturn => {
   const [isRelaxedMode, setIsRelaxedMode] = useState<boolean>(false);
   const [originalPreferences, setOriginalPreferences] = useState<MatchingPreferences | null>(null);
   
+  // マッチング済みモードフラグを追加
+  const [isMatchedMode, setIsMatchedMode] = useState<boolean>(false);
+  
   // connectionSubscription を useRef に変更
   const connectionSubscriptionRef = useRef<RealtimeChannel | null>(null);
   
@@ -220,9 +226,6 @@ export const useMatching = (): UseMatchingReturn => {
   
   // フェッチング状態を追跡するref
   const isFetchingRef = useRef<boolean>(false);
-  
-  // 現在の操作を追跡するref (削除)
-  //const currentOperationRef = useRef<string | null>(null);
   
   // startFetching と endFetching の実装
   const startFetching = useCallback((operation: string): boolean => {
@@ -649,16 +652,17 @@ const fetchUserProfile = useCallback(async () => {
 
   /**
    * マッチングユーザーを取得します
+   * @param isMatched マッチング済みユーザーのみを取得するかどうか
    */
-  const fetchMatchedUsers = useCallback(async () => {
+  const fetchMatchedUsers = useCallback(async (isMatched: boolean = false) => {
     if (!user?.id) return;
-    if (!startFetching('fetchMatchedUsers')) return;
+    if (!startFetching(`fetchMatchedUsers-${isMatched ? 'matched' : 'candidates'}`)) return;
 
     setLoading(true);
     setError(null);
     try {
       if (process.env.NODE_ENV === 'development') {
-        console.log('マッチング設定:', preferences);
+        console.log(`マッチング${isMatched ? '済み' : '候補'}ユーザー取得開始:`, preferences);
         setDebugInfo(prev => ({
           ...prev,
           matchingPreferences: preferences
@@ -673,70 +677,84 @@ const fetchUserProfile = useCallback(async () => {
         ensureTableExists('user_likes')
       ]);
 
-      // 修正後:
-const prefsToUse = preferences || {
-  gender_preference: GenderPreference.ANY,
-  age_range_min: 18,
-  age_range_max: 99,
-  location_preference: { prefecture: undefined, region: undefined },
-  interest_tags: [],
-  genre_preference: [],
-  activity_level: ActivityLevel.MODERATE,
-  online_only: false,
-  premium_only: false,
-  has_video_history: false,
-  recent_activity: false,
-  filter_skipped: false, // デフォルトでfalseに変更
-  min_common_interests: 0,
-  max_distance: 0,
-  exclude_liked_users: true // 初期状態ではいいね済みユーザーを除外
-};
+      // マッチングモードを設定
+      setIsMatchedMode(isMatched);
 
-      // 修正後:
-let candidates;
-try {
-  // まず通常通りいいね済みユーザーを除外して検索
-  const searchPrefs = { ...prefsToUse };
-  candidates = await fetchMatchCandidates(user.id, searchPrefs);
-  
-  // 候補が見つからず、いいね済みユーザーが除外されている場合は
-  // いいね済みユーザーも含めて再検索
-  if ((!candidates || candidates.length === 0) && searchPrefs.exclude_liked_users) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('通常の検索で候補なし - いいね済みユーザーも含めて再検索します');
-    }
-    
-    const includeLikedPrefs = { 
-      ...searchPrefs, 
-      exclude_liked_users: false 
-    };
-    
-    candidates = await fetchMatchCandidates(user.id, includeLikedPrefs);
-  }
-  
-  if (process.env.NODE_ENV === 'development') {
-    console.log('マッチング候補取得結果:', candidates?.length || 0, '件');
-    setDebugInfo(prev => ({
-      ...prev,
-      candidatesCount: candidates?.length || 0,
-      fetchTime: new Date().toISOString()
-    }));
-  }
-} catch (fetchError) {
-  console.error('マッチング候補取得エラー:', fetchError);
-  if (process.env.NODE_ENV === 'development') {
-    setDebugInfo(prev => ({
-      ...prev,
-      matchingError: fetchError
-    }));
-  }
-  throw fetchError;
-}
+      const prefsToUse = preferences || {
+        gender_preference: GenderPreference.ANY,
+        age_range_min: 18,
+        age_range_max: 99,
+        location_preference: { prefecture: undefined, region: undefined },
+        interest_tags: [],
+        genre_preference: [],
+        activity_level: ActivityLevel.MODERATE,
+        online_only: false,
+        premium_only: false,
+        has_video_history: false,
+        recent_activity: false,
+        filter_skipped: false, // デフォルトでfalseに変更
+        min_common_interests: 0,
+        max_distance: 0,
+        exclude_liked_users: true // 初期状態ではいいね済みユーザーを除外
+      };
+
+      let candidates;
+      try {
+        // isMatchedModeパラメータを明示的に渡す
+        const searchPrefs = { ...prefsToUse };
+        candidates = await fetchMatchCandidates(user.id, searchPrefs, isMatched);
+        
+        // 候補が見つからず、いいね済みユーザーが除外されている場合は
+        // いいね済みユーザーも含めて再検索（マッチング済みモードでない場合のみ）
+        if ((!candidates || candidates.length === 0) && searchPrefs.exclude_liked_users && !isMatched) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('通常の検索で候補なし - いいね済みユーザーも含めて再検索します');
+          }
+          
+          const includeLikedPrefs = { 
+            ...searchPrefs, 
+            exclude_liked_users: false 
+          };
+          
+          candidates = await fetchMatchCandidates(user.id, includeLikedPrefs, isMatched);
+        }
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`マッチング${isMatched ? '済み' : '候補'}ユーザー取得結果:`, candidates?.length || 0, '件');
+          setDebugInfo(prev => ({...prev,
+            candidatesCount: candidates?.length || 0,
+            fetchTime: new Date().toISOString()
+          }));
+        }
+      } catch (fetchError) {
+        console.error('マッチング候補取得エラー:', fetchError);
+        if (process.env.NODE_ENV === 'development') {
+          setDebugInfo(prev => ({
+            ...prev,
+            matchingError: fetchError
+          }));
+        }
+        throw fetchError;
+      }
 
       // 候補が見つからない場合のフォールバック処理
       if (!candidates || candidates.length === 0) {
-        // 緩和モードでなければ、緩和モードを提案するエラーを設定
-        if (!isRelaxedMode) {
+        // マッチング済みモードで候補がない場合は単にメッセージを表示
+        if (isMatched) {
+          setMatchedUsers([]);
+          setNoMoreUsers(true);
+          setLoading(false);
+          setError('マッチング済みのユーザーがいません。');
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log("マッチング済みユーザーが見つかりません");
+          }
+          
+          endFetching(`fetchMatchedUsers-${isMatched ? 'matched' : 'candidates'}`, true, { count: 0 });
+          return;
+        }
+        // 通常モードで緩和モードでなければ、緩和モードを提案するエラーを設定
+        else if (!isRelaxedMode) {
           setMatchedUsers([]);
           setNoMoreUsers(true);
           setLoading(false);
@@ -747,7 +765,7 @@ try {
             console.log("候補なし: 緩和モードを提案");
           }
           
-          endFetching('fetchMatchedUsers', true, { count: 0, suggestRelaxedMode: true });
+          endFetching(`fetchMatchedUsers-${isMatched ? 'matched' : 'candidates'}`, true, { count: 0, suggestRelaxedMode: true });
           return;
         } else {
           // すでに緩和モードでも候補がない場合は単純に空を返す
@@ -759,7 +777,7 @@ try {
             console.log("候補なし: 緩和モードでも候補なし");
           }
           
-          endFetching('fetchMatchedUsers', true, { count: 0, relaxedMode: true });
+          endFetching(`fetchMatchedUsers-${isMatched ? 'matched' : 'candidates'}`, true, { count: 0, relaxedMode: true });
           return;
         }
       }
@@ -849,10 +867,11 @@ try {
         } : null
       }));
     }
-    endFetching('fetchMatchedUsers', true, { 
+    endFetching(`fetchMatchedUsers-${isMatched ? 'matched' : 'candidates'}`, true, { 
       count: enhancedCandidates.length,
       updated: candidatesChanged,
-      relaxedMode: isRelaxedMode
+      relaxedMode: isRelaxedMode,
+      isMatchedMode: isMatched
     });
   } catch (error) {
     console.error('マッチングユーザーの取得に失敗しました:', error);
@@ -867,11 +886,19 @@ try {
       }));
     }
     
-    endFetching('fetchMatchedUsers', false, { error });
+    endFetching(`fetchMatchedUsers-${isMatched ? 'matched' : 'candidates'}`, false, { error });
   } finally {
     setLoading(false);
   }
 }, [user?.id, preferences, fetchYouTubeChannelInfo, startFetching, endFetching, isRelaxedMode, ensureTableExists]);
+
+/**
+ * マッチング済みユーザーのみを取得する関数
+ */
+const fetchMatchedOnlyUsers = useCallback(async () => {
+  // マッチング済みモードを指定して取得
+  return fetchMatchedUsers(true);
+}, [fetchMatchedUsers]);
 
 /**
  * 送信者の名前を取得します
@@ -1431,7 +1458,8 @@ const savePreferences = async (newPreferences: MatchingPreferences): Promise<boo
         console.log('新しい設定でマッチングユーザーを再取得します');
       }
       
-      await fetchMatchedUsers();
+      // 現在のマッチングモードを維持して再取得
+      await fetchMatchedUsers(isMatchedMode);
       
       endFetching('savePreferences', true, { 
         pointsUsed: (!isPremium && detailedFilterActive && !(filterAppliedDate && filterAppliedDate.startsWith(new Date().toISOString().split('T')[0]))) ? 3 : 0,
@@ -1447,7 +1475,6 @@ const savePreferences = async (newPreferences: MatchingPreferences): Promise<boo
     console.error('設定の保存に失敗しました:', error);
     toast.error('設定の保存に失敗しました');
     setError('設定の保存に失敗しました');
-
     if (process.env.NODE_ENV === 'development') {
       setDebugInfo(prev => ({
         ...prev,
@@ -1637,7 +1664,7 @@ const fetchDetailedProfile = async (userId: string): Promise<MatchingProfileDeta
  
     // マッチング候補を再取得
     if (noMoreUsers) {
-      await fetchMatchedUsers();
+      await fetchMatchedUsers(isMatchedMode);
     }
  
     toast.success('スキップを取り消しました');
@@ -2089,7 +2116,7 @@ const fetchDetailedProfile = async (userId: string): Promise<MatchingProfileDeta
       
       // マッチングユーザーを取得する処理を1回だけ実行
       const timer = setTimeout(() => {
-        fetchMatchedUsers().catch(error => {
+        fetchMatchedUsers(isMatchedMode).catch(error => {
           console.error("マッチングユーザー取得エラー:", error);
         });
       }, 0);
@@ -2097,7 +2124,7 @@ const fetchDetailedProfile = async (userId: string): Promise<MatchingProfileDeta
       return () => clearTimeout(timer);
     }
   }
- }, [user?.id, preferences, fetchMatchedUsers]);
+ }, [user?.id, preferences, fetchMatchedUsers, isMatchedMode]);
  
  // 接続状態変更の監視セットアップ
  useEffect(() => {
@@ -2193,8 +2220,11 @@ const fetchDetailedProfile = async (userId: string): Promise<MatchingProfileDeta
   commonFriends,
   error,
   isRelaxedMode,
+  isMatchedMode, // 追加：マッチング済みモード状態を返す
   debugInfo: process.env.NODE_ENV === 'development' ? debugInfo : null,
-  fetchMatchedUsers,
+  fetchMatchedUsers, // 修正：isMatchedパラメータを受け付けるように修正
+  fetchMatchedOnlyUsers, // 追加：マッチング済みユーザーのみ取得関数
+  setIsMatchedMode, // 追加：モード切替関数
   fetchPreferences,
   fetchDetailedProfile,
   getCommonVideos: getUserCommonVideos,
@@ -2231,4 +2261,3 @@ const fetchDetailedProfile = async (userId: string): Promise<MatchingProfileDeta
  };
  
  export default useMatching;
-        

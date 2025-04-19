@@ -264,7 +264,7 @@ const PremiumDashboard: React.FC = () => {
               <div className="text-3xl font-bold text-blue-600">{usageStats.matchesViewed}</div>
               <div className="text-gray-600">表示されたマッチング候補</div>
             </Link>
-            <Link to="/matching" className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all">
+            <Link to="/premium/matching" className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all">
               <div className="text-3xl mb-1">🤝</div>
               <div className="text-3xl font-bold text-blue-600">{usageStats.matchesConnected}</div>
               <div className="text-gray-600">成立したマッチング</div>
@@ -287,7 +287,7 @@ const PremiumDashboard: React.FC = () => {
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold">プレミアム会員特典</h2>
           <Link 
-            to="/matching" 
+            to="/premium/matching" 
             className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
           >
             マッチング機能を試す

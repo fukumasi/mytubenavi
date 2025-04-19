@@ -23,7 +23,8 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
     debugInfo,
     initializeDefaultPreferences,
     likeUser,
-    skipUser
+    skipUser,
+    pointBalance
   } = useMatching();
   
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +78,9 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
       // マッチング設定がない場合に初期化する
       await initializeDefaultPreferences();
       
-      await fetchMatchedUsers();
+      // マッチング済みユーザーのみを取得するよう変更
+      await fetchMatchedUsers(true); // true を渡してマッチング済みユーザーのみを取得
+      
       setError(null);
       console.log('マッチング取得完了');
     } catch (err) {
@@ -306,7 +309,7 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-gray-900">おすすめのユーザー</h2>
+        <h2 className="text-xl font-bold text-gray-900">マッチング済みユーザー</h2>
         <div className="flex space-x-2">
           {isPremium ? (
             <span className="flex items-center bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm">
@@ -340,7 +343,7 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
           ) : (
             <>
               <RefreshCw className="w-4 h-4 mr-1.5" />
-              マッチング候補を更新
+              マッチング済みユーザーを更新
             </>
           )}
         </button>
@@ -349,9 +352,9 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
       {/* デバッグ情報表示エリア（開発環境のみ） */}
       {process.env.NODE_ENV === 'development' && debugInfo && (
         <div className="mt-2 mb-4 text-xs font-mono p-2 bg-gray-800 text-white rounded-md overflow-auto max-h-40">
-          <div>候補件数: {debugInfo.enhancedCandidatesCount || debugInfo.candidatesCount || 0}件</div>
+          <div>マッチング済み件数: {debugInfo.enhancedCandidatesCount || debugInfo.candidatesCount || 0}件</div>
           <div>取得時間: {debugInfo.fetchTime || '-'}</div>
-          <div>ポイント残高: {debugInfo.remainingPoints || 0}</div>
+          <div>ポイント残高: {pointBalance || 0}</div>
           <div>プレミアム: {debugInfo.isPremium ? 'あり' : 'なし'}</div>
           <div>視聴履歴: {debugInfo.userHistoryCount || 0}件</div>
           <div>スキップユーザー: {debugInfo.skippedUsersCount || 0}件</div>
@@ -386,14 +389,14 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
         </div>
       ) : displayedMatches.length === 0 ? (
         <div className="text-center py-8 text-gray-600">
-          マッチするユーザーが見つかりませんでした
+          マッチング済みユーザーが見つかりませんでした
           <div className="mt-4">
             <button
               onClick={loadMatches}
               disabled={isLoading}
               className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50"
             >
-              {isLoading ? 'ロード中...' : 'マッチング候補を再取得'}
+              {isLoading ? 'ロード中...' : 'マッチング済みユーザーを再取得'}
             </button>
           </div>
         </div>

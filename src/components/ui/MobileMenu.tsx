@@ -14,6 +14,9 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, isPremium = fa
  const { user, signOut } = useAuth();
  const [menuClasses, setMenuClasses] = useState('translate-x-full');
 
+ // マッチングリンク先の決定 - プレミアムユーザーは /premium/matching へ
+ const matchingPath = isPremium ? "/premium/matching" : "/matching";
+
  // メニューの開閉状態が変わったときにアニメーションクラスを更新
  useEffect(() => {
    if (isOpen) {
@@ -93,7 +96,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, isPremium = fa
              {/* マッチング機能へのリンク */}
              <li>
                <Link 
-                 to="/matching"
+                 to={matchingPath}
                  className="flex items-center px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"
                  onClick={handleMenuItemClick}
                >

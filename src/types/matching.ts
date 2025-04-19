@@ -66,6 +66,7 @@ export interface MatchingUser {
   connection_status?: ConnectionStatus;  // 接続状態
   is_liked?: boolean;  // いいね済みかどうか
   is_matched?: boolean;
+  conversation_id?: string; // 追加: マッチング済みユーザーとのメッセージ会話ID
   // YouTubeクリエイターの場合
   channel_url?: string;  // YouTubeチャンネルURL
   // 視聴傾向（ジャンルごとの視聴割合）
