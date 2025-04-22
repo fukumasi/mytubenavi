@@ -57,14 +57,14 @@ const VerificationPage: React.FC = () => {
     
     if (currentLevel >= level) {
       return (
-        <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
+        <span className="ml-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs font-semibold rounded-full">
           認証済み
         </span>
       );
     }
     
     return (
-      <span className="ml-2 px-2 py-1 bg-gray-100 text-gray-500 text-xs font-semibold rounded-full">
+      <span className="ml-2 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs font-semibold rounded-full">
         未認証
       </span>
     );
@@ -78,38 +78,38 @@ const VerificationPage: React.FC = () => {
     <div className="max-w-xl mx-auto p-6">
       <Toaster position="top-right" />
       
-      <h1 className="text-2xl font-bold mb-6">アカウント認証</h1>
+      <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-dark-text-primary">アカウント認証</h1>
       
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">認証レベル</h2>
+      <div className="bg-white dark:bg-dark-surface rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-dark-text-primary">認証レベル</h2>
         
         <div className="space-y-4">
-          <div className="flex items-center justify-between p-3 border rounded-lg">
+          <div className="flex items-center justify-between p-3 border dark:border-dark-border rounded-lg">
             <div>
-              <span className="font-medium">メール認証</span>
+              <span className="font-medium text-gray-900 dark:text-dark-text-primary">メール認証</span>
               {renderVerificationBadge(VerificationLevel.EMAIL_ONLY)}
             </div>
-            <span className="text-green-600">完了</span>
+            <span className="text-green-600 dark:text-green-400">完了</span>
           </div>
           
-          <div className="flex items-center justify-between p-3 border rounded-lg">
+          <div className="flex items-center justify-between p-3 border dark:border-dark-border rounded-lg">
             <div>
-              <span className="font-medium">電話番号認証</span>
+              <span className="font-medium text-gray-900 dark:text-dark-text-primary">電話番号認証</span>
               {renderVerificationBadge(VerificationLevel.PHONE_VERIFIED)}
             </div>
             {verificationState?.phoneVerified ? (
-              <span className="text-green-600">完了</span>
+              <span className="text-green-600 dark:text-green-400">完了</span>
             ) : (
-              <span className="text-blue-600">認証が必要です</span>
+              <span className="text-blue-600 dark:text-blue-400">認証が必要です</span>
             )}
           </div>
           
-          <div className="flex items-center justify-between p-3 border rounded-lg opacity-70">
+          <div className="flex items-center justify-between p-3 border dark:border-dark-border rounded-lg opacity-70">
             <div>
-              <span className="font-medium">身分証明書認証</span>
+              <span className="font-medium text-gray-900 dark:text-dark-text-primary">身分証明書認証</span>
               {renderVerificationBadge(VerificationLevel.ID_VERIFIED)}
             </div>
-            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+            <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-xs rounded-full">
               準備中
             </span>
           </div>
@@ -117,26 +117,26 @@ const VerificationPage: React.FC = () => {
       </div>
       
       {!verificationState?.phoneVerified ? (
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white dark:bg-dark-surface rounded-lg shadow-md p-6">
           <PhoneVerification onVerificationComplete={handleVerificationComplete} />
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold mb-4">電話番号認証済み</h2>
+        <div className="bg-white dark:bg-dark-surface rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-dark-text-primary">電話番号認証済み</h2>
           
           <div className="mb-4">
-            <p className="text-gray-600 mb-2">
+            <p className="text-gray-600 dark:text-dark-text-secondary mb-2">
               あなたの電話番号（{verificationState.phoneNumber}）は認証済みです。
               マッチング機能やメッセージ機能が利用可能です。
             </p>
           </div>
           
-          <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 rounded-lg">
             <div className="flex items-center">
-              <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <svg className="w-5 h-5 text-green-500 dark:text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
-              <span className="font-medium text-green-600">認証ボーナス：20ポイント獲得済み</span>
+              <span className="font-medium text-green-600 dark:text-green-400">認証ボーナス：20ポイント獲得済み</span>
             </div>
           </div>
         </div>
@@ -144,7 +144,7 @@ const VerificationPage: React.FC = () => {
       
       <div className="mt-6 text-center">
         <button
-          className="text-blue-500 hover:text-blue-700"
+          className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           onClick={() => navigate('/profile')}
         >
           プロフィールに戻る

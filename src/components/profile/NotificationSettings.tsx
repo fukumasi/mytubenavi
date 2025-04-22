@@ -253,28 +253,28 @@ export default function NotificationSettings() {
         <div
           key={setting.id}
           className={`
-            flex items-center justify-between p-4 bg-white rounded-lg shadow-sm 
+            flex items-center justify-between p-4 bg-white dark:bg-dark-surface rounded-lg shadow-sm 
             hover:shadow-md transition-shadow duration-200
             ${setting.premiumOnly && !isPremium ? 'opacity-50' : ''}
           `}
         >
           <div className="flex items-center space-x-4">
-            <div className="text-gray-500">
+            <div className="text-gray-500 dark:text-dark-text-secondary">
               {setting.icon}
             </div>
             <div>
               <div className="flex items-center">
-                <h3 className="text-sm font-medium text-gray-900">
+                <h3 className="text-sm font-medium text-gray-900 dark:text-dark-text-primary">
                   {setting.title}
                 </h3>
                 {setting.premiumOnly && (
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
                     <Crown className="h-3 w-3 mr-1" />
                     プレミアム
                   </span>
                 )}
               </div>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 dark:text-dark-text-secondary">
                 {setting.description}
               </p>
             </div>
@@ -289,8 +289,9 @@ export default function NotificationSettings() {
               disabled={saving || (setting.premiumOnly && !isPremium)}
             />
             <div className={`
-              w-11 h-6 bg-gray-200
-              peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300
+              w-11 h-6 bg-gray-200 dark:bg-gray-700
+              peer-focus:outline-none peer-focus:ring-4 
+              peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800
               rounded-full peer
               peer-checked:after:translate-x-full
               peer-checked:after:border-white
@@ -299,13 +300,13 @@ export default function NotificationSettings() {
               after:top-[2px]
               after:left-[2px]
               after:bg-white
-              after:border-gray-300
+              after:border-gray-300 dark:after:border-gray-600
               after:border
               after:rounded-full
               after:h-5
               after:w-5
               after:transition-all
-              ${setting.enabled ? 'bg-blue-600' : 'bg-gray-200'}
+              ${setting.enabled ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}
               ${saving || (setting.premiumOnly && !isPremium) ? 'opacity-50 cursor-not-allowed' : ''}
             `}></div>
           </label>
@@ -327,33 +328,33 @@ export default function NotificationSettings() {
     <ProfileLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-gray-900">通知設定</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-dark-text-primary">通知設定</h2>
           {saving && (
-            <p className="text-sm text-gray-600">保存中...</p>
+            <p className="text-sm text-gray-600 dark:text-dark-text-secondary">保存中...</p>
           )}
           {error && (
-            <div className="flex items-center text-sm text-red-600">
+            <div className="flex items-center text-sm text-red-600 dark:text-red-400">
               <AlertCircle className="h-4 w-4 mr-1" />
               {error}
             </div>
           )}
           {successMessage && (
-            <p className="text-sm text-green-600">{successMessage}</p>
+            <p className="text-sm text-green-600 dark:text-green-400">{successMessage}</p>
           )}
         </div>
 
         {!isPremium && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 rounded-lg p-4 mb-6">
             <div className="flex items-start">
-              <Crown className="h-5 w-5 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" />
+              <Crown className="h-5 w-5 text-yellow-500 dark:text-yellow-400 mt-0.5 mr-2 flex-shrink-0" />
               <div>
-                <p className="text-sm font-medium text-yellow-700">プレミアム会員限定の通知設定があります</p>
-                <p className="text-sm text-yellow-600 mt-1">
+                <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300">プレミアム会員限定の通知設定があります</p>
+                <p className="text-sm text-yellow-600 dark:text-yellow-400/80 mt-1">
                   プレミアム会員になると、優先通知やリアルタイム通知など、より高度な通知設定が利用できます。
                 </p>
                 <a 
                   href="/premium" 
-                  className="mt-2 inline-flex items-center text-sm font-medium text-yellow-600 hover:text-yellow-800"
+                  className="mt-2 inline-flex items-center text-sm font-medium text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300"
                 >
                   プレミアム会員について詳しく見る
                   <span className="ml-1">→</span>
@@ -365,21 +366,21 @@ export default function NotificationSettings() {
 
         <div className="space-y-6">
           <section>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">一般通知</h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-dark-text-primary mb-4">一般通知</h3>
             <div className="space-y-4">
               {renderSettingsByCategory('general')}
             </div>
           </section>
 
           <section>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">メール通知</h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-dark-text-primary mb-4">メール通知</h3>
             <div className="space-y-4">
               {renderSettingsByCategory('email')}
             </div>
           </section>
 
           <section>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">プッシュ通知</h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-dark-text-primary mb-4">プッシュ通知</h3>
             <div className="space-y-4">
               {renderSettingsByCategory('push')}
             </div>

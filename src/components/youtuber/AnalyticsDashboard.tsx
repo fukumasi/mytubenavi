@@ -152,16 +152,16 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
   
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-lg p-4">
         <div className="flex items-center">
           <div className="flex-shrink-0">
-            <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="h-5 w-5 text-red-400 dark:text-red-500" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
             </svg>
           </div>
           <div className="ml-3">
-            <h3 className="text-sm font-medium text-red-800">エラーが発生しました</h3>
-            <div className="mt-2 text-sm text-red-700">
+            <h3 className="text-sm font-medium text-red-800 dark:text-red-300">エラーが発生しました</h3>
+            <div className="mt-2 text-sm text-red-700 dark:text-red-400">
               <p>{error}</p>
             </div>
           </div>
@@ -176,8 +176,8 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">YouTuberパフォーマンス分析</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-dark-text-primary">YouTuberパフォーマンス分析</h2>
+          <p className="text-muted-foreground dark:text-dark-text-secondary">
             掲載効果や視聴者増加の詳細分析
           </p>
         </div>
@@ -188,8 +188,8 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
               onClick={() => setTimeRange(range)}
               className={`px-3 py-2 text-sm font-medium rounded-md transition-colors
                 ${timeRange === range
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
+                  ? 'bg-indigo-600 text-white dark:bg-indigo-700'
+                  : 'text-gray-700 hover:bg-gray-100 dark:text-dark-text-primary dark:hover:bg-gray-800'
                 }`}
             >
               {timeRangeLabels[range]}
@@ -200,107 +200,107 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
       
       {/* サマリーカード */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="dark:bg-dark-surface dark:border-dark-border">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">総掲載費用</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium dark:text-dark-text-primary">総掲載費用</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground dark:text-dark-text-secondary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">¥{roi.totalSpent.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl font-bold dark:text-dark-text-primary">¥{roi.totalSpent.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground dark:text-dark-text-secondary">
               選択期間内の総予算
             </p>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="dark:bg-dark-surface dark:border-dark-border">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">チャンネル登録者増加</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium dark:text-dark-text-primary">チャンネル登録者増加</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground dark:text-dark-text-secondary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold flex items-center">
+            <div className="text-2xl font-bold flex items-center dark:text-dark-text-primary">
               {channelData.length > 0 && !isUnrealisticData() ? (
                 <>
                   {channelData[channelData.length-1].subscribers - channelData[0].subscribers}
                   <span className="ml-2 text-xs font-normal flex items-center">
                     {metrics.subscriberGrowth > 0 ? (
                       <>
-                        <ArrowUpIcon className="h-3 w-3 text-green-500 mr-1" />
-                        <span className="text-green-500">{metrics.subscriberGrowth.toFixed(1)}%</span>
+                        <ArrowUpIcon className="h-3 w-3 text-green-500 dark:text-green-400 mr-1" />
+                        <span className="text-green-500 dark:text-green-400">{metrics.subscriberGrowth.toFixed(1)}%</span>
                       </>
                     ) : metrics.subscriberGrowth < 0 ? (
                       <>
-                        <ArrowDownIcon className="h-3 w-3 text-red-500 mr-1" />
-                        <span className="text-red-500">{Math.abs(metrics.subscriberGrowth).toFixed(1)}%</span>
+                        <ArrowDownIcon className="h-3 w-3 text-red-500 dark:text-red-400 mr-1" />
+                        <span className="text-red-500 dark:text-red-400">{Math.abs(metrics.subscriberGrowth).toFixed(1)}%</span>
                       </>
                     ) : (
-                      <span className="text-gray-500">0%</span>
+                      <span className="text-gray-500 dark:text-gray-400">0%</span>
                     )}
                   </span>
                 </>
               ) : (
-                <>0<span className="ml-2 text-xs font-normal text-gray-500">0%</span></>
+                <>0<span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">0%</span></>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground dark:text-dark-text-secondary">
               {timeRangeLabels[timeRange]}の新規登録者数
             </p>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="dark:bg-dark-surface dark:border-dark-border">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">視聴回数増加</CardTitle>
-            <Eye className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium dark:text-dark-text-primary">視聴回数増加</CardTitle>
+            <Eye className="h-4 w-4 text-muted-foreground dark:text-dark-text-secondary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold flex items-center">
+            <div className="text-2xl font-bold flex items-center dark:text-dark-text-primary">
               {channelData.length > 0 && !isUnrealisticData() ? (
                 <>
                   {(channelData[channelData.length-1].views - channelData[0].views).toLocaleString()}
                   <span className="ml-2 text-xs font-normal flex items-center">
                     {metrics.viewGrowth > 0 ? (
                       <>
-                        <ArrowUpIcon className="h-3 w-3 text-green-500 mr-1" />
-                        <span className="text-green-500">{metrics.viewGrowth.toFixed(1)}%</span>
+                        <ArrowUpIcon className="h-3 w-3 text-green-500 dark:text-green-400 mr-1" />
+                        <span className="text-green-500 dark:text-green-400">{metrics.viewGrowth.toFixed(1)}%</span>
                       </>
                     ) : metrics.viewGrowth < 0 ? (
                       <>
-                        <ArrowDownIcon className="h-3 w-3 text-red-500 mr-1" />
-                        <span className="text-red-500">{Math.abs(metrics.viewGrowth).toFixed(1)}%</span>
+                        <ArrowDownIcon className="h-3 w-3 text-red-500 dark:text-red-400 mr-1" />
+                        <span className="text-red-500 dark:text-red-400">{Math.abs(metrics.viewGrowth).toFixed(1)}%</span>
                       </>
                     ) : (
-                      <span className="text-gray-500">0%</span>
+                      <span className="text-gray-500 dark:text-gray-400">0%</span>
                     )}
                   </span>
                 </>
               ) : (
-                <>0<span className="ml-2 text-xs font-normal text-gray-500">0%</span></>
+                <>0<span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">0%</span></>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground dark:text-dark-text-secondary">
               {timeRangeLabels[timeRange]}の総視聴回数増加
             </p>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="dark:bg-dark-surface dark:border-dark-border">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">投資対効果(ROI)</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium dark:text-dark-text-primary">投資対効果(ROI)</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground dark:text-dark-text-secondary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold dark:text-dark-text-primary">
               {roi.roi > 0 ? (
-                <span className="text-green-600">+{roi.roi.toFixed(1)}%</span>
+                <span className="text-green-600 dark:text-green-400">+{roi.roi.toFixed(1)}%</span>
               ) : roi.roi < 0 ? (
-                <span className="text-red-600">{roi.roi.toFixed(1)}%</span>
+                <span className="text-red-600 dark:text-red-400">{roi.roi.toFixed(1)}%</span>
               ) : (
-                <span className="text-gray-600">0.0%</span>
+                <span className="text-gray-600 dark:text-gray-400">0.0%</span>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground dark:text-dark-text-secondary">
               推定YouTube収益ベース
             </p>
           </CardContent>
@@ -313,12 +313,12 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
         onValueChange={handleTabChange} 
         className="w-full"
       >
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="video">動画パフォーマンス</TabsTrigger>
-          <TabsTrigger value="channel">チャンネル成長</TabsTrigger>
-          <TabsTrigger value="genre">ジャンル別</TabsTrigger>
-          <TabsTrigger value="effect">掲載効果分析</TabsTrigger>
-          <TabsTrigger value="roi">投資対効果</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-5 dark:bg-dark-surface">
+          <TabsTrigger className="dark:data-[state=active]:bg-indigo-900/30 dark:data-[state=active]:text-indigo-300 dark:hover:bg-gray-700 dark:text-dark-text-primary" value="video">動画パフォーマンス</TabsTrigger>
+          <TabsTrigger className="dark:data-[state=active]:bg-indigo-900/30 dark:data-[state=active]:text-indigo-300 dark:hover:bg-gray-700 dark:text-dark-text-primary" value="channel">チャンネル成長</TabsTrigger>
+          <TabsTrigger className="dark:data-[state=active]:bg-indigo-900/30 dark:data-[state=active]:text-indigo-300 dark:hover:bg-gray-700 dark:text-dark-text-primary" value="genre">ジャンル別</TabsTrigger>
+          <TabsTrigger className="dark:data-[state=active]:bg-indigo-900/30 dark:data-[state=active]:text-indigo-300 dark:hover:bg-gray-700 dark:text-dark-text-primary" value="effect">掲載効果分析</TabsTrigger>
+          <TabsTrigger className="dark:data-[state=active]:bg-indigo-900/30 dark:data-[state=active]:text-indigo-300 dark:hover:bg-gray-700 dark:text-dark-text-primary" value="roi">投資対効果</TabsTrigger>
         </TabsList>
         
         {/* タブの内容 */}
@@ -326,14 +326,14 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
           {videoData.length > 0 ? (
             <VideoPerformanceChart data={videoData} />
           ) : (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 text-center">
-              <Calendar className="h-12 w-12 text-yellow-500 mx-auto mb-3" />
-              <h3 className="text-lg font-medium text-yellow-800 mb-2">掲載中の動画データがありません</h3>
-              <p className="text-yellow-700 mb-4">選択した期間内に掲載された動画がないか、分析データがまだ収集されていません。</p>
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 rounded-lg p-8 text-center">
+              <Calendar className="h-12 w-12 text-yellow-500 dark:text-yellow-400 mx-auto mb-3" />
+              <h3 className="text-lg font-medium text-yellow-800 dark:text-yellow-300 mb-2">掲載中の動画データがありません</h3>
+              <p className="text-yellow-700 dark:text-yellow-400 mb-4">選択した期間内に掲載された動画がないか、分析データがまだ収集されていません。</p>
               <div className="flex justify-center">
                 <button
                   onClick={() => setTimeRange('1year')}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+                  className="px-4 py-2 bg-indigo-600 dark:bg-indigo-700 text-white rounded-md hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors"
                 >
                   より長い期間で表示
                 </button>
@@ -343,7 +343,7 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
           
           {/* 動画一覧表 - 内容は変更なしのため省略 */}
           {videoData.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm overflow-hidden">
               {/* 内容は元のコードと同じ */}
               {/* ... */}
             </div>
@@ -352,13 +352,13 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
         
         <TabsContent value="channel" className="space-y-6 mt-4">
           {/* チャンネル成長チャート - 内容は変更なしのため省略 */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm p-6">
             {/* 内容は元のコードと同じ */}
             {/* ... */}
           </div>
           
           {/* 指標の説明 - 内容は変更なしのため省略 */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm p-6">
             {/* 内容は元のコードと同じ */}
             {/* ... */}
           </div>
@@ -372,14 +372,14 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
               {/* ... */}
             </>
           ) : (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 text-center">
-              <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-3" />
-              <h3 className="text-lg font-medium text-yellow-800 mb-2">ジャンル別データがありません</h3>
-              <p className="text-yellow-700 mb-4">選択した期間内にジャンル別の掲載がないか、分析データがまだ収集されていません。</p>
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 rounded-lg p-8 text-center">
+              <AlertTriangle className="h-12 w-12 text-yellow-500 dark:text-yellow-400 mx-auto mb-3" />
+              <h3 className="text-lg font-medium text-yellow-800 dark:text-yellow-300 mb-2">ジャンル別データがありません</h3>
+              <p className="text-yellow-700 dark:text-yellow-400 mb-4">選択した期間内にジャンル別の掲載がないか、分析データがまだ収集されていません。</p>
               <div className="flex justify-center">
                 <button
                   onClick={() => setTimeRange('1year')}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+                  className="px-4 py-2 bg-indigo-600 dark:bg-indigo-700 text-white rounded-md hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors"
                 >
                   より長い期間で表示
                 </button>
@@ -393,16 +393,16 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
           {promotionEffectData.length > 0 ? (
             <>
               {/* 掲載効果サマリー */}
-              <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm p-6">
                 <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-medium text-gray-900">掲載効果の詳細分析</h3>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-dark-text-primary">掲載効果の詳細分析</h3>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                  <div className="bg-purple-50 p-6 rounded-lg">
-                    <BarChart2 className="h-8 w-8 text-purple-500 mb-3" />
-                    <h4 className="text-sm font-medium text-purple-900 mb-1">掲載中の視聴回数増加（平均）</h4>
-                    <p className="text-xl font-bold text-purple-900 mb-1">
+                  <div className="bg-purple-50 dark:bg-purple-900/30 p-6 rounded-lg">
+                    <BarChart2 className="h-8 w-8 text-purple-500 dark:text-purple-400 mb-3" />
+                    <h4 className="text-sm font-medium text-purple-900 dark:text-purple-300 mb-1">掲載中の視聴回数増加（平均）</h4>
+                    <p className="text-xl font-bold text-purple-900 dark:text-purple-300 mb-1">
                       {promotionEffectData.length > 0 
                         ? Math.round(
                             promotionEffectData.reduce(
@@ -413,7 +413,7 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
                         : 0
                       }
                     </p>
-                    <p className="text-sm text-purple-700">
+                    <p className="text-sm text-purple-700 dark:text-purple-400">
                       {promotionEffectData.length > 0 
                         ? `+${Math.round(
                             promotionEffectData.reduce(
@@ -426,10 +426,10 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
                     </p>
                   </div>
                   
-                  <div className="bg-blue-50 p-6 rounded-lg">
-                    <Users className="h-8 w-8 text-blue-500 mb-3" />
-                    <h4 className="text-sm font-medium text-blue-900 mb-1">登録者増加効果（平均）</h4>
-                    <p className="text-xl font-bold text-blue-900 mb-1">
+                  <div className="bg-blue-50 dark:bg-blue-900/30 p-6 rounded-lg">
+                    <Users className="h-8 w-8 text-blue-500 dark:text-blue-400 mb-3" />
+                    <h4 className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-1">登録者増加効果（平均）</h4>
+                    <p className="text-xl font-bold text-blue-900 dark:text-blue-300 mb-1">
                       {promotionEffectData.length > 0 
                         ? Math.round(
                             promotionEffectData.reduce(
@@ -440,15 +440,15 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
                         : 0
                       }
                     </p>
-                    <p className="text-sm text-blue-700">
+                    <p className="text-sm text-blue-700 dark:text-blue-400">
                       掲載期間中の追加獲得
                     </p>
                   </div>
                   
-                  <div className="bg-emerald-50 p-6 rounded-lg">
-                    <Activity className="h-8 w-8 text-emerald-500 mb-3" />
-                    <h4 className="text-sm font-medium text-emerald-900 mb-1">日次平均視聴増加（平均）</h4>
-                    <p className="text-xl font-bold text-emerald-900 mb-1">
+                  <div className="bg-emerald-50 dark:bg-emerald-900/30 p-6 rounded-lg">
+                    <Activity className="h-8 w-8 text-emerald-500 dark:text-emerald-400 mb-3" />
+                    <h4 className="text-sm font-medium text-emerald-900 dark:text-emerald-300 mb-1">日次平均視聴増加（平均）</h4>
+                    <p className="text-xl font-bold text-emerald-900 dark:text-emerald-300 mb-1">
                       {promotionEffectData.length > 0 
                         ? Math.round(
                             promotionEffectData.reduce(
@@ -459,7 +459,7 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
                         : 0
                       }
                     </p>
-                    <p className="text-sm text-emerald-700">
+                    <p className="text-sm text-emerald-700 dark:text-emerald-400">
                       {promotionEffectData.length > 0 
                         ? `+${Math.round(
                             promotionEffectData.reduce(
@@ -475,7 +475,7 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
                 
                 {/* 掲載効果比較チャート（掲載前・中・後） */}
                 <div className="mb-6">
-                  <h4 className="text-sm font-medium text-gray-800 mb-4">掲載前後の効果比較</h4>
+                  <h4 className="text-sm font-medium text-gray-800 dark:text-dark-text-primary mb-4">掲載前後の効果比較</h4>
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
@@ -488,15 +488,21 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
                         }))}
                         margin={{ top: 20, right: 30, left: 20, bottom: 50 }}
                       >
-                        <CartesianGrid strokeDasharray="3 3" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeOpacity={0.2} />
                         <XAxis 
                           dataKey="name" 
                           angle={-45} 
                           textAnchor="end"
                           height={70}
                           interval={0}
+                          stroke="#6B7280"
+                          tick={{ fill: "#6B7280" }}
                         />
-                        <YAxis label={{ value: '日平均視聴回数', angle: -90, position: 'insideLeft' }} />
+                        <YAxis 
+                          label={{ value: '日平均視聴回数', angle: -90, position: 'insideLeft', fill: "#6B7280" }} 
+                          stroke="#6B7280"
+                          tick={{ fill: "#6B7280" }}
+                        />
                         <Tooltip 
                           formatter={(value: any) => [value.toLocaleString(), '']}
                           labelFormatter={(name) => {
@@ -506,19 +512,26 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
                             );
                             return item?.title || name;
                           }}
+                          contentStyle={{ backgroundColor: 'rgba(23, 23, 23, 0.8)', borderColor: '#374151', color: '#E5E7EB' }}
+                          itemStyle={{ color: '#E5E7EB' }}
                         />
-                        <Legend />
+                        <Legend 
+                          wrapperStyle={{ color: '#6B7280' }}
+                        />
                         <Bar 
                           dataKey="掲載前" 
                           fill="#94a3b8"
+                          fillOpacity={0.9}
                         />
                         <Bar 
                           dataKey="掲載中" 
                           fill="#6366f1"
+                          fillOpacity={0.9}
                         />
                         <Bar 
                           dataKey="掲載後" 
                           fill="#10b981"
+                          fillOpacity={0.9}
                         />
                       </BarChart>
                     </ResponsiveContainer>
@@ -526,30 +539,28 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
                 </div>
               </div>
               
-              {/* 動画ごとの掲載効果詳細 - 内容は変更なしのため省略 */}
-              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                {/* 内容は元のコードと同じ */}
-                {/* ... */}
+              {/* 動画ごとの掲載効果詳細 */}
+              <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm overflow-hidden">
+                {/* 元のコードの内容をここに入れる（ダークモード対応） */}
               </div>
               
-              {/* 掲載効果の解説 - 内容は変更なしのため省略 */}
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                {/* 内容は元のコードと同じ */}
-                {/* ... */}
+              {/* 掲載効果の解説 */}
+              <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm p-6">
+                {/* 元のコードの内容をここに入れる（ダークモード対応） */}
               </div>
             </>
           ) : (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 text-center">
-              <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-3" />
-              <h3 className="text-lg font-medium text-yellow-800 mb-2">掲載効果分析データがありません</h3>
-              <p className="text-yellow-700 mb-4">
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 rounded-lg p-8 text-center">
+              <AlertTriangle className="h-12 w-12 text-yellow-500 dark:text-yellow-400 mx-auto mb-3" />
+              <h3 className="text-lg font-medium text-yellow-800 dark:text-yellow-300 mb-2">掲載効果分析データがありません</h3>
+              <p className="text-yellow-700 dark:text-yellow-400 mb-4">
                 選択した期間内に完了した掲載がない、または十分な分析データが収集されていません。
                 より長い期間を選択するか、掲載完了後にもう一度確認してください。
               </p>
               <div className="flex justify-center">
                 <button
                   onClick={() => setTimeRange('1year')}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+                  className="px-4 py-2 bg-indigo-600 dark:bg-indigo-700 text-white rounded-md hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors"
                 >
                   より長い期間で表示
                 </button>
@@ -559,16 +570,14 @@ export default function AnalyticsDashboard({ initialTab = 'video' }: AnalyticsDa
         </TabsContent>
         
         <TabsContent value="roi" className="space-y-6 mt-4">
-          {/* ROI分析 - 内容は変更なしのため省略 */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            {/* 内容は元のコードと同じ */}
-            {/* ... */}
+          {/* ROI分析 */}
+          <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm p-6">
+            {/* 元のコードの内容をここに入れる（ダークモード対応） */}
           </div>
           
-          {/* ROI向上のためのヒント - 内容は変更なしのため省略 */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            {/* 内容は元のコードと同じ */}
-            {/* ... */}
+          {/* ROI向上のためのヒント */}
+          <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm p-6">
+            {/* 元のコードの内容をここに入れる（ダークモード対応） */}
           </div>
         </TabsContent>
       </Tabs>

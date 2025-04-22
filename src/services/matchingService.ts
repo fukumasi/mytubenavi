@@ -1317,10 +1317,10 @@ if (matchData && matchData.length > 0) {
   try {
     const { data: targetUserData, error: targetUserError } = await supabase
       .from('profiles')
-      .select('is_premium, username')
+      .select('username')
       .eq('id', targetUserId)
       .limit(1);
-
+  
     if (targetUserError) {
       console.error('ユーザープロフィール取得エラー:', targetUserError);
       return {
@@ -1330,8 +1330,8 @@ if (matchData && matchData.length > 0) {
       };
     }
     
-    // プレミアム会員への通知送信
-    if (targetUserData && targetUserData.length > 0 && targetUserData[0].is_premium) {
+    // すべてのユーザーに通知送信
+    if (targetUserData && targetUserData.length > 0) {
       // いいね通知を送信
       const matchScore = 75; // 本番環境でのスコア
       await notificationService.createMatchingNotification(
@@ -1342,7 +1342,7 @@ if (matchData && matchData.length > 0) {
       );
     }
   } catch (error) {
-    console.error('プレミアム確認エラー:', error);
+    console.error('通知送信エラー:', error);
     // エラーは処理続行
   }
 

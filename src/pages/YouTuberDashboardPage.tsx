@@ -16,7 +16,13 @@ const YouTuberDashboardPage: React.FC = () => {
     return <Navigate to="/youtuber/register" replace />;
   }
 
-  return <PromotionDashboard />;
+  // このコンポーネント自体にはダークモード対応が必要なUI要素はないが、
+  // 将来的な拡張に備えてdark:クラスを追加できるようにする
+  return (
+    <div className="dark:bg-dark-bg">
+      <PromotionDashboard />
+    </div>
+  );
 };
 
 export default YouTuberDashboardPage;

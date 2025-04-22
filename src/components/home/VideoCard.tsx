@@ -65,9 +65,9 @@ export default function VideoCard({
   };
 
   return (
-    <div className="w-full bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+    <div className="w-full bg-white dark:bg-dark-surface rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden dark:shadow-none dark:border dark:border-dark-border">
       {/* 上段：サムネイルと動画タイトル */}
-      <div className="flex flex-row border-b border-gray-100">
+      <div className="flex flex-row border-b border-gray-100 dark:border-dark-border">
         {/* サムネイル - 左側に配置 */}
         <div 
           className="relative w-32 h-20 cursor-pointer" 
@@ -92,11 +92,11 @@ export default function VideoCard({
           className="flex-1 p-2 cursor-pointer" 
           onClick={handleVideoClick}
         >
-          <h3 className="font-medium text-xs line-clamp-3 text-gray-900">
+          <h3 className="font-medium text-xs line-clamp-3 text-gray-900 dark:text-dark-text-primary">
             {title}
           </h3>
           {channelTitle && (
-            <div className="text-xs text-gray-600 mt-1 line-clamp-1">
+            <div className="text-xs text-gray-600 dark:text-dark-text-secondary mt-1 line-clamp-1">
               {channelTitle}
             </div>
           )}
@@ -104,7 +104,7 @@ export default function VideoCard({
       </div>
       
       {/* 下段：評価、レビュー数、投稿日 */}
-      <div className="flex justify-between px-2 py-1 text-xs text-gray-500 bg-gray-50">
+      <div className="flex justify-between px-2 py-1 text-xs text-gray-500 dark:text-dark-text-secondary bg-gray-50 dark:bg-dark-bg">
         {/* 星評価 */}
         <div className="flex items-center">
           <Star className="h-3 w-3 text-yellow-400 mr-1" />

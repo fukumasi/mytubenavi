@@ -33,7 +33,7 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
       <button
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className="px-4 py-2 rounded-md transition-colors bg-white text-gray-700 border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="px-4 py-2 rounded-md transition-colors bg-white dark:bg-dark-surface text-gray-700 dark:text-dark-text-primary border border-gray-300 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label="前のページ"
       >
         前へ
@@ -45,8 +45,8 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
           onClick={() => onPageChange(pageNum)}
           className={`px-4 py-2 rounded-md transition-colors ${
             currentPage === pageNum
-              ? 'bg-indigo-600 text-white'
-              : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+              ? 'bg-indigo-600 dark:bg-indigo-700 text-white'
+              : 'bg-white dark:bg-dark-surface text-gray-700 dark:text-dark-text-primary border border-gray-300 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-gray-800'
           }`}
           aria-label={`${pageNum}ページ目`}
           aria-current={currentPage === pageNum ? 'page' : undefined}
@@ -58,7 +58,7 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
       <button
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className="px-4 py-2 rounded-md transition-colors bg-white text-gray-700 border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="px-4 py-2 rounded-md transition-colors bg-white dark:bg-dark-surface text-gray-700 dark:text-dark-text-primary border border-gray-300 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label="次のページ"
       >
         次へ
@@ -274,14 +274,14 @@ const SearchPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-4 bg-white relative mt-16">
+    <div className="container mx-auto px-4 py-4 bg-white dark:bg-dark-surface relative mt-16">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* 左カラム - サブジャンル/プロモーションエリア */}
         <div className="md:col-span-1">
-          <div className="bg-white p-4 rounded border border-gray-200">
-            <h2 className="text-lg font-medium text-gray-800 mb-4">おすすめ動画</h2>
+          <div className="bg-white dark:bg-dark-surface p-4 rounded border border-gray-200 dark:border-dark-border">
+            <h2 className="text-lg font-medium text-gray-800 dark:text-dark-text-primary mb-4">おすすめ動画</h2>
             <div className="space-y-2">
-              <div className="bg-gray-100 p-4 text-center text-gray-600 rounded">
+              <div className="bg-gray-100 dark:bg-gray-800 p-4 text-center text-gray-600 dark:text-dark-text-secondary rounded">
                 プロモーション動画エリア
               </div>
             </div>
@@ -292,7 +292,7 @@ const SearchPage: React.FC = () => {
         <div className="md:col-span-3">
           {/* ヘッダー */}
           <div className="mb-4">
-            <h1 className="text-xl font-semibold text-gray-800 mb-2">
+            <h1 className="text-xl font-semibold text-gray-800 dark:text-dark-text-primary mb-2">
               {isKeywordSearch ? `「${query}」の検索結果` : 
                isGenreSearch ? `${genre}の動画一覧` : 
                '動画を探す'}
@@ -300,11 +300,13 @@ const SearchPage: React.FC = () => {
             
             {/* 並び替えボタン */}
             <div className="flex items-center space-x-1 mt-2 mb-4">
-              <span className="text-sm text-gray-600 mr-2">並び替え:</span>
+              <span className="text-sm text-gray-600 dark:text-dark-text-secondary mr-2">並び替え:</span>
               <button
                 onClick={() => handleSortChange('title')}
                 className={`px-3 py-1 text-xs rounded ${
-                  sortField === 'title' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'
+                  sortField === 'title' 
+                    ? 'bg-indigo-600 dark:bg-indigo-700 text-white' 
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-dark-text-primary'
                 }`}
               >
                 タイトル
@@ -312,7 +314,9 @@ const SearchPage: React.FC = () => {
               <button
                 onClick={() => handleSortChange('rating')}
                 className={`px-3 py-1 text-xs rounded ${
-                  sortField === 'rating' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'
+                  sortField === 'rating' 
+                    ? 'bg-indigo-600 dark:bg-indigo-700 text-white' 
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-dark-text-primary'
                 }`}
               >
                 評価
@@ -320,7 +324,9 @@ const SearchPage: React.FC = () => {
               <button
                 onClick={() => handleSortChange('view_count')}
                 className={`px-3 py-1 text-xs rounded ${
-                  sortField === 'view_count' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'
+                  sortField === 'view_count' 
+                    ? 'bg-indigo-600 dark:bg-indigo-700 text-white' 
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-dark-text-primary'
                 }`}
               >
                 再生回数
@@ -328,7 +334,9 @@ const SearchPage: React.FC = () => {
               <button
                 onClick={() => handleSortChange('published_at')}
                 className={`px-3 py-1 text-xs rounded ${
-                  sortField === 'published_at' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'
+                  sortField === 'published_at' 
+                    ? 'bg-indigo-600 dark:bg-indigo-700 text-white' 
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-dark-text-primary'
                 }`}
               >
                 投稿日
@@ -339,13 +347,13 @@ const SearchPage: React.FC = () => {
           {/* ローディング状態 */}
           {isLoading ? (
             <div className="flex justify-center items-center py-12">
-              <Loader className="w-8 h-8 animate-spin text-indigo-400" />
+              <Loader className="w-8 h-8 animate-spin text-indigo-400 dark:text-indigo-300" />
             </div>
           ) : (
             <div>
               {/* エラー表示 */}
               {error && (
-                <div className="bg-red-100 border border-red-400 rounded p-4 mb-4 text-red-700">
+                <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-800/50 rounded p-4 mb-4 text-red-700 dark:text-red-400">
                   {error}
                 </div>
               )}
@@ -354,7 +362,7 @@ const SearchPage: React.FC = () => {
               <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-gray-100 text-gray-700 text-xs">
+                    <tr className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-dark-text-primary text-xs">
                       <th className="p-2 text-left font-medium" style={{ width: '50%' }}>タイトル</th>
                       <th className="p-2 text-center font-medium" style={{ width: '10%' }}>
                         <div className="flex items-center justify-center">
@@ -364,14 +372,14 @@ const SearchPage: React.FC = () => {
                       </th>
                       <th className="p-2 text-center font-medium" style={{ width: '15%' }}>
                         <div className="flex items-center justify-center">
-                          <Eye className="h-3 w-3 text-gray-600 mr-1" />
+                          <Eye className="h-3 w-3 text-gray-600 dark:text-gray-400 mr-1" />
                           <span>再生回数</span>
                         </div>
                       </th>
                       <th className="p-2 text-center font-medium" style={{ width: '15%' }}>チャンネル</th>
                       <th className="p-2 text-center font-medium" style={{ width: '10%' }}>
                         <div className="flex items-center justify-center">
-                          <Clock className="h-3 w-3 text-gray-600 mr-1" />
+                          <Clock className="h-3 w-3 text-gray-600 dark:text-gray-400 mr-1" />
                           <span>投稿日</span>
                         </div>
                       </th>
@@ -384,7 +392,7 @@ const SearchPage: React.FC = () => {
                         <tr 
                           key={video.id}
                           onClick={() => navigate(`/video/${video.youtube_id || video.id}`)}
-                          className="border-b border-gray-200 hover:bg-gray-100 cursor-pointer transition-colors"
+                          className="border-b border-gray-200 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors"
                         >
                           <td className="p-2">
                             <div className="flex items-center">
@@ -404,32 +412,32 @@ const SearchPage: React.FC = () => {
                               </div>
                               
                               {/* タイトル */}
-                              <span className="text-xs sm:text-sm text-gray-800 line-clamp-2">
+                              <span className="text-xs sm:text-sm text-gray-800 dark:text-dark-text-primary line-clamp-2">
                                 {video.title}
                               </span>
                             </div>
                           </td>
                           
-                          <td className="p-2 text-center text-xs text-gray-700">
+                          <td className="p-2 text-center text-xs text-gray-700 dark:text-dark-text-secondary">
                             {(video.rating || video.avg_rating || 0).toFixed(1)}
                           </td>
                           
-                          <td className="p-2 text-center text-xs text-gray-700">
+                          <td className="p-2 text-center text-xs text-gray-700 dark:text-dark-text-secondary">
                             {formatViewCount(video.view_count)} 回視聴
                           </td>
                           
-                          <td className="p-2 text-center text-xs text-gray-700 truncate max-w-[150px]">
+                          <td className="p-2 text-center text-xs text-gray-700 dark:text-dark-text-secondary truncate max-w-[150px]">
                             {video.channel_title || '-'}
                           </td>
                           
-                          <td className="p-2 text-center text-xs text-gray-700">
+                          <td className="p-2 text-center text-xs text-gray-700 dark:text-dark-text-secondary">
                             {formatDate(video.published_at)}
                           </td>
                         </tr>
                       ))
                     ) : query ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-8 text-gray-500">
+                        <td colSpan={5} className="text-center py-8 text-gray-500 dark:text-dark-text-secondary">
                           <p>検索結果が見つかりませんでした</p>
                         </td>
                       </tr>
@@ -444,7 +452,7 @@ const SearchPage: React.FC = () => {
                   videos.map((video) => (
                     <div 
                       key={video.id} 
-                      className="bg-white border border-gray-200 rounded overflow-hidden cursor-pointer"
+                      className="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded overflow-hidden cursor-pointer"
                       onClick={() => navigate(`/video/${video.youtube_id || video.id}`)}
                     >
                       {/* 上段: サムネイルとタイトル */}
@@ -463,30 +471,30 @@ const SearchPage: React.FC = () => {
                           />
                         </div>
                         <div className="flex-1">
-                          <h3 className="text-xs text-gray-800 line-clamp-2">{video.title}</h3>
-                          <p className="text-xs text-gray-500 mt-1 truncate">{video.channel_title || '-'}</p>
+                          <h3 className="text-xs text-gray-800 dark:text-dark-text-primary line-clamp-2">{video.title}</h3>
+                          <p className="text-xs text-gray-500 dark:text-dark-text-secondary mt-1 truncate">{video.channel_title || '-'}</p>
                         </div>
                       </div>
                       
                       {/* 下段: 評価、再生数、投稿日 */}
-                      <div className="bg-gray-100 px-2 py-1 flex justify-between text-xs text-gray-600">
+                      <div className="bg-gray-100 dark:bg-gray-800 px-2 py-1 flex justify-between text-xs text-gray-600 dark:text-dark-text-secondary">
                         <div className="flex items-center">
                           <Star className="h-3 w-3 text-yellow-400 mr-1" />
                           <span>{(video.rating || video.avg_rating || 0).toFixed(1)}</span>
                         </div>
                         <div className="flex items-center">
-                          <Eye className="h-3 w-3 text-gray-500 mr-1" />
+                          <Eye className="h-3 w-3 text-gray-500 dark:text-gray-400 mr-1" />
                           <span>{formatViewCount(video.view_count)}</span>
                         </div>
                         <div className="flex items-center">
-                          <Clock className="h-3 w-3 text-gray-500 mr-1" />
+                          <Clock className="h-3 w-3 text-gray-500 dark:text-gray-400 mr-1" />
                           <span>{formatDate(video.published_at)}</span>
                         </div>
                       </div>
                     </div>
                   ))
                 ) : query ? (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className="text-center py-8 text-gray-500 dark:text-dark-text-secondary">
                     <p>検索結果が見つかりませんでした</p>
                   </div>
                 ) : null}
@@ -504,7 +512,7 @@ const SearchPage: React.FC = () => {
                   {/* さらに読み込むボタン */}
                   <button
                     onClick={() => handlePageChange(currentPage + 1)}
-                    className="mt-4 px-6 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                    className="mt-4 px-6 py-2 bg-indigo-600 dark:bg-indigo-700 text-white rounded hover:bg-indigo-700 dark:hover:bg-indigo-800 transition-colors"
                   >
                     さらに読み込む
                   </button>

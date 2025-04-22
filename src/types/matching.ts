@@ -49,34 +49,33 @@ export interface MatchingUser {
   avatar_url: string | null;
   bio: string;
   interests: string[];
-  matching_score: number;  // マッチングアルゴリズムに基づくスコア（0-100）
-  common_interests: string[];  // 現在のユーザーとの共通の興味
-  common_genres?: string[];  // 共通のビデオジャンル
-  common_videos_count?: number;  // 共通の視聴動画数
-  is_premium: boolean;  // プレミアム会員かどうか
-  gender: string;  // 'male', 'female', 'other'など
-  age: number | null;  // ユーザーの年齢
+  matching_score: number;  
+  common_interests: string[];  
+  common_genres?: string[];  
+  common_videos_count?: number;  
+  is_premium: boolean;  
+  gender: string;  
+  age: number | null;  
   location: {
-    prefecture?: string;  // 都道府県
-    region?: string;  // 地域
+    prefecture?: string;  
+    region?: string;  
   } | null;
-  activity_level?: ActivityLevel | number;  // 活動レベル（文字列または1-10のスコア）
-  online_status?: OnlineStatus;  // オンライン状態
-  last_active?: string;  // 最終アクティブ日時（ISO 8601形式）
-  connection_status?: ConnectionStatus;  // 接続状態
-  is_liked?: boolean;  // いいね済みかどうか
+  activity_level?: ActivityLevel | number;  
+  online_status?: OnlineStatus;  
+  last_active?: string;  
+  connection_status?: ConnectionStatus;  
+  is_liked?: boolean;  
   is_matched?: boolean;
-  conversation_id?: string; // 追加: マッチング済みユーザーとのメッセージ会話ID
-  // YouTubeクリエイターの場合
-  channel_url?: string;  // YouTubeチャンネルURL
-  // 視聴傾向（ジャンルごとの視聴割合）
-  viewing_trends?: Record<string, number>;  // キー：ジャンル名、値：視聴割合（%）
-  // 共通の友達
+  conversation_id?: string;
+  channel_url?: string;  
+  viewing_trends?: Record<string, number>;  
   common_friends?: Array<{
     id: string;
     username: string;
     avatar_url?: string | null;
   }>;
+  connection_id?: string | null;  // 接続情報のID
+  is_initiator?: boolean;        // 接続リクエストの送信者かどうか
 }
 
 /**
@@ -141,7 +140,8 @@ export type TransactionType =
   | 'like'             // いいね送信（消費）
   | 'match_bonus'      // マッチング成立ボーナス（獲得）
   | 'message_activity' // メッセージのやり取り（獲得）
-  | 'filter_usage';    // 検索フィルター使用（消費）
+  | 'filter_usage'     // 検索フィルター使用（消費）
+  | 'intimacy_level_up';  // 親密度レベルアップボーナス（獲得）
 
 /**
  * ポイント取引の記録
@@ -172,6 +172,21 @@ export interface VerificationStatus {
 }
 
 /**
+ * メッセージの添付ファイル情報
+ * メッセージに添付された画像やファイルの情報
+ */
+export interface MessageAttachment {
+  id?: string;  // 添付ファイルID
+  message_id: string;  // 添付先メッセージID
+  file_url: string;  // ファイルのURL
+  file_type: string;  // ファイルのMIMEタイプ
+  file_name: string;  // ファイル名
+  file_size: number;  // ファイルサイズ（バイト）
+  created_at: string;  // 作成日時（ISO 8601形式）
+  thumbnail_url?: string;  // サムネイルURL（画像の場合）
+}
+
+/**
  * メッセージの情報
  * ユーザー間のメッセージデータ
  */
@@ -183,6 +198,7 @@ export interface Message {
   content: string;  // メッセージ内容
   is_highlighted: boolean;  // 強調表示されたメッセージか
   is_read: boolean;  // 既読状態
+  has_attachment?: boolean;  // 添付ファイルがあるかどうか
   created_at: string;  // 作成日時（ISO 8601形式）
   updated_at: string;  // 更新日時（ISO 8601形式）
   deleted_by_sender?: boolean;  // 送信者が削除したか
@@ -201,13 +217,13 @@ export interface Conversation {
   is_active: boolean;  // アクティブな会話か（削除済みでないか）
   user1_unread_count: number;  // ユーザー1の未読メッセージ数
   user2_unread_count: number;  // ユーザー2の未読メッセージ数
+  intimacy_level?: number;  // 親密度レベル（0-5）
 }
 
 /**
  * 相手のプロフィール情報を含む会話情報
  * 会話リスト表示用に拡張した会話情報
  */
-// ConversationWithProfileインターフェースの修正
 export interface ConversationWithProfile extends Conversation {
   otherUser: {  // 相手ユーザーの情報
     id: string;
@@ -216,14 +232,15 @@ export interface ConversationWithProfile extends Conversation {
     is_premium?: boolean;
     online_status?: OnlineStatus | string;
     last_active?: string;  // ISO 8601形式
-    verification_level?: number; // 追加：認証レベル
+    verification_level?: number; // 認証レベル
   };
   last_message?: {  // 最後のメッセージ情報
     content: string;
     created_at: string;  // ISO 8601形式
     sender_id: string;
     is_read: boolean;
-    is_highlighted?: boolean; // 追加：ハイライトメッセージかどうか
+    is_highlighted?: boolean; // ハイライトメッセージかどうか
+    has_attachment?: boolean; // 添付ファイルがあるかどうか
   } | null;
   unread_count: number;  // 現在のユーザーの未読数
 }
@@ -238,6 +255,10 @@ export interface VideoDetails {
   title: string;  // 動画タイトル
   thumbnail_url: string;  // サムネイルURL
   channel_name?: string;  // チャンネル名
+  description?: string;  // 動画の説明
+  published_at?: string;  // 公開日時（ISO 8601形式）
+  duration?: number;  // 動画の長さ（秒）
+  view_count?: number;  // 視聴回数
 }
 
 /**

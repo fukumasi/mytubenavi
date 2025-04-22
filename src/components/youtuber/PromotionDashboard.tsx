@@ -49,13 +49,13 @@ const CancelBookingModal: React.FC<CancelModalProps> = ({ isOpen, booking, onClo
   
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-        <h3 className="text-lg font-semibold mb-4">予約をキャンセルしますか？</h3>
-        <p className="mb-4 text-gray-700">
+      <div className="bg-white dark:bg-dark-surface rounded-lg shadow-lg p-6 w-full max-w-md">
+        <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-dark-text-primary">予約をキャンセルしますか？</h3>
+        <p className="mb-4 text-gray-700 dark:text-dark-text-secondary">
           掲載枠「{booking.slot?.name}」の予約をキャンセルします。この操作は取り消せません。
         </p>
         <div className="mb-4">
-          <label htmlFor="cancel-reason" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="cancel-reason" className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
             キャンセル理由（任意）
           </label>
           <textarea
@@ -63,20 +63,20 @@ const CancelBookingModal: React.FC<CancelModalProps> = ({ isOpen, booking, onClo
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="キャンセル理由を入力してください"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-dark-surface dark:text-dark-text-primary"
             rows={3}
           />
         </div>
         <div className="flex justify-end space-x-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded"
+            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-dark-text-primary rounded"
           >
             キャンセル
           </button>
           <button
             onClick={() => onConfirm(booking.id, reason)}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+            className="px-4 py-2 bg-red-600 dark:bg-red-700 hover:bg-red-700 dark:hover:bg-red-800 text-white rounded"
           >
             予約をキャンセルする
           </button>
@@ -340,27 +340,27 @@ export default function PromotionDashboard() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
           <CheckCircle className="w-3 h-3 mr-1" />
           アクティブ
         </span>;
       case 'completed':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
           <CheckCircle className="w-3 h-3 mr-1" />
           完了
         </span>;
       case 'cancelled':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
           <XCircle className="w-3 h-3 mr-1" />
           キャンセル
         </span>;
       case 'pending':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300">
           <Clock className="w-3 h-3 mr-1" />
           保留中
         </span>;
       default:
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
           {status}
         </span>;
     }
@@ -370,17 +370,17 @@ export default function PromotionDashboard() {
     switch (paymentStatus) {
       case 'succeeded':
       case 'paid':
-        return <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">支払済</span>;
+        return <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-full text-xs font-medium">支払済</span>;
       case 'pending':
-        return <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">未払い</span>;
+        return <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded-full text-xs font-medium">未払い</span>;
       case 'processing':
-        return <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">処理中</span>;
+        return <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-xs font-medium">処理中</span>;
       case 'refunded':
-        return <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">返金済</span>;
+        return <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded-full text-xs font-medium">返金済</span>;
       case 'cancelled':
-        return <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">キャンセル</span>;
+        return <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 rounded-full text-xs font-medium">キャンセル</span>;
       default:
-        return <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">不明</span>;
+        return <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 rounded-full text-xs font-medium">不明</span>;
     }
   };
 
@@ -563,9 +563,9 @@ export default function PromotionDashboard() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center p-4 bg-red-50 rounded-lg">
-        <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
-        <p className="text-red-600">{error}</p>
+      <div className="flex items-center justify-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+        <AlertTriangle className="h-5 w-5 text-red-500 dark:text-red-400 mr-2" />
+        <p className="text-red-600 dark:text-red-300">{error}</p>
       </div>
     );
   }
@@ -575,18 +575,18 @@ export default function PromotionDashboard() {
       {/* ヘッダー */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between space-y-4 md:space-y-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">YouTuberダッシュボード</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-dark-text-primary">YouTuberダッシュボード</h1>
+          <p className="text-sm text-gray-500 dark:text-dark-text-secondary mt-1">
             動画プロモーションの管理とデータ分析
           </p>
         </div>
         
-        <div className="flex items-center space-x-2 bg-white rounded-lg shadow-sm p-1">
+        <div className="flex items-center space-x-2 bg-white dark:bg-dark-surface rounded-lg shadow-sm p-1">
           <button 
             className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
               activeTab === 'slots' 
-                ? 'bg-indigo-100 text-indigo-700' 
-                : 'hover:bg-gray-100 text-gray-600'
+                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' 
+                : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-dark-text-secondary'
             }`}
             onClick={() => setActiveTab('slots')}
           >
@@ -596,8 +596,8 @@ export default function PromotionDashboard() {
           <button 
             className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
               activeTab === 'bookings' 
-                ? 'bg-indigo-100 text-indigo-700' 
-                : 'hover:bg-gray-100 text-gray-600'
+                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' 
+                : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-dark-text-secondary'
             }`}
             onClick={() => setActiveTab('bookings')}
           >
@@ -607,8 +607,8 @@ export default function PromotionDashboard() {
           <button 
             className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
               activeTab === 'analytics' 
-                ? 'bg-indigo-100 text-indigo-700' 
-                : 'hover:bg-gray-100 text-gray-600'
+                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' 
+                : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-dark-text-secondary'
             }`}
             onClick={() => setActiveTab('analytics')}
           >
@@ -619,7 +619,7 @@ export default function PromotionDashboard() {
       </div>
 
       {/* 動画掲載予約ボタン (常に表示) */}
-      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg p-6">
+      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 dark:from-blue-600 dark:to-indigo-700 rounded-lg shadow-lg p-6">
         <div className="flex flex-col md:flex-row justify-between items-center">
           <div className="mb-4 md:mb-0">
             <h3 className="text-xl font-bold text-white">動画掲載を開始しましょう</h3>
@@ -629,7 +629,7 @@ export default function PromotionDashboard() {
           </div>
           <button
             onClick={handleCreateBooking}
-            className="px-6 py-3 bg-white text-blue-600 font-medium rounded-lg shadow hover:bg-blue-50 transition-colors"
+            className="px-6 py-3 bg-white dark:bg-gray-200 text-blue-600 dark:text-blue-700 font-medium rounded-lg shadow hover:bg-blue-50 dark:hover:bg-gray-100 transition-colors"
           >
             <Calendar className="inline-block w-5 h-5 mr-2 align-text-bottom" />
             動画掲載を予約する
@@ -639,63 +639,63 @@ export default function PromotionDashboard() {
 
       {/* アナリティクスカード（常に表示） */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm p-6">
           <div className="flex items-center">
-            <div className="p-3 rounded-full bg-indigo-100 text-indigo-600 mr-4">
+            <div className="p-3 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 mr-4">
               <DollarSign className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-500">
+              <p className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary">
                 総掲載費
               </p>
-              <h3 className="text-xl font-bold text-gray-900">
-                ¥{analyticsData.totalRevenue.toLocaleString()}
+              <h3 className="text-xl font-bold text-gray-900 dark:text-dark-text-primary">
+              ¥{analyticsData.totalRevenue.toLocaleString()}
               </h3>
             </div>
           </div>
         </div>
         
-        <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm p-6">
           <div className="flex items-center">
-            <div className="p-3 rounded-full bg-green-100 text-green-600 mr-4">
+            <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300 mr-4">
               <FileText className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-500">
+              <p className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary">
                 予約数
               </p>
-              <h3 className="text-xl font-bold text-gray-900">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-dark-text-primary">
                 {analyticsData.totalBookings}件
               </h3>
             </div>
           </div>
         </div>
         
-        <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm p-6">
           <div className="flex items-center">
-            <div className="p-3 rounded-full bg-blue-100 text-blue-600 mr-4">
+            <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 mr-4">
               <CheckCircle className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-500">
+              <p className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary">
                 アクティブな予約
               </p>
-              <h3 className="text-xl font-bold text-gray-900">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-dark-text-primary">
                 {analyticsData.activeBookings}件
               </h3>
             </div>
           </div>
         </div>
         
-        <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm p-6">
           <div className="flex items-center">
-            <div className="p-3 rounded-full bg-purple-100 text-purple-600 mr-4">
+            <div className="p-3 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 mr-4">
               <Clock className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-500">
+              <p className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary">
                 完了した予約</p>
-              <h3 className="text-xl font-bold text-gray-900">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-dark-text-primary">
                 {analyticsData.completedBookings}件
               </h3>
             </div>
@@ -709,9 +709,9 @@ export default function PromotionDashboard() {
           <>
             {/* サイドバー */}
             <div className="lg:w-64 flex-shrink-0">
-              <div className="bg-white rounded-lg shadow-sm p-4">
+              <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm p-4">
                 <div className="flex items-center space-x-3 mb-6">
-                  <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
                     {profile?.avatar_url ? (
                       <img 
                         src={profile.avatar_url} 
@@ -719,26 +719,26 @@ export default function PromotionDashboard() {
                         className="w-full h-full rounded-full object-cover"
                       />
                     ) : (
-                      <ImageIcon className="w-6 h-6 text-gray-400" />
+                      <ImageIcon className="w-6 h-6 text-gray-400 dark:text-gray-500" />
                     )}
                   </div>
                   <div>
-                    <h2 className="text-sm font-medium text-gray-900">
+                    <h2 className="text-sm font-medium text-gray-900 dark:text-dark-text-primary">
                       {youtuberProfile?.username || profile?.username}
                     </h2>
-                    <p className="text-xs text-gray-500">YouTuber</p>
+                    <p className="text-xs text-gray-500 dark:text-dark-text-secondary">YouTuber</p>
                   </div>
                 </div>
 
                 <button 
                   onClick={handleCreateSlot}
-                  className="w-full bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors mb-6"
+                  className="w-full bg-red-600 dark:bg-red-700 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 dark:hover:bg-red-800 transition-colors mb-6"
                 >
                   <Upload className="inline-block w-4 h-4 mr-2" />
                   掲載枠を登録する
                 </button>
 
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-gray-500 dark:text-dark-text-secondary">
                   <p>※ 掲載枠は最大5つまで作成できます</p>
                   <p className="mt-1">※ アクティブな予約がある掲載枠は削除できません</p>
                 </div>
@@ -750,29 +750,29 @@ export default function PromotionDashboard() {
               <div className="space-y-8">
                 <section>
                   <div className="flex items-center mb-4">
-                    <DollarSign className="h-6 w-6 text-indigo-600 mr-2" />
-                    <h2 className="text-2xl font-bold text-gray-900">掲載枠管理</h2>
+                    <DollarSign className="h-6 w-6 text-indigo-600 dark:text-indigo-400 mr-2" />
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-dark-text-primary">掲載枠管理</h2>
                   </div>
                   
                   {loading ? (
                     <div className="text-center py-12">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                      <p className="mt-4 text-gray-600">読み込み中...</p>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-300 mx-auto"></div>
+                      <p className="mt-4 text-gray-600 dark:text-dark-text-secondary">読み込み中...</p>
                     </div>
                   ) : (
-                    <div className="bg-white rounded-lg shadow-sm">
-                      <div className="p-6 border-b border-gray-200">
+                    <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm">
+                      <div className="p-6 border-b border-gray-200 dark:border-dark-border">
                         <div className="flex items-center justify-between">
-                          <h2 className="text-lg font-medium text-gray-900">
+                          <h2 className="text-lg font-medium text-gray-900 dark:text-dark-text-primary">
                             掲載枠一覧 
-                            <span className="ml-2 text-sm text-gray-500">
+                            <span className="ml-2 text-sm text-gray-500 dark:text-dark-text-secondary">
                               ({promotionSlots.length}/5)
                             </span>
                           </h2>
                           <button 
                             onClick={handleCreateSlot}
                             disabled={promotionSlots.length >= 5}
-                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-800 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
                           >
                             <Upload className="h-4 w-4 mr-2" />
                             新規作成
@@ -780,9 +780,9 @@ export default function PromotionDashboard() {
                         </div>
                       </div>
                       
-                      <div className="divide-y divide-gray-200">
+                      <div className="divide-y divide-gray-200 dark:divide-dark-border">
                         {promotionSlots.length === 0 ? (
-                          <div className="p-6 text-center text-gray-500">
+                          <div className="p-6 text-center text-gray-500 dark:text-dark-text-secondary">
                             掲載枠がまだ登録されていません
                           </div>
                         ) : (
@@ -798,18 +798,18 @@ export default function PromotionDashboard() {
                                       className="w-full h-32 object-cover rounded-lg"
                                     />
                                   ) : (
-                                    <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center">
-                                      <ImageIcon className="w-8 h-8 text-gray-400" />
+                                    <div className="w-full h-32 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
+                                      <ImageIcon className="w-8 h-8 text-gray-400 dark:text-gray-500" />
                                     </div>
                                   )}
                                 </div>
                                 <div className="flex-grow">
-                                  <h3 className="text-sm font-medium text-gray-900">{slot.name}</h3>
-                                  <div className="mt-2 text-sm text-gray-500">
+                                  <h3 className="text-sm font-medium text-gray-900 dark:text-dark-text-primary">{slot.name}</h3>
+                                  <div className="mt-2 text-sm text-gray-500 dark:text-dark-text-secondary">
                                     <p>{slot.description}</p>
                                     <p className="mt-1">価格: ¥{slot.price.toLocaleString()}/日</p>
                                     {bookingsCount > 0 && (
-                                      <p className="mt-1 text-indigo-600">
+                                      <p className="mt-1 text-indigo-600 dark:text-indigo-400">
                                         アクティブな予約: {bookingsCount}件
                                       </p>
                                     )}
@@ -818,14 +818,14 @@ export default function PromotionDashboard() {
                                 <div className="flex items-center space-x-2">
                                   <button 
                                     onClick={() => handleEditSlot(slot.id)}
-                                    className="p-2 text-gray-400 hover:text-gray-500 transition-colors"
+                                    className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
                                   >
                                     <Edit className="h-5 w-5" />
                                   </button>
                                   <button 
                                     onClick={() => handleDeleteSlot(slot.id)}
                                     disabled={bookingsCount > 0}
-                                    className="p-2 text-gray-400 hover:text-red-500 disabled:text-gray-300 disabled:hover:text-gray-300 disabled:cursor-not-allowed transition-colors"
+                                    className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:hover:text-gray-300 dark:disabled:hover:text-gray-600 disabled:cursor-not-allowed transition-colors"
                                   >
                                     <Trash2 className="h-5 w-5" />
                                   </button>
@@ -847,27 +847,27 @@ export default function PromotionDashboard() {
           <div className="w-full">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center">
-                <FileText className="h-6 w-6 text-indigo-600 mr-2" />
-                <h2 className="text-2xl font-bold text-gray-900">予約管理</h2>
+                <FileText className="h-6 w-6 text-indigo-600 dark:text-indigo-400 mr-2" />
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-dark-text-primary">予約管理</h2>
               </div>
               <div className="flex items-center space-x-2">
                 <button
                   onClick={handleCreateBooking}
-                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 transition-colors"
                 >
                   <Calendar className="h-4 w-4 mr-1" />
                   新規予約
                 </button>
                 <button
                   onClick={refreshData}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-dark-border text-sm font-medium rounded-md text-gray-700 dark:text-dark-text-secondary bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
                   <RefreshCw className="h-4 w-4 mr-1" />
                   更新
                 </button>
                 <button
                   onClick={handleExportCSV}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-dark-border text-sm font-medium rounded-md text-gray-700 dark:text-dark-text-secondary bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
                   <FileText className="h-4 w-4 mr-1" />
                   CSVエクスポート
@@ -876,47 +876,47 @@ export default function PromotionDashboard() {
             </div>
 
             {loading ? (
-              <div className="text-center py-12 bg-white rounded-lg shadow-sm">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                <p className="mt-4 text-gray-600">読み込み中...</p>
+              <div className="text-center py-12 bg-white dark:bg-dark-surface rounded-lg shadow-sm">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-300 mx-auto"></div>
+                <p className="mt-4 text-gray-600 dark:text-dark-text-secondary">読み込み中...</p>
               </div>
             ) : (
-              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm overflow-hidden">
                 {bookings.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500">
+                  <div className="p-6 text-center text-gray-500 dark:text-dark-text-secondary">
                     予約データがありません
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
+                      <thead className="bg-gray-50 dark:bg-gray-800">
                         <tr>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">
                             予約情報
                           </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">
                             掲載枠
                           </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">
                             金額
                           </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">
                             期間
                           </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">
                             状態
                           </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">
                             決済情報
                           </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">
                             アクション
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
+                      <tbody className="bg-white dark:bg-dark-surface divide-y divide-gray-200 dark:divide-dark-border">
                         {bookings.map((booking) => (
-                          <tr key={booking.id} className="hover:bg-gray-50">
+                          <tr key={booking.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center">
                                 <div className="flex-shrink-0 h-10 w-10 relative">
@@ -927,26 +927,26 @@ export default function PromotionDashboard() {
                                       alt=""
                                     />
                                   ) : (
-                                    <div className="h-10 w-10 rounded bg-gray-100 flex items-center justify-center">
-                                      <ImageIcon className="h-5 w-5 text-gray-400" />
+                                    <div className="h-10 w-10 rounded bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                                      <ImageIcon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
                                     </div>
                                   )}
                                 </div>
                                 <div className="ml-4 max-w-xs truncate">
-                                  <div className="text-sm font-medium text-gray-900 truncate">
+                                  <div className="text-sm font-medium text-gray-900 dark:text-dark-text-primary truncate">
                                     {booking.video?.title || "タイトルなし"}
                                   </div>
-                                  <div className="text-xs text-gray-500">
+                                  <div className="text-xs text-gray-500 dark:text-dark-text-secondary">
                                     予約ID: {booking.id.substring(0, 8)}...
                                   </div>
                                 </div>
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{booking.slot?.name || "不明"}</div>
+                              <div className="text-sm text-gray-900 dark:text-dark-text-primary">{booking.slot?.name || "不明"}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">
+                              <div className="text-sm text-gray-900 dark:text-dark-text-primary">
                                 ¥{booking.amount_paid?.toLocaleString() || 0}
                               </div>
                               <div className="text-xs">
@@ -954,17 +954,17 @@ export default function PromotionDashboard() {
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">
+                              <div className="text-sm text-gray-900 dark:text-dark-text-primary">
                                 {formatDate(booking.start_date)} 〜 {formatDate(booking.end_date)}
                               </div>
-                              <div className="text-xs text-gray-500">
+                              <div className="text-xs text-gray-500 dark:text-dark-text-secondary">
                                 {booking.duration ? `${booking.duration}日間` : ''}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               {getStatusBadge(booking.status)}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-dark-text-secondary">
                               {booking.payment_intent_id ? (
                                 <>
                                   <div className="text-xs">
@@ -983,7 +983,7 @@ export default function PromotionDashboard() {
                                 {(booking.payment_status === 'pending' || booking.payment_status === 'processing') && (
                                   <button
                                     onClick={() => handleCompletePayment(booking.id, booking.payment_intent_id)}
-                                    className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded"
+                                    className="px-3 py-1 bg-green-600 dark:bg-green-700 hover:bg-green-700 dark:hover:bg-green-800 text-white text-xs rounded"
                                   >
                                     支払う
                                   </button>
@@ -992,7 +992,7 @@ export default function PromotionDashboard() {
                                 {(booking.status === 'active' || booking.status === 'pending') && (
                                   <button
                                     onClick={() => handleOpenCancelModal(booking)}
-                                    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded flex items-center"
+                                    className="px-3 py-1 bg-red-600 dark:bg-red-700 hover:bg-red-700 dark:hover:bg-red-800 text-white text-xs rounded flex items-center"
                                   >
                                     <Trash2 className="h-3 w-3 mr-1" />
                                     キャンセル
@@ -1016,17 +1016,17 @@ export default function PromotionDashboard() {
             {/* 分析タブのサブタブナビゲーション */}
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center">
-                <BarChart2 className="h-6 w-6 text-indigo-600 mr-2" />
-                <h2 className="text-2xl font-bold text-gray-900">分析</h2>
+                <BarChart2 className="h-6 w-6 text-indigo-600 dark:text-indigo-400 mr-2" />
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-dark-text-primary">分析</h2>
               </div>
               
               {/* 追加: サブタブナビゲーション */}
-              <div className="flex items-center space-x-2 bg-white rounded-lg shadow-sm p-1">
+              <div className="flex items-center space-x-2 bg-white dark:bg-dark-surface rounded-lg shadow-sm p-1">
                 <button 
                   className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
                     analyticsSubTab === 'cost' 
-                      ? 'bg-indigo-100 text-indigo-700' 
-                      : 'hover:bg-gray-100 text-gray-600'
+                      ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' 
+                      : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-dark-text-secondary'
                   }`}
                   onClick={() => setAnalyticsSubTab('cost')}
                 >
@@ -1036,8 +1036,8 @@ export default function PromotionDashboard() {
                 <button 
                   className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
                     analyticsSubTab === 'performance' 
-                      ? 'bg-indigo-100 text-indigo-700' 
-                      : 'hover:bg-gray-100 text-gray-600'
+                      ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' 
+                      : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-dark-text-secondary'
                   }`}
                   onClick={() => setAnalyticsSubTab('performance')}
                 >
@@ -1050,27 +1050,27 @@ export default function PromotionDashboard() {
             {/* 条件分岐: 費用分析または掲載効果分析を表示 */}
             {analyticsSubTab === 'cost' ? (
               <>
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">費用サマリー</h3>
+                <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm p-6">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-dark-text-primary mb-4">費用サマリー</h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                     <div className="mb-6">
-                        <h4 className="text-sm font-medium text-gray-500 mb-2">総予約数</h4>
-                        <p className="text-3xl font-bold text-gray-900">{analyticsData.totalBookings}件</p>
+                        <h4 className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary mb-2">総予約数</h4>
+                        <p className="text-3xl font-bold text-gray-900 dark:text-dark-text-primary">{analyticsData.totalBookings}件</p>
                       </div>
                     </div>
                     
                     <div>
                     <div className="mb-6">
-                      <h4 className="text-sm font-medium text-gray-500 mb-2">ステータス別予約</h4>
+                      <h4 className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary mb-2">ステータス別予約</h4>
                         <div className="mt-2 space-y-2">
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">アクティブ</span>
+                            <span className="text-sm text-gray-600 dark:text-dark-text-secondary">アクティブ</span>
                             <div className="flex items-center">
-                              <div className="w-32 h-2 bg-gray-200 rounded-full mr-2">
+                              <div className="w-32 h-2 bg-gray-200 dark:bg-gray-700 rounded-full mr-2">
                                 <div 
-                                  className="h-full bg-green-500 rounded-full" 
+                                  className="h-full bg-green-500 dark:bg-green-600 rounded-full" 
                                   style={{ 
                                     width: `${analyticsData.totalBookings 
                                       ? (analyticsData.activeBookings / analyticsData.totalBookings * 100) 
@@ -1078,17 +1078,17 @@ export default function PromotionDashboard() {
                                   }}
                                 ></div>
                               </div>
-                              <span className="text-sm font-medium text-gray-900">
+                              <span className="text-sm font-medium text-gray-900 dark:text-dark-text-primary">
                                 {analyticsData.activeBookings}件
                               </span>
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">完了</span>
+                          <span className="text-sm text-gray-600 dark:text-dark-text-secondary">完了</span>
                             <div className="flex items-center">
-                              <div className="w-32 h-2 bg-gray-200 rounded-full mr-2">
+                              <div className="w-32 h-2 bg-gray-200 dark:bg-gray-700 rounded-full mr-2">
                                 <div 
-                                  className="h-full bg-blue-500 rounded-full" 
+                                  className="h-full bg-blue-500 dark:bg-blue-600 rounded-full" 
                                   style={{ 
                                     width: `${analyticsData.totalBookings 
                                       ? (analyticsData.completedBookings / analyticsData.totalBookings * 100) 
@@ -1096,17 +1096,17 @@ export default function PromotionDashboard() {
                                   }}
                                 ></div>
                               </div>
-                              <span className="text-sm font-medium text-gray-900">
+                              <span className="text-sm font-medium text-gray-900 dark:text-dark-text-primary">
                                 {analyticsData.completedBookings}件
                               </span>
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">その他</span>
+                            <span className="text-sm text-gray-600 dark:text-dark-text-secondary">その他</span>
                             <div className="flex items-center">
-                              <div className="w-32 h-2 bg-gray-200 rounded-full mr-2">
+                              <div className="w-32 h-2 bg-gray-200 dark:bg-gray-700 rounded-full mr-2">
                                 <div 
-                                  className="h-full bg-gray-500 rounded-full" 
+                                  className="h-full bg-gray-500 dark:bg-gray-600 rounded-full" 
                                   style={{ 
                                     width: `${analyticsData.totalBookings 
                                       ? ((analyticsData.totalBookings - analyticsData.activeBookings - analyticsData.completedBookings) / analyticsData.totalBookings * 100) 
@@ -1114,7 +1114,7 @@ export default function PromotionDashboard() {
                                   }}
                                 ></div>
                               </div>
-                              <span className="text-sm font-medium text-gray-900">
+                              <span className="text-sm font-medium text-gray-900 dark:text-dark-text-primary">
                                 {analyticsData.totalBookings - analyticsData.activeBookings - analyticsData.completedBookings}件
                               </span>
                             </div>
@@ -1125,13 +1125,13 @@ export default function PromotionDashboard() {
                   </div>
                   
                   <div className="mt-8">
-                    <h4 className="text-sm font-medium text-gray-500 mb-4">予約データ詳細</h4>
-                    <p className="text-sm text-gray-500 mb-4">
+                    <h4 className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary mb-4">予約データ詳細</h4>
+                    <p className="text-sm text-gray-500 dark:text-dark-text-secondary mb-4">
                       詳細な費用データと分析はCSVをエクスポートして確認できます。
                     </p>
                     <button
                       onClick={handleExportCSV}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-800 transition-colors"
                     >
                       <FileText className="h-4 w-4 mr-2" />
                       予約データCSVをエクスポート
@@ -1139,123 +1139,123 @@ export default function PromotionDashboard() {
                   </div>
                 </div>
                 
-                <div className="mt-6 bg-white rounded-lg shadow-sm p-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">決済履歴</h3>
+                <div className="mt-6 bg-white dark:bg-dark-surface rounded-lg shadow-sm p-6">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-dark-text-primary mb-4">決済履歴</h3>
                   
                   {bookings.filter(b => b.payment_intent_id).length === 0 ? (
-                    <div className="text-center py-6 text-gray-500">
+                    <div className="text-center py-6 text-gray-500 dark:text-dark-text-secondary">
                       決済データがありません
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                      <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
+                        <thead className="bg-gray-50 dark:bg-gray-800">
                           <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">
                               日時
                             </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">
                               ID
                             </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">
                               掲載枠
                             </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">
                               金額
                             </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">
                               状態
                             </th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-white dark:bg-dark-surface divide-y divide-gray-200 dark:divide-dark-border">
                           {bookings
                             .filter(b => b.payment_intent_id)
                             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                             .map((booking) => (
-                              <tr key={booking.id} className="hover:bg-gray-50">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                  {formatDate(booking.created_at)}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="text-xs text-gray-900">
-                                    {booking.payment_intent_id?.substring(0, 12)}...
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="text-sm text-gray-900">{booking.slot?.name || "不明"}</div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="text-sm font-medium text-gray-900">
-                                    ¥{booking.amount_paid?.toLocaleString() || 0}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  {getStatusBadge(booking.status)}
-                                </td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              // 掲載効果分析タブの内容：AnalyticsDashboardコンポーネントを表示
-              <AnalyticsDashboard />
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* 掲載枠作成モーダル */}
-      <CreateSlotModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={handleSlotSuccess}
-      />
-
-      {/* 掲載枠編集モーダル */}
-      {selectedSlot && (
-        <EditSlotModal
-          isOpen={showEditModal}
-          onClose={() => setShowEditModal(false)}
-          onSuccess={handleSlotSuccess}
-          slot={selectedSlot}
-        />
-      )}
-
-      {/* 動画掲載予約モーダル */}
-      {showBookingModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
-              <h2 className="text-lg font-medium text-gray-900">動画掲載予約</h2>
-              <button 
-                onClick={() => setShowBookingModal(false)}
-                className="text-gray-400 hover:text-gray-500"
-              >
-                <XCircle className="h-6 w-6" />
-              </button>
-            </div>
-            <div className="p-4">
-              <BookingForm 
-                onSuccess={handleBookingSuccess}
-                onCancel={() => setShowBookingModal(false)}
-              />
-            </div>
-          </div>
+                              <tr key={booking.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-dark-text-secondary">
+                                {formatDate(booking.created_at)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-xs text-gray-900 dark:text-dark-text-primary">
+                                  {booking.payment_intent_id?.substring(0, 12)}...
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 dark:text-dark-text-primary">{booking.slot?.name || "不明"}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900 dark:text-dark-text-primary">
+                                  ¥{booking.amount_paid?.toLocaleString() || 0}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {getStatusBadge(booking.status)}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            // 掲載効果分析タブの内容：AnalyticsDashboardコンポーネントを表示
+            <AnalyticsDashboard />
+          )}
         </div>
       )}
-
-      {/* キャンセル確認モーダル */}
-      <CancelBookingModal
-        isOpen={cancelModalOpen}
-        booking={selectedBooking}
-        onClose={handleCloseCancelModal}
-        onConfirm={handleConfirmCancel}
-      />
     </div>
-  );
+
+    {/* 掲載枠作成モーダル */}
+    <CreateSlotModal
+      isOpen={showCreateModal}
+      onClose={() => setShowCreateModal(false)}
+      onSuccess={handleSlotSuccess}
+    />
+
+    {/* 掲載枠編集モーダル */}
+    {selectedSlot && (
+      <EditSlotModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        onSuccess={handleSlotSuccess}
+        slot={selectedSlot}
+      />
+    )}
+
+    {/* 動画掲載予約モーダル */}
+    {showBookingModal && (
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-dark-surface rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+          <div className="p-4 border-b border-gray-200 dark:border-dark-border flex justify-between items-center sticky top-0 bg-white dark:bg-dark-surface z-10">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-dark-text-primary">動画掲載予約</h2>
+            <button 
+              onClick={() => setShowBookingModal(false)}
+              className="text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400"
+            >
+              <XCircle className="h-6 w-6" />
+            </button>
+          </div>
+          <div className="p-4">
+            <BookingForm 
+              onSuccess={handleBookingSuccess}
+              onCancel={() => setShowBookingModal(false)}
+            />
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* キャンセル確認モーダル */}
+    <CancelBookingModal
+      isOpen={cancelModalOpen}
+      booking={selectedBooking}
+      onClose={handleCloseCancelModal}
+      onConfirm={handleConfirmCancel}
+    />
+  </div>
+);
 }

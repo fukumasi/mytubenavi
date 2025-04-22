@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  darkMode: 'class', // ダークモードを'class'戦略で有効化
   theme: {
     extend: {
       colors: {
@@ -15,6 +16,16 @@ export default {
           700: '#0369a1',
           800: '#075985',
           900: '#0c4a6e',
+        },
+        // ダークモード用の追加カラー 柔らかい色調に変更
+        dark: {
+          bg: '#15202B',
+          surface: '#192734',
+          border: '#253341',
+          text: {
+            primary: '#FFFFFF',
+            secondary: '#8899A6',
+          }
         },
       },
       spacing: {

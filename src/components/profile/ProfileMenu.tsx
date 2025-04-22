@@ -62,7 +62,7 @@ export default function ProfileMenu() {
     },
     {
       path: isPremium ? '/premium/dashboard' : '/premium/upgrade',
-      icon: <Crown className={`h-5 w-5 ${isPremium ? 'text-yellow-500' : 'text-gray-400'}`} />,
+      icon: <Crown className={`h-5 w-5 ${isPremium ? 'text-yellow-500' : 'text-gray-400 dark:text-gray-500'}`} />,
       label: 'プレミアム',
       badge: getPremiumBadgeText(),
       badgeColor
@@ -100,15 +100,15 @@ export default function ProfileMenu() {
           className={({ isActive }) =>
             `flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
               isActive
-                ? 'bg-blue-100 text-blue-700'
-                : 'text-gray-900 hover:bg-gray-100'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                : 'text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-dark-surface'
             }`
           }
         >
           <span className="mr-3">{item.icon}</span>
           {item.label}
           {item.badge && (
-            <span className={`ml-auto bg-${item.badgeColor || 'yellow'}-100 text-${item.badgeColor || 'yellow'}-800 text-xs px-2 py-1 rounded-full`}>
+            <span className={`ml-auto bg-${item.badgeColor || 'yellow'}-100 dark:bg-${item.badgeColor || 'yellow'}-900/30 text-${item.badgeColor || 'yellow'}-800 dark:text-${item.badgeColor || 'yellow'}-300 text-xs px-2 py-1 rounded-full`}>
               {item.badge}
             </span>
           )}

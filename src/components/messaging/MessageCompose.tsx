@@ -153,13 +153,13 @@ const MessageCompose: React.FC<MessageComposeProps> = ({
    (!isPremium && !isHighlighted && !hasEnoughPoints(POINT_COSTS.REGULAR_MESSAGE));
 
  return (
-   <div className="mt-4 border-t pt-3">
+   <div className="mt-4 border-t dark:border-dark-border pt-3">
      {verificationState.level < VerificationLevel.PHONE_VERIFIED && !verificationState.loading && (
-       <div className="mb-3 p-2 bg-yellow-100 border border-yellow-300 rounded-md text-sm">
-         <p className="flex items-center text-yellow-800">
+       <div className="mb-3 p-2 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-800/50 rounded-md text-sm">
+         <p className="flex items-center text-yellow-800 dark:text-yellow-300">
            <FontAwesomeIcon icon={faExclamationTriangle} className="mr-2" />
            メッセージ送信には電話番号認証が必要です。
-           <a href="/profile/verification" className="ml-2 text-blue-600 font-medium hover:underline">
+           <a href="/profile/verification" className="ml-2 text-blue-600 dark:text-blue-400 font-medium hover:underline">
              今すぐ認証する
            </a>
          </p>
@@ -167,7 +167,7 @@ const MessageCompose: React.FC<MessageComposeProps> = ({
      )}
      
      {error && (
-       <div className="mb-2 text-red-600 text-sm font-medium">
+       <div className="mb-2 text-red-600 dark:text-red-400 text-sm font-medium">
          <span className="flex items-center">
            <FontAwesomeIcon icon={faLock} className="mr-1" />
            {error}
@@ -190,9 +190,9 @@ const MessageCompose: React.FC<MessageComposeProps> = ({
                  : "メッセージを入力..."
          }
          className={`w-full p-3 pr-16 border ${
-           isHighlighted ? 'border-yellow-400 bg-yellow-50' : 'border-gray-300'
+           isHighlighted ? 'border-yellow-400 dark:border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20' : 'border-gray-300 dark:border-dark-border dark:bg-dark-surface dark:text-dark-text-primary'
          } rounded-lg resize-none min-h-[60px] transition-colors focus:outline-none focus:ring-2 ${
-           isHighlighted ? 'focus:ring-yellow-400' : 'focus:ring-blue-500'
+           isHighlighted ? 'focus:ring-yellow-400 dark:focus:ring-yellow-500' : 'focus:ring-blue-500 dark:focus:ring-blue-400'
          }`}
          disabled={disabled || isSending || verificationState.level < VerificationLevel.PHONE_VERIFIED}
          rows={1}
@@ -207,10 +207,10 @@ const MessageCompose: React.FC<MessageComposeProps> = ({
            disabled={!isPremium || disabled || isSending || verificationState.level < VerificationLevel.PHONE_VERIFIED}
            className={`rounded-full p-2 transition-colors focus:outline-none ${
              !isPremium || verificationState.level < VerificationLevel.PHONE_VERIFIED
-               ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+               ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
                : isHighlighted
-                 ? 'bg-yellow-400 text-white hover:bg-yellow-500' 
-                 : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                 ? 'bg-yellow-400 dark:bg-yellow-500 text-white hover:bg-yellow-500 dark:hover:bg-yellow-600' 
+                 : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
            }`}
            title={isPremium ? 'ハイライトメッセージ' : 'プレミアム会員限定機能'}
          >
@@ -223,10 +223,10 @@ const MessageCompose: React.FC<MessageComposeProps> = ({
            disabled={isSendButtonDisabled}
            className={`rounded-full p-2 transition-colors focus:outline-none ${
              isSendButtonDisabled
-               ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+               ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
                : isHighlighted
-                 ? 'bg-yellow-500 text-white hover:bg-yellow-600'
-                 : 'bg-blue-500 text-white hover:bg-blue-600'
+                 ? 'bg-yellow-500 dark:bg-yellow-600 text-white hover:bg-yellow-600 dark:hover:bg-yellow-700'
+                 : 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700'
            }`}
            title="送信"
          >
@@ -237,8 +237,8 @@ const MessageCompose: React.FC<MessageComposeProps> = ({
      
      {/* ポイント表示 - 認証レベルが十分の場合のみ表示 */}
      {verificationState.level >= VerificationLevel.PHONE_VERIFIED && (
-       <div className="mt-1 text-right text-sm text-gray-500 flex justify-end items-center">
-         <FontAwesomeIcon icon={faCoins} className="mr-1 text-yellow-500" />
+       <div className="mt-1 text-right text-sm text-gray-500 dark:text-dark-text-secondary flex justify-end items-center">
+         <FontAwesomeIcon icon={faCoins} className="mr-1 text-yellow-500 dark:text-yellow-400" />
          <span>
            {isPremium 
              ? 'プレミアム会員：ポイント消費なし'
@@ -251,7 +251,7 @@ const MessageCompose: React.FC<MessageComposeProps> = ({
      )}
      
      {/* 文字数カウンター */}
-     <div className="mt-1 text-right text-xs text-gray-400">
+     <div className="mt-1 text-right text-xs text-gray-400 dark:text-gray-500">
        {message.length}/500文字
      </div>
    </div>

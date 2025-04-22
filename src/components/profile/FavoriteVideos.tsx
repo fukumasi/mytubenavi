@@ -15,7 +15,7 @@ function FavoriteVideoCard({ video }: FavoriteVideoCardProps) {
     return (
         <div
             onClick={() => navigate(`/video/${video.youtube_id}`)}
-            className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+            className="bg-white dark:bg-dark-surface rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
         >
             <div className="flex p-4">
                 <div className="relative flex-shrink-0 w-48">
@@ -32,15 +32,15 @@ function FavoriteVideoCard({ video }: FavoriteVideoCardProps) {
                 </div>
 
                 <div className="ml-4 flex-grow">
-                    <h3 className="text-lg font-medium text-gray-900 mb-2 line-clamp-2">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-dark-text-primary mb-2 line-clamp-2">
                         {video.title}
                     </h3>
 
-                    <div className="flex items-center text-sm text-gray-600 mb-2">
+                    <div className="flex items-center text-sm text-gray-600 dark:text-dark-text-secondary mb-2">
                         <span className="font-medium">{video.channel_title}</span>
                     </div>
 
-                    <div className="flex items-center space-x-4 text-sm text-gray-500">
+                    <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-dark-text-secondary">
                         <div className="flex items-center">
                             <Eye className="h-4 w-4 mr-1" />
                             <span>{video.view_count ? `${(video.view_count / 10000).toFixed(1)}万回視聴` : '再生回数不明'}</span>
@@ -74,7 +74,7 @@ function FavoriteVideosContent({ videos, loading, error }: FavoriteVideosContent
     if (loading) {
         return (
             <div className="flex justify-center items-center min-h-[200px]">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 dark:border-blue-400"></div>
             </div>
         );
     }
@@ -82,10 +82,10 @@ function FavoriteVideosContent({ videos, loading, error }: FavoriteVideosContent
     if (error) {
         return (
             <div className="text-center py-8">
-                <p className="text-red-600">{error}</p>
+                <p className="text-red-600 dark:text-red-400">{error}</p>
                 <button
                     onClick={() => window.location.reload()}
-                    className="mt-4 text-indigo-600 hover:text-indigo-500"
+                    className="mt-4 text-indigo-600 hover:text-indigo-500 dark:text-blue-400 dark:hover:text-blue-300"
                 >
                     再読み込み
                 </button>
@@ -96,10 +96,10 @@ function FavoriteVideosContent({ videos, loading, error }: FavoriteVideosContent
     if (videos.length === 0) {
         return (
             <div className="text-center py-8">
-                <p className="text-gray-600">お気に入りの動画はまだありません。</p>
+                <p className="text-gray-600 dark:text-dark-text-secondary">お気に入りの動画はまだありません。</p>
                 <button
                     onClick={() => navigate('/')}
-                    className="mt-4 text-indigo-600 hover:text-indigo-500"
+                    className="mt-4 text-indigo-600 hover:text-indigo-500 dark:text-blue-400 dark:hover:text-blue-300"
                 >
                     動画を探す
                 </button>
@@ -177,8 +177,8 @@ export default function FavoriteVideos() {
         <ProfileLayout>
             <div className="space-y-6">
                 <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-gray-900">お気に入り動画</h2>
-                    <span className="text-sm text-gray-500">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-dark-text-primary">お気に入り動画</h2>
+                    <span className="text-sm text-gray-500 dark:text-dark-text-secondary">
                         {!loading && !error && `${videos.length}件の動画`}
                     </span>
                 </div>

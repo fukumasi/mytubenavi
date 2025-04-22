@@ -38,8 +38,8 @@ const ProfileLayout: React.FC<ProfileLayoutProps> = ({ children }) => {
         onClick={() => handleMenuClick(item.path)}
         className={`w-full text-left px-4 py-3 flex items-center justify-between rounded-lg transition-colors
           ${isActive 
-            ? 'bg-blue-100 text-blue-700' 
-            : 'hover:bg-gray-100'
+            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' 
+            : 'hover:bg-gray-100 dark:hover:bg-dark-surface'
           }`}
       >
         <div className="flex items-center gap-3">
@@ -47,7 +47,7 @@ const ProfileLayout: React.FC<ProfileLayoutProps> = ({ children }) => {
           <span>{item.label}</span>
         </div>
         {item.count !== undefined && (
-          <span className="bg-gray-200 text-gray-700 text-sm px-2 py-1 rounded-full">
+          <span className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm px-2 py-1 rounded-full">
             {item.count}
           </span>
         )}
@@ -69,7 +69,7 @@ const ProfileLayout: React.FC<ProfileLayoutProps> = ({ children }) => {
 
         {/* Main Content */}
         <main className="flex-1 min-w-0">
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white dark:bg-dark-surface rounded-lg shadow dark:shadow-none dark:border dark:border-dark-border p-6">
             {children}
           </div>
         </main>

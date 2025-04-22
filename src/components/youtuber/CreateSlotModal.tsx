@@ -220,24 +220,24 @@ export default function CreateSlotModal({
   
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full p-6">
+      <div className="bg-white dark:bg-dark-surface rounded-lg max-w-2xl w-full p-6">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-gray-900">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-dark-text-primary">
             {slot ? '掲載枠の編集' : '新規掲載枠の作成'}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-500"
+            className="text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400"
           >
             <X className="h-6 w-6" />
           </button>
         </div>
         
         {error && (
-          <div className="mb-4 bg-red-50 p-4 rounded-md">
+          <div className="mb-4 bg-red-50 dark:bg-red-900/30 p-4 rounded-md">
             <div className="flex">
-              <AlertTriangle className="h-5 w-5 text-red-400 mr-2" />
-              <p className="text-sm text-red-700">{error}</p>
+              <AlertTriangle className="h-5 w-5 text-red-400 dark:text-red-300 mr-2" />
+              <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
             </div>
           </div>
         )}
@@ -245,8 +245,8 @@ export default function CreateSlotModal({
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                掲載枠名 <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-primary mb-1">
+                掲載枠名 <span className="text-red-500 dark:text-red-400">*</span>
               </label>
               <input
                 type="text"
@@ -254,16 +254,16 @@ export default function CreateSlotModal({
                 value={formData.name}
                 onChange={handleChange}
                 required
-                className="w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="w-full rounded-md border border-gray-300 dark:border-dark-border p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-dark-surface dark:text-dark-text-primary"
                 placeholder="管理用の名前（例: 春の新作PR用トップページ枠）"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-gray-500 dark:text-dark-text-secondary">
                 あなたの管理用に覚えやすい名前をつけてください。この名前はダッシュボードでの識別用です。
               </p>
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-primary mb-1">
                 説明
               </label>
               <textarea
@@ -271,36 +271,36 @@ export default function CreateSlotModal({
                 value={formData.description}
                 onChange={handleChange}
                 rows={3}
-                className="w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="w-full rounded-md border border-gray-300 dark:border-dark-border p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-dark-surface dark:text-dark-text-primary"
                 placeholder="この掲載枠の特徴や表示場所などを記入してください"
               />
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  タイプ <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-primary mb-1">
+                  タイプ <span className="text-red-500 dark:text-red-400">*</span>
                 </label>
                 <select
                   name="type"
                   value={formData.type}
                   onChange={handleChange}
                   required
-                  className="w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  className="w-full rounded-md border border-gray-300 dark:border-dark-border p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-dark-surface dark:text-dark-text-primary"
                 >
                   <option value="premium">プレミアム</option>
                   <option value="sidebar">サイドバー</option>
                   <option value="genre">ジャンルページ</option>
                   <option value="related">関連動画</option>
                 </select>
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-gray-500 dark:text-dark-text-secondary">
                   掲載位置により表示効果や露出度が異なります
                 </p>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  1日あたりの価格 (円) <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-primary mb-1">
+                  1日あたりの価格 (円) <span className="text-red-500 dark:text-red-400">*</span>
                 </label>
                 <input
                   type="number"
@@ -310,11 +310,11 @@ export default function CreateSlotModal({
                   required
                   min={0}
                   step={100}
-                  className="w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  className="w-full rounded-md border border-gray-300 dark:border-dark-border p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-dark-surface dark:text-dark-text-primary"
                 />
                 <div className="mt-1 flex items-start">
-                  <Info className="h-4 w-4 text-blue-500 mr-1 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-blue-600">
+                  <Info className="h-4 w-4 text-blue-500 dark:text-blue-400 mr-1 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-blue-600 dark:text-blue-400">
                     推奨価格帯: {currentTypePrice.min}円〜{currentTypePrice.max}円
                     {formData.price === 0 && " (無料掲載も可能ですが、有料掲載の方が優先表示されます)"}
                   </p>
@@ -323,8 +323,8 @@ export default function CreateSlotModal({
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                YouTube URL <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-primary mb-1">
+                YouTube URL <span className="text-red-500 dark:text-red-400">*</span>
               </label>
               <div className="flex items-center">
                 <div className="relative flex-grow">
@@ -337,12 +337,12 @@ export default function CreateSlotModal({
                     value={formData.youtubeUrl}
                     onChange={handleYouTubeUrlChange}
                     required
-                    className="w-full rounded-md border border-gray-300 pl-10 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    className="w-full rounded-md border border-gray-300 dark:border-dark-border pl-10 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-dark-surface dark:text-dark-text-primary"
                     placeholder="https://www.youtube.com/watch?v=..."
                   />
                 </div>
               </div>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-gray-500 dark:text-dark-text-secondary">
                 YouTubeの動画URLを入力してください。サムネイルは自動的に取得されます。
               </p>
             </div>
@@ -350,7 +350,7 @@ export default function CreateSlotModal({
             {/* サムネイルプレビュー */}
             {formData.youtube_id && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-primary mb-1">
                   サムネイルプレビュー
                 </label>
                 <div className="mt-1">
@@ -364,9 +364,9 @@ export default function CreateSlotModal({
             )}
             
             {/* 価格設定に関する説明 */}
-            <div className="bg-blue-50 p-4 rounded-md">
-              <h3 className="text-sm font-medium text-blue-700 mb-2">価格設定のガイドライン</h3>
-              <ul className="text-xs text-blue-600 space-y-1 list-disc pl-4">
+            <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-md">
+              <h3 className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">価格設定のガイドライン</h3>
+              <ul className="text-xs text-blue-600 dark:text-blue-300 space-y-1 list-disc pl-4">
                 <li>掲載価格は0円から設定可能ですが、有料掲載の方が優先的に表示されます</li>
                 <li>掲載位置によって推奨価格が異なります（プレミアム枠が最も露出度が高く、効果的です）</li>
                 <li>初期は低価格から始めて、効果を見ながら調整することをお勧めします</li>
@@ -379,14 +379,14 @@ export default function CreateSlotModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 dark:border-dark-border rounded-md text-sm font-medium text-gray-700 dark:text-dark-text-primary hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               キャンセル
             </button>
             <button
               type="submit"
               disabled={loading || !formData.name || !formData.youtube_id}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+              className="px-4 py-2 bg-indigo-600 dark:bg-indigo-700 text-white rounded-md text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-800 disabled:opacity-50"
             >
               {loading ? '保存中...' : (slot ? '更新する' : '作成する')}
             </button>

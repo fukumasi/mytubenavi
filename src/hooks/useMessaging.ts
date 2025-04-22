@@ -18,6 +18,7 @@ export const useMessaging = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [unreadMessageCount, setUnreadMessageCount] = useState<number>(0);
   const [verificationState, setVerificationState] = useState<{
     level: VerificationLevel;
     loading: boolean;
@@ -57,6 +58,15 @@ export const useMessaging = () => {
     fetchVerificationLevel();
   }, [user]);
 
+  // 未読メッセージの数を計算する関数
+  const calculateUnreadMessageCount = useCallback((conversationsData: ConversationWithProfile[]) => {
+    if (!user) return 0;
+    
+    return conversationsData.reduce((count, conversation) => {
+      return count + (conversation.unread_count || 0);
+    }, 0);
+  }, [user]);
+
   // 会話一覧を取得
   const fetchConversations = useCallback(async () => {
     if (!user) return;
@@ -65,6 +75,10 @@ export const useMessaging = () => {
       setLoading(true);
       console.log('会話一覧を取得します');
       const conversationsData = await messagingService.getConversations(user.id);
+      
+      // 未読メッセージ数を計算
+      const unreadCount = calculateUnreadMessageCount(conversationsData);
+      setUnreadMessageCount(unreadCount);
       
       // 前の状態と異なる場合のみ更新
       setConversations(prev => {
@@ -81,7 +95,7 @@ export const useMessaging = () => {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, calculateUnreadMessageCount]);
 
   // 特定の会話のメッセージを取得
   const fetchMessages = useCallback(async (conversationId: string) => {
@@ -108,13 +122,16 @@ export const useMessaging = () => {
       
       // メッセージを既読にする
       await messagingService.markMessagesAsRead(conversationId, user.id);
+      
+      // 会話一覧を再取得して未読数を更新
+      await fetchConversations();
     } catch (err) {
       console.error('Error fetching messages:', err);
       setError('メッセージの取得に失敗しました');
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, fetchConversations]);
 
   // 会話を作成
   const createConversation = useCallback(async (otherUserId: string) => {
@@ -278,6 +295,8 @@ export const useMessaging = () => {
         // 自分宛てのメッセージが来たら既読にする
         if (newMessage.receiver_id === user.id) {
           messagingService.markMessagesAsRead(currentConversation, user.id);
+          // 会話一覧を再取得して未読数を更新
+          fetchConversations();
         }
         
         // メッセージ一覧に追加（重複を避ける）
@@ -303,7 +322,7 @@ export const useMessaging = () => {
       }
       isMessageSubscribedRef.current = false;
     };
-  }, [user, currentConversation]);
+  }, [user, currentConversation, fetchConversations]);
 
   // 会話一覧のリアルタイム更新
   useEffect(() => {
@@ -354,6 +373,7 @@ export const useMessaging = () => {
     currentConversation,
     loading,
     error,
+    unreadMessageCount,
     verificationState,
     fetchConversations,
     fetchMessages,

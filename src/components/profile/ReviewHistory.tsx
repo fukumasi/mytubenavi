@@ -115,7 +115,7 @@ const ReviewHistory = () => {
     return (
       <ProfileLayout>
         <div className="flex justify-center items-center min-h-[200px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 dark:border-blue-400"></div>
         </div>
       </ProfileLayout>
     );
@@ -125,10 +125,10 @@ const ReviewHistory = () => {
     return (
       <ProfileLayout>
         <div className="text-center py-6">
-          <p className="text-red-600">{error}</p>
+          <p className="text-red-600 dark:text-red-400">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-3 text-indigo-600 hover:text-indigo-500"
+            className="mt-3 text-indigo-600 hover:text-indigo-500 dark:text-blue-400 dark:hover:text-blue-300"
           >
             再読み込み
           </button>
@@ -141,10 +141,10 @@ const ReviewHistory = () => {
     return (
       <ProfileLayout>
         <div className="text-center py-6">
-          <p className="text-gray-600">まだレビューを投稿していません。</p>
+          <p className="text-gray-600 dark:text-dark-text-secondary">まだレビューを投稿していません。</p>
           <button
             onClick={() => navigate('/')}
-            className="mt-3 text-indigo-600 hover:text-indigo-500"
+            className="mt-3 text-indigo-600 hover:text-indigo-500 dark:text-blue-400 dark:hover:text-blue-300"
           >
             動画を探す
           </button>
@@ -157,34 +157,34 @@ const ReviewHistory = () => {
     <ProfileLayout>
       <div className="space-y-4">
         <div className="flex justify-between items-center mb-2">
-          <h2 className="text-xl font-semibold text-gray-900">評価・レビュー履歴</h2>
-          <span className="text-sm text-gray-500">{reviews.length}件のレビュー</span>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-dark-text-primary">評価・レビュー履歴</h2>
+          <span className="text-sm text-gray-500 dark:text-dark-text-secondary">{reviews.length}件のレビュー</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 dark:bg-dark-surface">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">
                   動画
                 </th>
-                <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ width: '90px' }}>
+                <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider" style={{ width: '90px' }}>
                   評価
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">
                   コメント
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ width: '100px' }}>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider" style={{ width: '100px' }}>
                   投稿日
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-dark-bg divide-y divide-gray-200 dark:divide-dark-border">
               {reviews.map(review => (
                 <tr 
                   key={review.id}
                   onClick={() => handleVideoClick(review.video_id)}
-                  className="hover:bg-gray-50 cursor-pointer"
+                  className="hover:bg-gray-50 dark:hover:bg-dark-surface cursor-pointer"
                 >
                   <td className="px-3 py-3 align-top">
                     <div className="flex items-start">
@@ -199,10 +199,10 @@ const ReviewHistory = () => {
                         />
                       </div>
                       <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900 line-clamp-2 max-w-xs">
+                        <div className="text-sm font-medium text-gray-900 dark:text-dark-text-primary line-clamp-2 max-w-xs">
                           {review.videoTitle}
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-gray-500 dark:text-dark-text-secondary mt-1">
                           ID: {review.video_id}
                         </div>
                       </div>
@@ -214,20 +214,20 @@ const ReviewHistory = () => {
                         {[1, 2, 3, 4, 5].map(star => (
                           <Star 
                             key={star} 
-                            className={`h-3 w-3 ${star <= review.rating ? 'text-yellow-400' : 'text-gray-300'}`}
+                            className={`h-3 w-3 ${star <= review.rating ? 'text-yellow-400' : 'text-gray-300 dark:text-gray-600'}`}
                             fill={star <= review.rating ? "currentColor" : "none"}
                           />
                         ))}
                       </div>
-                      <span className="ml-1 text-xs text-gray-700">{review.rating}</span>
+                      <span className="ml-1 text-xs text-gray-700 dark:text-dark-text-secondary">{review.rating}</span>
                     </div>
                   </td>
                   <td className="px-3 py-3 align-top">
-                    <div className="text-xs text-gray-900 line-clamp-2 max-w-xs">
+                    <div className="text-xs text-gray-900 dark:text-dark-text-primary line-clamp-2 max-w-xs">
                       {review.comment || "コメントなし"}
                     </div>
                   </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-500 align-top">
+                  <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-500 dark:text-dark-text-secondary align-top">
                     {new Date(review.created_at).toLocaleDateString('ja-JP')}
                   </td>
                 </tr>

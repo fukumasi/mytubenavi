@@ -142,15 +142,15 @@ const PremiumDashboardPage: React.FC = () => {
             redirectUrl="/premium/upgrade"
           />
         ) : (
-          <div className="p-6 max-w-4xl mx-auto bg-white rounded-lg shadow-md">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">プレミアム会員特典</h2>
-            <p className="text-lg text-gray-700 mb-6">
+          <div className="p-6 max-w-4xl mx-auto bg-white dark:bg-dark-surface rounded-lg shadow-md">
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-dark-text-primary mb-4">プレミアム会員特典</h2>
+            <p className="text-lg text-gray-700 dark:text-dark-text-secondary mb-6">
               プレミアム会員になると、より多くの特典を利用できます。
             </p>
             <div className="flex justify-center">
               <button
                 onClick={() => navigate('/premium/upgrade')}
-                className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                className="px-6 py-3 bg-blue-600 dark:bg-blue-700 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               >
                 プレミアム会員にアップグレード
               </button>
@@ -164,7 +164,7 @@ const PremiumDashboardPage: React.FC = () => {
   return (
     <ProfileLayout>
       {error ? (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-800/50 text-red-700 dark:text-red-400 px-4 py-3 rounded mb-4">
           {error}
           <button
             onClick={() => window.location.reload()}

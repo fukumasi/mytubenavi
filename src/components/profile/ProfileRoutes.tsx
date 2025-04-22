@@ -56,15 +56,15 @@ export default function ProfileRoutes() {
   };
 
   return (
-    <div className="bg-white shadow rounded-lg overflow-hidden">
-      <div className="border-b">
+    <div className="bg-white dark:bg-dark-surface shadow dark:shadow-none dark:border dark:border-dark-border rounded-lg overflow-hidden">
+      <div className="border-b dark:border-dark-border">
         <nav className="flex overflow-x-auto">
           <Link
             to="/profile"
             className={`px-6 py-4 text-sm font-medium ${
               isActive('') 
-                ? 'text-indigo-600 border-b-2 border-indigo-600' 
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' 
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
             プロフィール
@@ -73,8 +73,8 @@ export default function ProfileRoutes() {
             to="/profile/favorites"
             className={`px-6 py-4 text-sm font-medium ${
               isActive('/favorites') 
-                ? 'text-indigo-600 border-b-2 border-indigo-600' 
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' 
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
             お気に入り動画
@@ -83,8 +83,8 @@ export default function ProfileRoutes() {
             to="/profile/reviews"
             className={`px-6 py-4 text-sm font-medium ${
               isActive('/reviews') 
-                ? 'text-indigo-600 border-b-2 border-indigo-600' 
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' 
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
             口コミ・評価履歴
@@ -93,8 +93,8 @@ export default function ProfileRoutes() {
             to="/profile/history"
             className={`px-6 py-4 text-sm font-medium ${
               isActive('/history') 
-                ? 'text-indigo-600 border-b-2 border-indigo-600' 
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' 
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
             視聴履歴
@@ -103,13 +103,13 @@ export default function ProfileRoutes() {
             to="/profile/matching"
             className={`px-6 py-4 text-sm font-medium flex items-center ${
               isActive('/matching') 
-                ? 'text-indigo-600 border-b-2 border-indigo-600' 
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' 
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
             おすすめユーザー
             {!loading && matchCount > 0 && (
-              <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-indigo-100 bg-indigo-600 rounded-full">
+              <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-indigo-100 bg-indigo-600 dark:bg-indigo-700 rounded-full">
                 {matchCount}
               </span>
             )}
@@ -118,8 +118,8 @@ export default function ProfileRoutes() {
             to="/profile/notifications"
             className={`px-6 py-4 text-sm font-medium ${
               isActive('/notifications') 
-                ? 'text-indigo-600 border-b-2 border-indigo-600' 
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' 
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
             通知
@@ -128,8 +128,8 @@ export default function ProfileRoutes() {
             to="/profile/verification"
             className={`px-6 py-4 text-sm font-medium flex items-center ${
               isActive('/verification') 
-                ? 'text-indigo-600 border-b-2 border-indigo-600' 
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' 
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
             アカウント認証
@@ -139,8 +139,8 @@ export default function ProfileRoutes() {
             to="/profile/settings"
             className={`px-6 py-4 text-sm font-medium ${
               isActive('/settings') 
-                ? 'text-indigo-600 border-b-2 border-indigo-600' 
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' 
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
             設定
@@ -158,11 +158,11 @@ export default function ProfileRoutes() {
           <Route path="/matching" element={
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold">おすすめユーザー</h2>
+                <h2 className="text-xl font-bold dark:text-dark-text-primary">おすすめユーザー</h2>
                 {!isPremium && (
                   <Link 
                     to="/premium/upgrade" 
-                    className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+                    className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300"
                   >
                     プレミアム会員になってフル機能を利用する
                   </Link>
@@ -170,16 +170,16 @@ export default function ProfileRoutes() {
               </div>
               
               {!isPremium && (
-                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg mb-6">
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg mb-6">
                   <div className="flex items-start">
                     <div className="flex-shrink-0">
-                      <Users className="h-5 w-5 text-yellow-600" />
+                      <Users className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
                     </div>
                     <div className="ml-3">
-                      <h3 className="text-sm font-medium text-yellow-800">
+                      <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-500">
                         プレミアム会員限定の機能があります
                       </h3>
-                      <div className="mt-2 text-sm text-yellow-700">
+                      <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-600">
                         <p>
                           プレミアム会員になると、メッセージ機能や詳細なユーザー情報の閲覧など、
                           より充実したマッチング機能をご利用いただけます。

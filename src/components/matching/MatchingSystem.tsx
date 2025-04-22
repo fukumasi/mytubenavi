@@ -3,18 +3,21 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMatching } from '@/hooks/useMatching';
 import { supabase } from '@/lib/supabase';
-import { Crown, Lock, Users, AlertCircle, RefreshCw } from 'lucide-react';
+import { Crown, Lock, Users, AlertCircle, RefreshCw, Zap, Filter } from 'lucide-react';
 import UserCard from '@/components/matching/UserCard';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Link } from 'react-router-dom';
 import { ConnectionStatus, MatchingUser } from '@/types/matching';
 import { toast } from 'react-hot-toast';
 import { connectUsers } from '@/services/matchingService';
+import { notificationService } from '@/services/notificationService';
+
 interface MatchingSystemProps {
   limit?: number;
+  matchedOnly?: boolean; // マッチング済みユーザーのみを表示するかどうか
 }
 
-export default function MatchingSystem({ limit }: MatchingSystemProps) {
+export default function MatchingSystem({ limit, matchedOnly = false }: MatchingSystemProps) {
   const { user, isPremium } = useAuth();
   const {
     loading, 
@@ -24,7 +27,10 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
     initializeDefaultPreferences,
     likeUser,
     skipUser,
-    pointBalance
+    pointBalance,
+    isRelaxedMode,
+    toggleRelaxedMode,
+    error: matchingError
   } = useMatching();
   
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +42,8 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
   const [connectionChanged, setConnectionChanged] = useState(false);
   // 更新されたマッチングユーザーリスト
   const [updatedMatchedUsers, setUpdatedMatchedUsers] = useState<MatchingUser[]>([]);
+  // 緩和モード試行中かどうかのフラグ
+  const [attemptedRelaxedMode, setAttemptedRelaxedMode] = useState(false);
   
   // useRefを使用して初期ロードが完了したかを追跡
   const initialLoadDone = useRef(false);
@@ -63,23 +71,39 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
     }
   }, [matchedUsers]);
 
+  // エラーを表示するuseEffect
+  useEffect(() => {
+    if (matchingError) {
+      setError(matchingError);
+    }
+  }, [matchingError]);
+
   // マッチングデータを取得する関数
-  const loadMatches = useCallback(async () => {
+  const loadMatches = useCallback(async (useRelaxedMode: boolean = false) => {
     if (isFetchingRef.current) {
       console.log('既にロード中のため、取得をスキップします');
       return;
     }
     
     try {
-      console.log('マッチング取得開始');
+      console.log('マッチング取得開始', useRelaxedMode ? '(緩和モード)' : '');
       setIsFetching(true);
       isFetchingRef.current = true;
       
       // マッチング設定がない場合に初期化する
       await initializeDefaultPreferences();
+
+      // 緩和モードを適用するかどうか
+      if (useRelaxedMode && !isRelaxedMode) {
+        toggleRelaxedMode(true);
+        setAttemptedRelaxedMode(true);
+      } else if (!useRelaxedMode && isRelaxedMode) {
+        toggleRelaxedMode(false);
+        setAttemptedRelaxedMode(false);
+      }
       
-      // マッチング済みユーザーのみを取得するよう変更
-      await fetchMatchedUsers(true); // true を渡してマッチング済みユーザーのみを取得
+      // コンポーネントのプロパティに応じて、マッチング済みユーザーまたはマッチング候補を取得
+      await fetchMatchedUsers(matchedOnly); // matchedOnlyの値に基づいて取得モードを切り替え
       
       setError(null);
       console.log('マッチング取得完了');
@@ -90,7 +114,20 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
       setIsFetching(false);
       isFetchingRef.current = false;
     }
-  }, [fetchMatchedUsers, initializeDefaultPreferences]);
+  }, [fetchMatchedUsers, initializeDefaultPreferences, matchedOnly, isRelaxedMode, toggleRelaxedMode]);
+
+  // マッチング候補が見つからない場合に緩和モードで再試行する
+  const retryWithRelaxedMode = useCallback(() => {
+    if (!isRelaxedMode) {
+      // 緩和モードを有効にして再取得
+      loadMatches(true);
+    } else {
+      // 既に緩和モードの場合は通常モードに戻す
+      toggleRelaxedMode(false);
+      setAttemptedRelaxedMode(false);
+      loadMatches(false);
+    }
+  }, [isRelaxedMode, loadMatches, toggleRelaxedMode]);
 
   // 初期ロード
   useEffect(() => {
@@ -268,14 +305,80 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
     }
   };
 
+  // 接続リクエストの応答処理（承認/拒否）
+  const handleConnectionResponse = async (
+    connectionId: string,
+    status: ConnectionStatus.CONNECTED | ConnectionStatus.REJECTED
+  ): Promise<boolean> => {
+    if (!user) {
+      toast.error('ログインが必要です');
+      return false;
+    }
+    
+    try {
+      // notificationService.tsの関数を使用して接続リクエストに応答
+      const result = await notificationService.respondToConnectionRequest(
+        connectionId,
+        status
+      );
+      
+      if (result.success) {
+        if (status === ConnectionStatus.CONNECTED) {
+          toast.success('接続リクエストを承認しました');
+        } else {
+          toast.success('接続リクエストを拒否しました');
+        }
+        
+        // データを再取得してUIを更新
+        loadMatches();
+        
+        return true;
+      } else {
+        throw new Error(result.error || '接続リクエストの応答に失敗しました');
+      }
+    } catch (err) {
+      console.error('接続リクエスト応答エラー:', err);
+      toast.error('処理に失敗しました');
+      return false;
+    }
+  };
+
   // いいね処理のハンドラー
   const handleLike = async (userId: string): Promise<boolean> => {
-    return await likeUser(userId);
+    try {
+      const success = await likeUser(userId);
+      if (success) {
+        toast.success('いいねを送信しました');
+        // いいねが成功したら、一時的にマッチングリストから削除して UI を更新
+        setUpdatedMatchedUsers(prev => prev.filter(u => u.id !== userId));
+      } else {
+        toast.error('いいねの送信に失敗しました');
+      }
+      return success;
+    } catch (err) {
+      console.error('いいね処理エラー:', err);
+      toast.error('いいねの送信に失敗しました');
+      return false;
+    }
   };
 
   // スキップ処理のハンドラー
   const handleSkip = async (userId: string): Promise<boolean> => {
-    return await skipUser(userId);
+    try {
+      const success = await skipUser(userId);
+      if (success) {
+        toast.success('スキップしました');
+        // スキップが成功したら、一時的にマッチングリストから削除して UI を更新
+        setUpdatedMatchedUsers(prev => prev.filter(u => u.id !== userId));
+      } else {
+        toast.error('スキップに失敗しました');
+      }
+      return success;
+    } catch (err) {
+      console.error('スキップ処理エラー:', err);
+      toast.error('スキップに失敗しました');
+      return false;
+    }
   };
 
   if (!user) {
@@ -309,7 +412,22 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-gray-900">マッチング済みユーザー</h2>
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 flex items-center">
+            {matchedOnly ? "マッチング済みユーザー" : "マッチング候補"}
+            {isRelaxedMode && !matchedOnly && (
+              <span className="ml-2 text-sm font-normal text-yellow-600 bg-yellow-50 px-2 py-1 rounded-md flex items-center">
+                <Zap className="w-3 h-3 mr-1" />
+                緩和モード
+              </span>
+            )}
+          </h2>
+          {!matchedOnly && (
+            <p className="text-sm text-gray-500 mt-1">
+              趣味や視聴傾向が似ているユーザーを表示しています
+            </p>
+          )}
+        </div>
         <div className="flex space-x-2">
           {isPremium ? (
             <span className="flex items-center bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm">
@@ -328,26 +446,40 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
         </div>
       </div>
 
-      {/* リフレッシュボタン */}
-      <div className="mb-4">
-        <button
-          onClick={loadMatches}
-          disabled={isLoading}
-          className="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isLoading ? (
-            <>
-              <LoadingSpinner className="w-4 h-4 mr-1.5" />
-              ロード中...
-            </>
-          ) : (
-            <>
-              <RefreshCw className="w-4 h-4 mr-1.5" />
-              マッチング済みユーザーを更新
-            </>
-          )}
-        </button>
-      </div>
+      {/* 検索条件と緩和モード切り替え */}
+      {!matchedOnly && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <button
+            onClick={retryWithRelaxedMode}
+            className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md 
+                       ${isRelaxedMode 
+                          ? 'bg-yellow-500 text-white hover:bg-yellow-600' 
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} 
+                       transition-colors`}
+          >
+            <Filter className="w-4 h-4 mr-1.5" />
+            {isRelaxedMode ? "通常条件に戻す" : "条件を緩和する"}
+          </button>
+          
+          <button
+            onClick={() => loadMatches(isRelaxedMode)}
+            disabled={isLoading}
+            className="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? (
+              <>
+                <LoadingSpinner className="w-4 h-4 mr-1.5" />
+                ロード中...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4 mr-1.5" />
+                マッチング候補を更新
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* デバッグ情報表示エリア（開発環境のみ） */}
       {process.env.NODE_ENV === 'development' && debugInfo && (
@@ -358,6 +490,8 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
           <div>プレミアム: {debugInfo.isPremium ? 'あり' : 'なし'}</div>
           <div>視聴履歴: {debugInfo.userHistoryCount || 0}件</div>
           <div>スキップユーザー: {debugInfo.skippedUsersCount || 0}件</div>
+          <div>緩和モード: {isRelaxedMode ? 'ON' : 'OFF'}</div>
+          <div>緩和モード試行: {attemptedRelaxedMode ? 'あり' : 'なし'}</div>
           {debugInfo.realtimeUpdate && (
             <div className="text-green-400">
               リアルタイム更新: {debugInfo.realtimeUpdate.time} ({debugInfo.realtimeUpdate.type})
@@ -380,24 +514,88 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
             <AlertCircle className="w-5 h-5 mr-2" />
             <span>{error}</span>
           </div>
-          <button
-            onClick={loadMatches}
-            className="mx-auto block px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
-          >
-            再試行
-          </button>
+          <div className="flex flex-col items-center justify-center gap-2 mt-4">
+            <button
+              onClick={() => loadMatches(isRelaxedMode)}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+            >
+              再試行
+            </button>
+            
+            {!matchedOnly && (
+              <button
+                onClick={retryWithRelaxedMode}
+                className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition-colors"
+              >
+                {isRelaxedMode ? "通常モードで試す" : "条件を緩和して試す"}
+              </button>
+            )}
+          </div>
         </div>
       ) : displayedMatches.length === 0 ? (
         <div className="text-center py-8 text-gray-600">
-          マッチング済みユーザーが見つかりませんでした
-          <div className="mt-4">
+          {matchedOnly ? (
+            <>
+              <div className="text-lg font-medium mb-2">マッチング済みユーザーが見つかりませんでした</div>
+              <p className="text-sm mb-4">まだ他のユーザーと相互にいいねを交換していないようです。マッチング候補からいいねを送ってみましょう。</p>
+            </>
+          ) : (
+            <>
+              <div className="text-lg font-medium mb-2">
+                {isRelaxedMode ? (
+                  "マッチング候補が見つかりませんでした"
+                ) : (
+                  "条件に合うマッチング候補が見つかりませんでした"
+                )}
+              </div>
+              <div className="text-sm mb-4">
+                {isRelaxedMode ? (
+                  <>
+                    すべての条件を緩和しても候補が見つかりませんでした。<br />
+                    • 新しいユーザーが登録されるのを待つ<br />
+                    • しばらく時間をおいて再試行する<br />
+                    • 自分のプロフィールを充実させてみる
+                  </>
+                ) : (
+                  <>
+                    候補が見つからない理由として次のことが考えられます：<br />
+                    • 既にほとんどのユーザーにいいねを送信済み<br />
+                    • 条件に合うユーザーが少ない<br />
+                    • 検索条件が厳しすぎる（「条件を緩和」を試してみてください）
+                  </>
+                )}
+              </div>
+            </>
+          )}
+          <div className="mt-4 flex flex-col items-center justify-center gap-2">
             <button
-              onClick={loadMatches}
+              onClick={() => loadMatches(isRelaxedMode)}
               disabled={isLoading}
               className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50"
             >
-              {isLoading ? 'ロード中...' : 'マッチング済みユーザーを再取得'}
+              {isLoading ? 'ロード中...' : matchedOnly ? 'マッチング済みユーザーを再取得' : 'マッチング候補を再取得'}
             </button>
+            
+            {!matchedOnly && !isRelaxedMode && (
+              <button
+                onClick={retryWithRelaxedMode}
+                disabled={isLoading}
+                className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition-colors disabled:opacity-50"
+              >
+                <Zap className="w-4 h-4 inline-block mr-1" />
+                条件を緩和して試す
+              </button>
+            )}
+            
+            {!matchedOnly && isRelaxedMode && (
+              <button
+                onClick={retryWithRelaxedMode}
+                disabled={isLoading}
+                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors disabled:opacity-50"
+              >
+                通常モードに戻す
+              </button>
+            )}
           </div>
         </div>
       ) : (
@@ -419,6 +617,16 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
                   onLike={handleLike}
                   onSkip={handleSkip}
                   onConnect={handleConnect}
+                  onAcceptConnection={
+                    match.connection_id && effectiveConnectionStatus === ConnectionStatus.PENDING
+                      ? (match.is_initiator ? undefined : () => handleConnectionResponse(match.connection_id!, ConnectionStatus.CONNECTED))
+                      : undefined
+                  }
+                  onRejectConnection={
+                    match.connection_id && effectiveConnectionStatus === ConnectionStatus.PENDING
+                      ? (match.is_initiator ? undefined : () => handleConnectionResponse(match.connection_id!, ConnectionStatus.REJECTED))
+                      : undefined
+                  }
                   isPremium={isPremium}
                   hasDetailedView={false}
                   showYouTubeLink={true}
@@ -427,8 +635,8 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
             );
           })}
           
-          {/* プレミアム会員でない場合はもっと見るボタンを表示 */}
-          {!isPremium && updatedMatchedUsers.length > displayLimit && !limit && (
+         {/* プレミアム会員でない場合はもっと見るボタンを表示 */}
+         {!isPremium && updatedMatchedUsers.length > displayLimit && !limit && (
             <div className="pt-4">
               <Link
                 to="/premium"
@@ -459,7 +667,7 @@ export default function MatchingSystem({ limit }: MatchingSystemProps) {
               >
                 すべてのマッチングを見る
                 <Users className="ml-2 w-4 h-4" />
-              </Link>
+                </Link>
             </div>
           )}
         </div>

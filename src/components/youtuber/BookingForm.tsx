@@ -461,13 +461,13 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
   const renderAlertIcon = (type: AlertType) => {
     switch (type) {
       case 'error':
-        return <FontAwesomeIcon icon={faExclamationCircle} className="text-red-500 mr-2" />;
+        return <FontAwesomeIcon icon={faExclamationCircle} className="text-red-500 dark:text-red-400 mr-2" />;
       case 'success':
-        return <FontAwesomeIcon icon={faCheckCircle} className="text-green-500 mr-2" />;
+        return <FontAwesomeIcon icon={faCheckCircle} className="text-green-500 dark:text-green-400 mr-2" />;
       case 'info':
-        return <FontAwesomeIcon icon={faInfoCircle} className="text-blue-500 mr-2" />;
+        return <FontAwesomeIcon icon={faInfoCircle} className="text-blue-500 dark:text-blue-400 mr-2" />;
       case 'warning':
-        return <FontAwesomeIcon icon={faExclamationCircle} className="text-yellow-500 mr-2" />;
+        return <FontAwesomeIcon icon={faExclamationCircle} className="text-yellow-500 dark:text-yellow-400 mr-2" />;
       default:
         return null;
     }
@@ -476,18 +476,18 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
   const renderAlert = () => {
     if (!alert.type || !alert.message) return null;
 
-    const bgColor = alert.type === 'error' ? 'bg-red-50' : 
-                   alert.type === 'success' ? 'bg-green-50' : 
-                   alert.type === 'warning' ? 'bg-yellow-50' :
-                   'bg-blue-50';
-    const textColor = alert.type === 'error' ? 'text-red-700' : 
-                     alert.type === 'success' ? 'text-green-700' : 
-                     alert.type === 'warning' ? 'text-yellow-700' :
-                     'text-blue-700';
-    const borderColor = alert.type === 'error' ? 'border-red-200' : 
-                       alert.type === 'success' ? 'border-green-200' : 
-                       alert.type === 'warning' ? 'border-yellow-200' :
-                       'border-blue-200';
+    const bgColor = alert.type === 'error' ? 'bg-red-50 dark:bg-red-900/30' : 
+                   alert.type === 'success' ? 'bg-green-50 dark:bg-green-900/30' : 
+                   alert.type === 'warning' ? 'bg-yellow-50 dark:bg-yellow-900/30' :
+                   'bg-blue-50 dark:bg-blue-900/30';
+    const textColor = alert.type === 'error' ? 'text-red-700 dark:text-red-300' : 
+                     alert.type === 'success' ? 'text-green-700 dark:text-green-300' : 
+                     alert.type === 'warning' ? 'text-yellow-700 dark:text-yellow-300' :
+                     'text-blue-700 dark:text-blue-300';
+    const borderColor = alert.type === 'error' ? 'border-red-200 dark:border-red-800/50' : 
+                       alert.type === 'success' ? 'border-green-200 dark:border-green-800/50' : 
+                       alert.type === 'warning' ? 'border-yellow-200 dark:border-yellow-800/50' :
+                       'border-blue-200 dark:border-blue-800/50';
 
     return (
       <div 
@@ -508,8 +508,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
     if (!slotDetails) return null;
 
     return (
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-        <h3 className="text-lg font-medium text-gray-800 mb-2">掲載枠詳細</h3>
+      <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-dark-border">
+        <h3 className="text-lg font-medium text-gray-800 dark:text-dark-text-primary mb-2">掲載枠詳細</h3>
         <div className="space-y-2 text-sm">
           <p><span className="font-medium">タイプ:</span> {getTypeLabel(slotDetails.type)}</p>
           <p><span className="font-medium">表示位置:</span> {slotDetails.description || '指定なし'}</p>
@@ -535,8 +535,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
     endDateObj.setDate(endDateObj.getDate() + duration);
 
     return (
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-        <h3 className="text-lg font-medium text-gray-800 mb-2">予約内容の確認</h3>
+      <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-dark-border">
+        <h3 className="text-lg font-medium text-gray-800 dark:text-dark-text-primary mb-2">予約内容の確認</h3>
         <div className="space-y-2 text-sm">
           <p><span className="font-medium">掲載枠:</span> {slot.name} ({getTypeLabel(slot.type)})</p>
           <p><span className="font-medium">動画:</span> {video.title}</p>
@@ -550,7 +550,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
   const renderFieldError = (field: string) => {
     if (touched[field] && validationErrors[field]) {
       return (
-        <div className="mt-1 text-sm text-red-600" role="alert">
+        <div className="mt-1 text-sm text-red-600 dark:text-red-400" role="alert">
           <FontAwesomeIcon icon={faExclamationCircle} className="mr-1" />
           {validationErrors[field]}
         </div>
@@ -569,9 +569,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
   }
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow" aria-labelledby="booking-form-title">
+    <div className="bg-white dark:bg-dark-surface p-6 rounded-lg shadow" aria-labelledby="booking-form-title">
       <div className="flex justify-between items-center mb-6">
-        <h2 id="booking-form-title" className="text-xl font-bold">掲載枠予約</h2>
+        <h2 id="booking-form-title" className="text-xl font-bold text-gray-900 dark:text-dark-text-primary">掲載枠予約</h2>
         <YoutubeSyncButton onSyncComplete={handleSyncComplete} />
       </div>
 
@@ -579,12 +579,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
 
       <form ref={formRef} onSubmit={handleSubmit} noValidate>
         <div className="mb-6">
-          <label htmlFor="slot" className="block text-sm font-medium text-gray-700 mb-1">
-            掲載枠タイプ <span className="text-red-500" aria-hidden="true">*</span>
+          <label htmlFor="slot" className="block text-sm font-medium text-gray-700 dark:text-dark-text-primary mb-1">
+            掲載枠タイプ <span className="text-red-500 dark:text-red-400" aria-hidden="true">*</span>
           </label>
           <select
             id="slot"
-            className={`w-full border ${touched.selectedSlot && validationErrors.selectedSlot ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'} rounded-md shadow-sm py-2 px-3 focus:outline-none`}
+            className={`w-full border ${touched.selectedSlot && validationErrors.selectedSlot ? 'border-red-300 dark:border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 dark:border-dark-border focus:ring-blue-500 focus:border-blue-500'} rounded-md shadow-sm py-2 px-3 focus:outline-none dark:bg-dark-surface dark:text-dark-text-primary`}
             value={selectedSlot}
             onChange={(e) => {
               setSelectedSlot(e.target.value);
@@ -609,12 +609,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
         {renderSlotDetails()}
 
         <div className="mb-6">
-          <label htmlFor="video" className="block text-sm font-medium text-gray-700 mb-1">
-            掲載する動画 <span className="text-red-500" aria-hidden="true">*</span>
+          <label htmlFor="video" className="block text-sm font-medium text-gray-700 dark:text-dark-text-primary mb-1">
+            掲載する動画 <span className="text-red-500 dark:text-red-400" aria-hidden="true">*</span>
           </label>
           <select
             id="video"
-            className={`w-full border ${touched.selectedVideo && validationErrors.selectedVideo ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'} rounded-md shadow-sm py-2 px-3 focus:outline-none`}
+            className={`w-full border ${touched.selectedVideo && validationErrors.selectedVideo ? 'border-red-300 dark:border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 dark:border-dark-border focus:ring-blue-500 focus:border-blue-500'} rounded-md shadow-sm py-2 px-3 focus:outline-none dark:bg-dark-surface dark:text-dark-text-primary`}
             value={selectedVideo}
             onChange={(e) => {
               setSelectedVideo(e.target.value);
@@ -636,12 +636,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
           </select>
           {renderFieldError('selectedVideo')}
           {videos.length === 0 && (
-            <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-              <p className="text-sm text-yellow-700 font-medium flex items-center">
+            <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800/50 rounded-md">
+              <p className="text-sm text-yellow-700 dark:text-yellow-300 font-medium flex items-center">
                 <FontAwesomeIcon icon={faFilm} className="mr-2" aria-hidden="true" />
                 表示できる動画がありません
               </p>
-              <p className="text-xs text-yellow-600 mt-1">
+              <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
                 YouTube同期を実行して、YouTubeチャンネルから動画データを取得してください。
                 同期が完了すると、このページが自動的に更新されます。
               </p>
@@ -651,17 +651,17 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div>
-            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
-              開始日 <span className="text-red-500" aria-hidden="true">*</span>
+            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 dark:text-dark-text-primary mb-1">
+              開始日 <span className="text-red-500 dark:text-red-400" aria-hidden="true">*</span>
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FontAwesomeIcon icon={faCalendarAlt} className="text-gray-400" aria-hidden="true" />
+                <FontAwesomeIcon icon={faCalendarAlt} className="text-gray-400 dark:text-gray-500" aria-hidden="true" />
               </div>
               <input
                 type="date"
                 id="startDate"
-                className={`w-full border ${touched.startDate && validationErrors.startDate ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'} rounded-md shadow-sm py-2 pl-10 pr-3 focus:outline-none`}
+                className={`w-full border ${touched.startDate && validationErrors.startDate ? 'border-red-300 dark:border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 dark:border-dark-border focus:ring-blue-500 focus:border-blue-500'} rounded-md shadow-sm py-2 pl-10 pr-3 focus:outline-none dark:bg-dark-surface dark:text-dark-text-primary`}
                 value={startDate}
                 onChange={(e) => {
                   setStartDate(e.target.value);
@@ -677,15 +677,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
             </div>
             {renderFieldError('startDate')}
           </div>
-
           <div>
-            <label htmlFor="duration" className="block text-sm font-medium text-gray-700 mb-1">
-              掲載期間（日数） <span className="text-red-500" aria-hidden="true">*</span>
+            <label htmlFor="duration" className="block text-sm font-medium text-gray-700 dark:text-dark-text-primary mb-1">
+              掲載期間（日数） <span className="text-red-500 dark:text-red-400" aria-hidden="true">*</span>
             </label>
             <input
               type="number"
               id="duration"
-              className={`w-full border ${touched.duration && validationErrors.duration ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'} rounded-md shadow-sm py-2 px-3 focus:outline-none`}
+              className={`w-full border ${touched.duration && validationErrors.duration ? 'border-red-300 dark:border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 dark:border-dark-border focus:ring-blue-500 focus:border-blue-500'} rounded-md shadow-sm py-2 px-3 focus:outline-none dark:bg-dark-surface dark:text-dark-text-primary`}
               value={duration}
               onChange={(e) => {
                 setDuration(parseInt(e.target.value) || 0);
@@ -701,7 +700,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
             />
             {renderFieldError('duration')}
             {slotDetails?.max_duration && (
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-gray-500 dark:text-dark-text-secondary">
                 この掲載枠の最大期間は{slotDetails.max_duration}日です
               </p>
             )}
@@ -710,15 +709,15 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
 
         {renderBookingSummary()}
 
-        <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-100 dark:border-blue-800/50">
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium text-blue-800">お支払い金額</h3>
-            <div className="text-xl font-bold text-blue-800">
+            <h3 className="text-lg font-medium text-blue-800 dark:text-blue-300">お支払い金額</h3>
+            <div className="text-xl font-bold text-blue-800 dark:text-blue-300">
               <FontAwesomeIcon icon={faMoneyBillWave} className="mr-2" aria-hidden="true" />
               {totalPrice.toLocaleString()}円
             </div>
           </div>
-          <p className="text-sm text-blue-600 mt-2">
+          <p className="text-sm text-blue-600 dark:text-blue-400 mt-2">
           このまま予約すると、安全な決済ページに移動します。キャンセルは予約開始の72時間前まで可能です。
           </p>
         </div>
@@ -726,7 +725,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
         <div className="flex justify-end space-x-4">
           <button
             type="button"
-            className="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="py-2 px-4 border border-gray-300 dark:border-dark-border rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-dark-text-primary bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             onClick={onCancel}
             disabled={submitting}
             aria-disabled={submitting}
@@ -735,7 +734,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onCancel }) => {
           </button>
           <button
             type="submit"
-            className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300 disabled:cursor-not-allowed"
+            className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300 dark:disabled:bg-blue-800/50 disabled:cursor-not-allowed"
             disabled={submitting || Object.keys(validationErrors).length > 0 || videos.length === 0}
             aria-disabled={submitting || Object.keys(validationErrors).length > 0 || videos.length === 0}
           >

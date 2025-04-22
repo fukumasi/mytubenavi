@@ -211,10 +211,10 @@ export default function VideoRatingForm({
    return (
      <div key={category} className={`
        flex items-center justify-between py-2 relative
-       ${isOverall ? 'mt-4 pt-4 border-t border-gray-200' : ''}
+       ${isOverall ? 'mt-4 pt-4 border-t border-gray-200 dark:border-dark-border' : ''}
      `}>
        <div className="flex items-center space-x-2">
-         <span className={`min-w-[5rem] text-gray-700 ${
+         <span className={`min-w-[5rem] text-gray-700 dark:text-dark-text-primary ${
            isOverall ? 'text-base font-semibold' : 'text-sm'
          }`}>
            {RATING_CATEGORY_LABELS[category]}
@@ -225,7 +225,7 @@ export default function VideoRatingForm({
            className="relative"
            aria-label={`${RATING_CATEGORY_LABELS[category]}の説明`}
          >
-           <HelpCircle className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" />
+           <HelpCircle className="w-4 h-4 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 cursor-help" />
            {tooltipCategory === category && (
              <div className="absolute z-10 left-full ml-2 w-48 p-2 bg-black text-white text-xs rounded shadow-lg">
                {RATING_CATEGORY_DESCRIPTIONS[category]}
@@ -249,26 +249,26 @@ export default function VideoRatingForm({
  const rightColumns = mainCategories.slice(Math.ceil(mainCategories.length / 2));
 
  return (
-   <form onSubmit={handleSubmit} className={`bg-white rounded-lg border border-gray-200 ${className}`}>
+   <form onSubmit={handleSubmit} className={`bg-white dark:bg-dark-surface rounded-lg border border-gray-200 dark:border-dark-border ${className}`}>
      <div className="p-4">
        {error && (
-         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-start">
-           <AlertCircle className="w-5 h-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
-           <p className="text-sm text-red-600">{error}</p>
+         <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-start">
+           <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 mr-2 flex-shrink-0 mt-0.5" />
+           <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
          </div>
        )}
        
        {success && (
-         <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
-           <p className="text-sm text-green-600">評価を送信しました。ありがとうございます！</p>
+         <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+           <p className="text-sm text-green-600 dark:text-green-400">評価を送信しました。ありがとうございます！</p>
          </div>
        )}
        
        {/* ポイント獲得表示の追加 */}
        {earnedPoints && earnedPoints > 0 && (
-         <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md flex items-center">
-           <Award className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0" />
-           <p className="text-sm text-yellow-700">レビュー投稿で{earnedPoints}ポイント獲得しました！</p>
+         <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md flex items-center">
+           <Award className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-2 flex-shrink-0" />
+           <p className="text-sm text-yellow-700 dark:text-yellow-400">レビュー投稿で{earnedPoints}ポイント獲得しました！</p>
          </div>
        )}
        
@@ -284,10 +284,10 @@ export default function VideoRatingForm({
        {renderRatingItem('overall')}
        
        <div className="mt-4">
-         <label htmlFor="review-comment" className="block text-sm font-medium text-gray-700 mb-2">
+         <label htmlFor="review-comment" className="block text-sm font-medium text-gray-700 dark:text-dark-text-primary mb-2">
            口コミコメント
            {isPremium && (
-             <span className="ml-1 text-xs text-blue-600">（プレミアム会員はポイント2倍！）</span>
+             <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">（プレミアム会員はポイント2倍！）</span>
            )}
          </label>
          <textarea
@@ -296,22 +296,22 @@ export default function VideoRatingForm({
            value={comment}
            onChange={(e) => setComment(e.target.value)}
            placeholder="この動画について詳しく教えてください（100文字以上でボーナスポイント！）"
-           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+           className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-dark-bg dark:text-dark-text-primary"
            aria-label="口コミコメント"
          />
-         <div className="mt-1 text-xs text-gray-500">
+         <div className="mt-1 text-xs text-gray-500 dark:text-dark-text-secondary">
            コメントを書くとポイントがもらえます！ 100文字以上で追加ポイント獲得！
          </div>
        </div>
      </div>
      
-     <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 rounded-b-lg flex justify-between">
+     <div className="px-4 py-3 bg-gray-50 dark:bg-dark-bg border-t border-gray-200 dark:border-dark-border rounded-b-lg flex justify-between">
        {showReset && (
          <button
            type="button"
            onClick={resetForm}
            disabled={isSubmitting}
-           className="text-gray-600 hover:text-gray-800 font-medium py-2 px-4 rounded-md transition-colors text-sm"
+           className="text-gray-600 dark:text-dark-text-secondary hover:text-gray-800 dark:hover:text-dark-text-primary font-medium py-2 px-4 rounded-md transition-colors text-sm"
          >
            リセット
          </button>

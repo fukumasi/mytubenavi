@@ -39,36 +39,36 @@ const PremiumExpired: React.FC<PremiumExpiredProps> = ({
         <span className="text-6xl">⏰</span>
       </div>
       
-      <h1 className="text-2xl font-bold mb-4">プレミアム会員の期限が切れました</h1>
+      <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-dark-text-primary">プレミアム会員の期限が切れました</h1>
       
-      <p className="text-gray-600 mb-6">
+      <p className="text-gray-600 dark:text-dark-text-secondary mb-6">
         {formatDate(displayExpiredDate)}に有効期限が切れました。
         引き続きプレミアム機能をご利用いただくには会員を更新してください。
       </p>
       
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
-        <h2 className="text-lg font-semibold text-yellow-800 mb-3">
+      <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800/50 rounded-lg p-6 mb-8">
+        <h2 className="text-lg font-semibold text-yellow-800 dark:text-yellow-300 mb-3">
           プレミアム会員特典
         </h2>
-        <ul className="text-left space-y-2 mb-4">
+        <ul className="text-left space-y-2 mb-4 text-gray-700 dark:text-dark-text-secondary">
           <li className="flex items-start">
-            <span className="text-green-500 mr-2">✓</span>
+            <span className="text-green-500 dark:text-green-400 mr-2">✓</span>
             <span>マッチング機能のフル利用（10件の候補表示と接続リクエスト）</span>
           </li>
           <li className="flex items-start">
-            <span className="text-green-500 mr-2">✓</span>
+            <span className="text-green-500 dark:text-green-400 mr-2">✓</span>
             <span>すべての通知をリアルタイムで受信</span>
           </li>
           <li className="flex items-start">
-            <span className="text-green-500 mr-2">✓</span>
+            <span className="text-green-500 dark:text-green-400 mr-2">✓</span>
             <span>広告表示の削減</span>
           </li>
           <li className="flex items-start">
-            <span className="text-green-500 mr-2">✓</span>
+            <span className="text-green-500 dark:text-green-400 mr-2">✓</span>
             <span>高度な検索機能とフィルター</span>
           </li>
           <li className="flex items-start">
-            <span className="text-green-500 mr-2">✓</span>
+            <span className="text-green-500 dark:text-green-400 mr-2">✓</span>
             <span>無制限のお気に入り保存</span>
           </li>
         </ul>
@@ -77,21 +77,21 @@ const PremiumExpired: React.FC<PremiumExpiredProps> = ({
       <div className="flex flex-col sm:flex-row gap-4 justify-center">
         <Link
           to={redirectUrl}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors"
+          className="bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-800 text-white font-medium py-3 px-6 rounded-lg transition-colors"
         >
           今すぐ更新する
         </Link>
         
         <button
           onClick={() => navigate('/')}
-          className="bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-3 px-6 rounded-lg transition-colors"
+          className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-dark-text-primary font-medium py-3 px-6 rounded-lg transition-colors"
         >
           ホームに戻る
         </button>
       </div>
       
-      <p className="mt-6 text-sm text-gray-500">
-        ご質問やお困りのことがありましたら、<Link to="/support" className="text-blue-600 hover:underline">サポート</Link>までお問い合わせください。
+      <p className="mt-6 text-sm text-gray-500 dark:text-gray-400">
+        ご質問やお困りのことがありましたら、<Link to="/support" className="text-blue-600 dark:text-blue-400 hover:underline">サポート</Link>までお問い合わせください。
       </p>
     </div>
   );

@@ -138,8 +138,12 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
   return (
     <form onSubmit={handleSearch} className={`relative flex-1 ${className}`}>
-      <div className={`flex items-center w-full bg-white rounded-lg overflow-hidden transition-all duration-200 border ${isFocused ? 'ring-2 ring-indigo-500 border-indigo-500' : 'border-gray-300'}`}>
-        <div className="pl-3 text-gray-400">
+      <div className={`flex items-center w-full bg-white dark:bg-dark-surface rounded-lg overflow-hidden transition-all duration-200 border ${
+        isFocused 
+          ? 'ring-2 ring-indigo-500 dark:ring-indigo-400 border-indigo-500 dark:border-indigo-400' 
+          : 'border-gray-300 dark:border-dark-border'
+      }`}>
+        <div className="pl-3 text-gray-400 dark:text-gray-500">
           <Search className="h-5 w-5" />
         </div>
         
@@ -151,7 +155,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
           onKeyDown={handleKeyDown}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          className="block w-full pl-2 pr-3 py-2 bg-transparent outline-none placeholder-gray-500 text-gray-900 sm:text-sm"
+          className="block w-full pl-2 pr-3 py-2 bg-transparent outline-none placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-dark-text-primary sm:text-sm"
           placeholder={placeholder}
           aria-label="検索"
         />
@@ -160,7 +164,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
           <button
             type="button"
             onClick={clearSearch}
-            className="p-2 text-gray-400 hover:text-gray-600 focus:outline-none"
+            className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 focus:outline-none"
             aria-label="検索をクリア"
             tabIndex={-1}
           >
@@ -170,7 +174,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
         
         <button
           type="submit"
-          className="flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          className="flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:ring-offset-2 dark:focus:ring-offset-dark-surface"
         >
           <span className="text-sm font-medium text-white">検索</span>
         </button>

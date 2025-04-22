@@ -112,7 +112,7 @@ function NotificationItem({
     <div
       className={`
         p-4 rounded-lg hover:shadow-md transition-all duration-200
-        ${notification.is_read ? 'bg-white' : 'bg-blue-50'}
+        ${notification.is_read ? 'bg-white dark:bg-dark-surface' : 'bg-blue-50 dark:bg-blue-900/20'}
         ${notification.priority === 'high' ? 'border-l-4 border-red-500' : ''}
         ${notification.type === 'connection_request' && !notification.is_read ? 'border-l-4 border-blue-500' : ''}
         ${notification.type === 'connection_accepted' && !notification.is_read ? 'border-l-4 border-green-500' : ''}
@@ -122,10 +122,10 @@ function NotificationItem({
       <div className="flex items-start gap-4">
         {getNotificationIcon(notification.type)}
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-medium text-gray-900">
+          <h3 className="text-sm font-medium text-gray-900 dark:text-dark-text-primary">
             {notification.title}
           </h3>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 dark:text-dark-text-secondary mt-1">
             {notification.message}
           </p>
           
@@ -135,7 +135,7 @@ function NotificationItem({
               <button
                 onClick={(e) => handleAction(e, 'accept')}
                 disabled={isProcessingAction !== null}
-                className="flex-1 bg-green-500 hover:bg-green-600 text-white py-1 px-3 rounded text-sm flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 text-white py-1 px-3 rounded text-sm flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isProcessingAction === 'accept' ? (
                   <span className="animate-pulse">処理中...</span>
@@ -148,7 +148,7 @@ function NotificationItem({
               <button
                 onClick={(e) => handleAction(e, 'reject')}
                 disabled={isProcessingAction !== null}
-                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-1 px-3 rounded text-sm flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 py-1 px-3 rounded text-sm flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isProcessingAction === 'reject' ? (
                   <span className="animate-pulse">処理中...</span>
@@ -162,7 +162,7 @@ function NotificationItem({
           )}
           
           <div className="flex items-center justify-between mt-2">
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-gray-400 dark:text-gray-500">
               {new Date(notification.created_at).toLocaleString('ja-JP')}
             </p>
             <div className="flex items-center gap-2">
@@ -170,7 +170,7 @@ function NotificationItem({
                 <button
                   onClick={handleMarkAsRead}
                   disabled={isUpdating}
-                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm flex items-center gap-1"
                 >
                   <Check className="h-4 w-4" />
                   既読
@@ -179,7 +179,7 @@ function NotificationItem({
               <button
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="text-red-600 hover:text-red-800 text-sm flex items-center gap-1"
+                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm flex items-center gap-1"
               >
                 <Trash2 className="h-4 w-4" />
                 削除
@@ -356,7 +356,7 @@ export default function NotificationsPage() {
     return (
       <ProfileLayout>
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 dark:border-blue-400" />
         </div>
       </ProfileLayout>
     );
@@ -369,12 +369,12 @@ export default function NotificationsPage() {
     <ProfileLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">通知一覧</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-dark-text-primary">通知一覧</h2>
           <div className="flex items-center gap-4">
             {notifications.some(n => !n.is_read) && (
               <button
                 onClick={() => markAllAsRead()}
-                className="text-sm text-blue-600 hover:text-blue-800"
+                className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
               >
                 すべて既読にする
               </button>
@@ -383,7 +383,7 @@ export default function NotificationsPage() {
               <button
                 onClick={handleClearAll}
                 disabled={isClearing}
-                className="text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 disabled:opacity-50"
               >
                 {isClearing ? '処理中...' : '既読の通知を削除'}
               </button>
@@ -393,8 +393,8 @@ export default function NotificationsPage() {
 
         <div className="space-y-4">
           {/* 通知タイプによるフィルタリング */}
-          <div className="bg-white p-4 rounded-lg shadow-sm">
-            <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+          <div className="bg-white dark:bg-dark-surface p-4 rounded-lg shadow-sm">
+            <h3 className="text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-2 flex items-center">
               <Filter className="h-4 w-4 mr-1" /> 通知タイプ
             </h3>
             <div className="flex gap-2 overflow-x-auto pb-2">
@@ -405,8 +405,8 @@ export default function NotificationsPage() {
                   className={`
                     flex items-center gap-2 px-4 py-2 rounded-full text-sm whitespace-nowrap
                     ${selectedFilter === option.value
-                      ? 'bg-indigo-100 text-indigo-700'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? 'bg-indigo-100 text-indigo-700 dark:bg-blue-900/50 dark:text-blue-300'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark-bg dark:text-dark-text-secondary dark:hover:bg-dark-border'
                     }
                   `}
                 >
@@ -418,8 +418,8 @@ export default function NotificationsPage() {
           </div>
 
           {/* 日付によるフィルタリング */}
-          <div className="bg-white p-4 rounded-lg shadow-sm">
-            <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+          <div className="bg-white dark:bg-dark-surface p-4 rounded-lg shadow-sm">
+            <h3 className="text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-2 flex items-center">
               <Calendar className="h-4 w-4 mr-1" /> 期間
             </h3>
             <div className="flex gap-2 overflow-x-auto pb-2">
@@ -430,8 +430,8 @@ export default function NotificationsPage() {
                   className={`
                     flex items-center gap-2 px-4 py-2 rounded-full text-sm whitespace-nowrap
                     ${selectedDateFilter === option.value
-                      ? 'bg-indigo-100 text-indigo-700'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? 'bg-indigo-100 text-indigo-700 dark:bg-blue-900/50 dark:text-blue-300'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark-bg dark:text-dark-text-secondary dark:hover:bg-dark-border'
                     }
                   `}
                 >
@@ -443,22 +443,22 @@ export default function NotificationsPage() {
         </div>
 
         {error && (
-          <div className="text-red-600 text-sm p-4 bg-red-50 rounded-lg">
+          <div className="text-red-600 dark:text-red-400 text-sm p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
             {error}
           </div>
         )}
 
         {!isPremium && (
-          <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg flex items-start">
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 p-4 rounded-lg flex items-start">
             <Star className="h-5 w-5 text-amber-500 mt-0.5 mr-2 flex-shrink-0" />
             <div>
-              <h3 className="font-medium text-amber-800">プレミアム会員向け機能</h3>
-              <p className="text-sm text-amber-700 mt-1">
+              <h3 className="font-medium text-amber-800 dark:text-amber-300">プレミアム会員向け機能</h3>
+              <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
                 プレミアム会員になると、すべての通知タイプの表示やより高度なフィルタリング機能が利用できます。
               </p>
               <button 
                 onClick={() => navigate('/premium/upgrade')}
-                className="mt-2 text-sm bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded transition-colors"
+                className="mt-2 text-sm bg-amber-500 hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-700 text-white px-3 py-1 rounded transition-colors"
               >
                 アップグレードする
               </button>
@@ -468,7 +468,7 @@ export default function NotificationsPage() {
 
         <div className="space-y-4">
           {filteredNotifications.length === 0 ? (
-            <p className="text-center text-gray-500 py-8">通知はありません</p>
+            <p className="text-center text-gray-500 dark:text-dark-text-secondary py-8">通知はありません</p>
           ) : (
             filteredNotifications.map(notification => (
               <NotificationItem

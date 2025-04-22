@@ -212,7 +212,7 @@ const Dashboard: React.FC = () => {
   
   // 掲載枠予約管理コンポーネント
   const BookingManagement = () => (
-    <div className="p-6 bg-white rounded shadow">
+    <div className="p-6 bg-white dark:bg-dark-surface rounded shadow">
       {showBookingForm ? (
         <BookingForm 
           onSuccess={() => {
@@ -223,12 +223,12 @@ const Dashboard: React.FC = () => {
         />
       ) : (
         <>
-          <h2 className="text-xl font-semibold mb-4">掲載枠予約管理</h2>
-          <p className="mb-4">現在利用可能な掲載枠を予約し、あなたの動画をプロモーションすることができます。</p>
+          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-dark-text-primary">掲載枠予約管理</h2>
+          <p className="mb-4 text-gray-600 dark:text-dark-text-secondary">現在利用可能な掲載枠を予約し、あなたの動画をプロモーションすることができます。</p>
           
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h3 className="font-medium text-blue-800 mb-2">掲載枠タイプ</h3>
-            <ul className="list-disc list-inside space-y-1 text-blue-700">
+          <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-lg">
+            <h3 className="font-medium text-blue-800 dark:text-blue-300 mb-2">掲載枠タイプ</h3>
+            <ul className="list-disc list-inside space-y-1 text-blue-700 dark:text-blue-400">
               <li>プレミアム枠 - トップページの目立つ位置に表示</li>
               <li>サイドバー枠 - サイドバーに固定表示</li>
               <li>ジャンル枠 - 特定のジャンルページで優先表示</li>
@@ -238,7 +238,7 @@ const Dashboard: React.FC = () => {
           
           <div className="mt-6">
             <button 
-              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded"
+              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white font-medium py-2 px-4 rounded"
               onClick={() => setShowBookingForm(true)}
             >
               掲載枠を予約する
@@ -250,12 +250,12 @@ const Dashboard: React.FC = () => {
   );
   
   const Settings = () => (
-    <div className="p-6 bg-white rounded shadow">
-      <h2 className="text-xl font-semibold mb-4">設定</h2>
+    <div className="p-6 bg-white dark:bg-dark-surface rounded shadow">
+      <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-dark-text-primary">設定</h2>
       
       <div className="mb-6">
-        <h3 className="text-lg font-medium mb-2">チャンネル同期</h3>
-        <p className="mb-2 text-sm text-gray-600">
+        <h3 className="text-lg font-medium mb-2 text-gray-900 dark:text-dark-text-primary">チャンネル同期</h3>
+        <p className="mb-2 text-sm text-gray-600 dark:text-dark-text-secondary">
           {lastSyncTime 
             ? `最終同期: ${new Date(lastSyncTime).toLocaleString('ja-JP')}`
             : 'まだ同期していません'}
@@ -263,52 +263,52 @@ const Dashboard: React.FC = () => {
         <button 
           onClick={triggerSync}
           disabled={syncStatus === 'syncing'}
-          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded disabled:bg-gray-400"
+          className="px-4 py-2 bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 text-white rounded disabled:bg-gray-400 dark:disabled:bg-gray-600"
         >
           {syncStatus === 'syncing' ? '同期中...' : 'YouTubeと同期する'}
         </button>
       </div>
       
       <div className="mt-6">
-        <h3 className="text-lg font-medium mb-2">通知設定</h3>
+        <h3 className="text-lg font-medium mb-2 text-gray-900 dark:text-dark-text-primary">通知設定</h3>
         <div className="flex items-center mb-2">
           <input type="checkbox" id="email-notify" className="mr-2" />
-          <label htmlFor="email-notify">メールで通知を受け取る</label>
+          <label htmlFor="email-notify" className="text-gray-700 dark:text-dark-text-secondary">メールで通知を受け取る</label>
         </div>
         <div className="flex items-center">
           <input type="checkbox" id="app-notify" className="mr-2" />
-          <label htmlFor="app-notify">アプリ内通知を受け取る</label>
+          <label htmlFor="app-notify" className="text-gray-700 dark:text-dark-text-secondary">アプリ内通知を受け取る</label>
         </div>
       </div>
     </div>
   );
   
   const Help = () => (
-    <div className="p-6 bg-white rounded shadow">
-      <h2 className="text-xl font-semibold mb-4">ヘルプ</h2>
+    <div className="p-6 bg-white dark:bg-dark-surface rounded shadow">
+      <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-dark-text-primary">ヘルプ</h2>
       <div className="space-y-4">
         <div>
-          <h3 className="text-lg font-medium mb-2">掲載枠について</h3>
-          <p>掲載枠は、あなたの動画をMyTubeNaviのさまざまな場所で宣伝するための機能です。</p>
+          <h3 className="text-lg font-medium mb-2 text-gray-900 dark:text-dark-text-primary">掲載枠について</h3>
+          <p className="text-gray-600 dark:text-dark-text-secondary">掲載枠は、あなたの動画をMyTubeNaviのさまざまな場所で宣伝するための機能です。</p>
         </div>
         
         <div>
-          <h3 className="text-lg font-medium mb-2">よくある質問</h3>
+          <h3 className="text-lg font-medium mb-2 text-gray-900 dark:text-dark-text-primary">よくある質問</h3>
           <div className="space-y-2">
             <div>
-              <h4 className="font-medium">Q: 掲載枠はいつから利用できますか？</h4>
-              <p>A: お支払いが完了次第、すぐに掲載が開始されます。</p>
+              <h4 className="font-medium text-gray-800 dark:text-dark-text-primary">Q: 掲載枠はいつから利用できますか？</h4>
+              <p className="text-gray-600 dark:text-dark-text-secondary">A: お支払いが完了次第、すぐに掲載が開始されます。</p>
             </div>
             <div>
-              <h4 className="font-medium">Q: 掲載枠の効果はどのように確認できますか？</h4>
-              <p>A: ダッシュボードの「分析」タブで、掲載枠のパフォーマンスを確認できます。</p>
+              <h4 className="font-medium text-gray-800 dark:text-dark-text-primary">Q: 掲載枠の効果はどのように確認できますか？</h4>
+              <p className="text-gray-600 dark:text-dark-text-secondary">A: ダッシュボードの「分析」タブで、掲載枠のパフォーマンスを確認できます。</p>
             </div>
           </div>
         </div>
         
         <div>
-          <h3 className="text-lg font-medium mb-2">お問い合わせ</h3>
-          <p>より詳しい情報が必要な場合は、<a href="mailto:support@mytubenavi.com" className="text-blue-600 hover:underline">support@mytubenavi.com</a>までお問い合わせください。</p>
+          <h3 className="text-lg font-medium mb-2 text-gray-900 dark:text-dark-text-primary">お問い合わせ</h3>
+          <p className="text-gray-600 dark:text-dark-text-secondary">より詳しい情報が必要な場合は、<a href="mailto:support@mytubenavi.com" className="text-blue-600 hover:underline dark:text-blue-400 dark:hover:text-blue-300">support@mytubenavi.com</a>までお問い合わせください。</p>
         </div>
       </div>
     </div>
@@ -328,11 +328,11 @@ const Dashboard: React.FC = () => {
   return (
     <div className="flex flex-col md:flex-row gap-6">
       {/* サイドナビゲーション */}
-      <div className="w-full md:w-64 bg-white p-4 rounded shadow">
+      <div className="w-full md:w-64 bg-white dark:bg-dark-surface p-4 rounded shadow">
         <div className="mb-6">
-          <h2 className="text-lg font-semibold mb-2">YouTuberダッシュボード</h2>
+          <h2 className="text-lg font-semibold mb-2 text-gray-900 dark:text-dark-text-primary">YouTuberダッシュボード</h2>
           {youtuberData && (
-            <p className="text-sm text-gray-600">{youtuberData.channel_name || 'チャンネル名未設定'}</p>
+            <p className="text-sm text-gray-600 dark:text-dark-text-secondary">{youtuberData.channel_name || 'チャンネル名未設定'}</p>
           )}
         </div>
         
@@ -341,7 +341,9 @@ const Dashboard: React.FC = () => {
             <li>
               <button
                 className={`w-full text-left px-4 py-2 rounded flex items-center ${
-                  activeTab === 'stats' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+                  activeTab === 'stats' 
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' 
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
                 onClick={() => handleTabClick('stats')}
               >
@@ -352,7 +354,9 @@ const Dashboard: React.FC = () => {
             <li>
               <button
                 className={`w-full text-left px-4 py-2 rounded flex items-center ${
-                  activeTab === 'bookings' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+                  activeTab === 'bookings' 
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' 
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
                 onClick={() => handleTabClick('bookings')}
               >
@@ -363,7 +367,9 @@ const Dashboard: React.FC = () => {
             <li>
               <button
                 className={`w-full text-left px-4 py-2 rounded flex items-center ${
-                  activeTab === 'history' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+                  activeTab === 'history' 
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' 
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
                 onClick={() => handleTabClick('history')}
               >
@@ -374,7 +380,9 @@ const Dashboard: React.FC = () => {
             <li>
               <button
                 className={`w-full text-left px-4 py-2 rounded flex items-center ${
-                  activeTab === 'analytics' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+                  activeTab === 'analytics' 
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' 
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
                 onClick={() => handleTabClick('analytics')}
               >
@@ -386,7 +394,9 @@ const Dashboard: React.FC = () => {
             <li className="relative">
               <button
                 className={`w-full text-left px-4 py-2 rounded flex items-center ${
-                  activeTab === 'effect' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+                  activeTab === 'effect' 
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' 
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
                 onClick={() => handleTabClick('effect')}
               >
@@ -397,7 +407,9 @@ const Dashboard: React.FC = () => {
             <li>
               <button
                 className={`w-full text-left px-4 py-2 rounded flex items-center ${
-                  activeTab === 'settings' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+                  activeTab === 'settings' 
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' 
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
                 onClick={() => handleTabClick('settings')}
               >
@@ -408,7 +420,9 @@ const Dashboard: React.FC = () => {
             <li>
               <button
                 className={`w-full text-left px-4 py-2 rounded flex items-center ${
-                  activeTab === 'help' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+                  activeTab === 'help' 
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' 
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
                 onClick={() => handleTabClick('help')}
               >

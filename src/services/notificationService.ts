@@ -371,7 +371,7 @@ export const notificationService = {
     }
   },
 
-  // マッチング用通知作成関数 - 簡素化して改善
+  // マッチング用通知作成関数 - 改善版
   async createMatchingNotification(
     userId: string,
     targetUserId: string,
@@ -410,6 +410,7 @@ export const notificationService = {
       let priority: 'high' | 'medium' | 'low' = 'medium';
       let link = '/matching';
       let connectionId = '';
+      let conversationId = '';
 
       // 通知種別に応じた内容設定
       switch (type) {
@@ -417,7 +418,16 @@ export const notificationService = {
           title = 'マッチングが成立しました！';
           message = `${senderData.username}さんとマッチングしました！メッセージを送ってみましょう。`;
           priority = 'high';
-          link = '/messages';
+          
+          // マッチングの場合は会話を作成または取得
+          conversationId = await this._findOrCreateConversation(userId, targetUserId);
+          
+          // 会話IDが取得できた場合はリンクを更新
+          if (conversationId) {
+            link = `/messages/${conversationId}`;
+          } else {
+            link = '/messages'; // 会話IDが取得できなかった場合はデフォルトのリンク
+          }
           break;
 
         case 'like':
@@ -448,6 +458,20 @@ export const notificationService = {
           match_type: type === 'match' ? 'mutual' : 'like',
         }
       };
+
+      // 会話IDが取得できた場合はメタデータに追加
+      // NotificationMetadataに会話データのフィールドがない場合は、直接linkのみ設定する
+      if (conversationId) {
+        // 以下の行はコメントアウト
+        // metadata.conversation_data = {
+        //   conversation_id: conversationId,
+        //   other_user_id: userId,
+        //   other_username: senderData.username
+        // };
+        
+        // リンクに会話IDを含める
+        link = `/messages/${conversationId}`;
+      }
 
       // 接続リクエストの場合は接続データも追加
       if (type === 'connection_request' && connectionId) {
@@ -481,7 +505,65 @@ export const notificationService = {
     }
   },
 
-  // 接続レコードの作成・取得ヘルパーメソッド
+  // 会話を検索または作成するヘルパーメソッド（新規追加）
+  async _findOrCreateConversation(
+    user1Id: string, 
+    user2Id: string
+  ): Promise<string> {
+    try {
+      // まず既存の会話を検索
+      const { data: existingConv, error: existingConvError } = await supabase
+        .from('conversations')
+        .select('id')
+        .or(`and(user1_id.eq.${user1Id},user2_id.eq.${user2Id}),and(user1_id.eq.${user2Id},user2_id.eq.${user1Id})`)
+        .limit(1);
+      
+      // 既存の会話がある場合はそのIDを返す
+      if (!existingConvError && existingConv && existingConv.length > 0) {
+        const conversationId = existingConv[0].id;
+        
+        // 会話を再アクティブ化
+        await supabase
+          .from('conversations')
+          .update({
+            is_active: true,
+            last_message_time: new Date().toISOString()
+          })
+          .eq('id', conversationId);
+        
+        return conversationId;
+      }
+      
+      // 既存の会話がない場合は新規作成
+      const { data: newConv, error: createError } = await supabase
+        .from('conversations')
+        .insert({
+          user1_id: user1Id,
+          user2_id: user2Id,
+          last_message_time: new Date().toISOString(),
+          is_active: true,
+          user1_unread_count: 0,
+          user2_unread_count: 0
+        })
+        .select('id');
+      
+      if (createError) {
+        console.error('会話作成エラー:', createError);
+        return '';
+      }
+      
+      if (newConv && newConv.length > 0) {
+        return newConv[0].id;
+      }
+      
+      return '';
+    } catch (error) {
+      console.error('会話検索/作成エラー:', error);
+      return '';
+    }
+  },
+
+  // 接続レコードの作成・取得ヘルパーメソッド（既存）
   async _createOrGetConnection(
     userId: string, 
     targetUserId: string
@@ -524,7 +606,7 @@ export const notificationService = {
     }
   },
 
-  // 接続リクエスト応答関数
+  // 接続リクエスト応答関数（既存）
   async respondToConnectionRequest(
     connectionId: string,
     status: ConnectionStatus.CONNECTED | ConnectionStatus.REJECTED
@@ -576,6 +658,12 @@ export const notificationService = {
         .single();
 
       if (status === ConnectionStatus.CONNECTED) {
+        // 会話IDを取得または作成
+        const conversationId = await this._findOrCreateConversation(
+          connectionData.user_id, 
+          connectionData.connected_user_id
+        );
+        
         // 承認通知を送信
         await this._sendConnectionResponseNotification(
           connectionData, 
@@ -584,11 +672,9 @@ export const notificationService = {
           'connection_accepted', 
           '接続リクエストが承認されました',
           `${senderProfile?.username || 'ユーザー'}さんが接続リクエストを承認しました。メッセージを送ってみましょう！`,
-          'accepted'
+          'accepted',
+          conversationId // 会話IDを渡す
         );
-
-        // 会話テーブルを作成
-        await this._createConversation(connectionData.user_id, connectionData.connected_user_id);
       } else {
         // 拒否通知を送信
         await this._sendConnectionResponseNotification(
@@ -609,7 +695,7 @@ export const notificationService = {
     }
   },
 
- // 接続応答通知の送信ヘルパーメソッド
+// 接続応答通知の送信ヘルパーメソッド（修正）
 async _sendConnectionResponseNotification(
   connectionData: any, 
   senderProfile: any, 
@@ -617,28 +703,43 @@ async _sendConnectionResponseNotification(
   type: NotificationType,
   title: string,
   message: string,
-  status: 'pending' | 'accepted' | 'rejected'  // ここを具体的な列挙型に変更
+  status: 'pending' | 'accepted' | 'rejected',
+  conversationId?: string // 会話IDを追加
 ): Promise<void> {
   try {
+    // リンク先の設定（会話IDがある場合は会話画面へ）
+    const link = (type === 'connection_accepted' && conversationId) 
+      ? `/messages/${conversationId}` 
+      : (type === 'connection_accepted' ? '/messages' : '/matching');
+    
+    // メタデータの準備
+    const metadata: NotificationMetadata = {
+      connection_data: {
+        connection_id: connectionId,
+        sender_id: connectionData.connected_user_id,
+        sender_username: senderProfile?.username,
+        sender_avatar_url: senderProfile?.avatar_url,
+        status,
+        action_required: false
+      },
+      matching_data: {
+        matched_user_id: connectionData.connected_user_id,
+        matched_username: senderProfile?.username,
+        match_score: 0, // スコア情報がない場合はデフォルト値
+        match_type: 'like' // "connection"から"like"に変更
+      }
+    };
+    
     await this.createNotification({
-      user_id: connectionData.user_id,
+      user_id: connectionData.connected_user_id,
       type,
       title,
       message,
       priority: 'high',
-      link: type === 'connection_accepted' ? '/messages' : '/matching',
-      sender_id: connectionData.connected_user_id,
+      link,
+      sender_id: connectionData.user_id,
       notification_group: 'matching',
-      metadata: {
-        connection_data: {
-          connection_id: connectionId,
-          sender_id: connectionData.connected_user_id,
-          sender_username: senderProfile?.username,
-          sender_avatar_url: senderProfile?.avatar_url,
-          status,
-          action_required: false
-        }
-      }
+      metadata
     });
   } catch (error) {
     console.error(`${status}通知送信エラー:`, error);
@@ -646,29 +747,7 @@ async _sendConnectionResponseNotification(
   }
 },
 
-  // 会話作成ヘルパーメソッド
-  async _createConversation(user1Id: string, user2Id: string): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('conversations')
-        .insert({
-          user1_id: user1Id,
-          user2_id: user2Id,
-          last_message_time: new Date().toISOString(),
-          is_active: true,
-          user1_unread_count: 0,
-          user2_unread_count: 0
-        });
-
-      if (error) {
-        console.error('会話作成エラー:', error);
-        // 会話作成エラーは上位関数の成功判定に影響しない
-      }
-    } catch (error) {
-      console.error('会話作成中にエラーが発生:', error);
-      // 続行するため、エラーをスローしない
-    }
-  },// 通知アクションを実行する関数
+  // 通知アクションを実行する関数
   async executeNotificationAction(
     notificationId: string,
     action: NotificationAction,
@@ -838,8 +917,3 @@ async _sendConnectionResponseNotification(
     }
   }
 };
-
-// 以下の重複関数は削除
-// export const createMatchingNotification = ...
-// function getNotificationTitle(type: string): string { ... }
-// function getNotificationMessage(type: string, matchScore: number): string { ... }

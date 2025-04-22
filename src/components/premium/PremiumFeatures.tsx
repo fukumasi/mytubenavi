@@ -74,8 +74,8 @@ const PremiumFeatures: React.FC<PremiumFeaturesProps> = ({
     <div className={`premium-features ${className}`}>
       {!compact && (
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold mb-2">MyTubeNaviの機能比較</h2>
-          <p className="text-gray-600">
+          <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-dark-text-primary">MyTubeNaviの機能比較</h2>
+          <p className="text-gray-600 dark:text-dark-text-secondary">
             一般会員とプレミアム会員で利用できる機能の違いをご確認ください
           </p>
         </div>
@@ -85,10 +85,10 @@ const PremiumFeatures: React.FC<PremiumFeaturesProps> = ({
         {FEATURES.map((feature, index) => (
           <div 
             key={index} 
-            className={`bg-white rounded-lg p-5 shadow-sm border ${
+            className={`bg-white dark:bg-dark-surface rounded-lg p-5 shadow-sm border ${
               feature.premium 
-                ? 'border-yellow-200 bg-gradient-to-br from-white to-yellow-50' 
-                : 'border-gray-200'
+                ? 'border-yellow-200 dark:border-yellow-800/50 bg-gradient-to-br from-white dark:from-dark-surface to-yellow-50 dark:to-yellow-900/20' 
+                : 'border-gray-200 dark:border-dark-border'
             }`}
           >
             <div className="flex items-start">
@@ -97,14 +97,14 @@ const PremiumFeatures: React.FC<PremiumFeaturesProps> = ({
               </div>
               <div>
                 <div className="flex items-center">
-                  <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
+                  <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-dark-text-primary">{feature.title}</h3>
                   {feature.premium && (
-                    <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
+                    <span className="ml-2 px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-xs font-medium rounded-full">
                       プレミアム
                     </span>
                   )}
                 </div>
-                <p className="text-gray-600 text-sm">
+                <p className="text-gray-600 dark:text-dark-text-secondary text-sm">
                   {feature.description}
                 </p>
               </div>
@@ -117,11 +117,11 @@ const PremiumFeatures: React.FC<PremiumFeaturesProps> = ({
         <div className="text-center mt-8">
           <Link 
             to="/premium/upgrade" 
-            className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors"
+            className="inline-block bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-800 text-white font-medium py-2 px-6 rounded-lg transition-colors"
           >
             プレミアム会員にアップグレード
           </Link>
-          <p className="mt-3 text-sm text-gray-600">
+          <p className="mt-3 text-sm text-gray-600 dark:text-dark-text-secondary">
             より快適なYouTube体験のためにプレミアム会員をおすすめします
           </p>
         </div>

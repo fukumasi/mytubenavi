@@ -80,7 +80,7 @@ export default function UserProfile() {
         return (
             <ProfileLayout>
                 <div className="flex justify-center items-center h-64">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 dark:border-indigo-400"></div>
                 </div>
             </ProfileLayout>
         );
@@ -89,7 +89,7 @@ export default function UserProfile() {
     const ProfileContent = (
         <div className="space-y-6">
             {error && (
-                <div className="bg-red-50 text-red-700 p-4 rounded-md mb-4">
+                <div className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 p-4 rounded-md mb-4">
                     {error}
                 </div>
             )}
@@ -103,12 +103,12 @@ export default function UserProfile() {
                     {isEditing ? (
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-primary mb-1">
                                     ユーザーネーム*
                                 </label>
                                 <input
                                     type="text"
-                                    className="w-full px-3 py-2 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                    className="w-full px-3 py-2 rounded-md border-gray-300 dark:border-dark-border dark:bg-dark-bg dark:text-dark-text-primary shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
                                     placeholder="ユーザーネーム"
@@ -116,24 +116,24 @@ export default function UserProfile() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-primary mb-1">
                                     自己紹介
                                 </label>
                                 <textarea
                                     rows={4}
-                                    className="w-full px-3 py-2 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                    className="w-full px-3 py-2 rounded-md border-gray-300 dark:border-dark-border dark:bg-dark-bg dark:text-dark-text-primary shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
                                     placeholder="自己紹介"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-primary mb-1">
                                     チャンネルURL
                                 </label>
                                 <input
                                     type="url"
-                                    className="w-full px-3 py-2 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                    className="w-full px-3 py-2 rounded-md border-gray-300 dark:border-dark-border dark:bg-dark-bg dark:text-dark-text-primary shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                     value={channelUrl}
                                     onChange={(e) => setChannelUrl(e.target.value)}
                                     placeholder="https://www.youtube.com/channel/..."
@@ -142,9 +142,9 @@ export default function UserProfile() {
                         </div>
                     ) : (
                         <div>
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">{profileData?.username}</h3>
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-dark-text-primary mb-2">{profileData?.username}</h3>
                             {profileData?.description && (
-                                <p className="text-gray-500">{profileData?.description}</p>
+                                <p className="text-gray-500 dark:text-dark-text-secondary">{profileData?.description}</p>
                             )}
                         </div>
                     )}
@@ -167,7 +167,7 @@ export default function UserProfile() {
                                     setDescription(profileData?.description || '');
                                     setChannelUrl(profileData?.channel_url || '');
                                 }} 
-                                className="border border-gray-300 px-4 py-2 rounded-md text-gray-700 hover:bg-gray-50"
+                                className="border border-gray-300 dark:border-dark-border px-4 py-2 rounded-md text-gray-700 dark:text-dark-text-primary hover:bg-gray-50 dark:hover:bg-dark-surface"
                                 disabled={isLoading}
                             >
                                 キャンセル
@@ -186,13 +186,13 @@ export default function UserProfile() {
             </div>
             
             {!isEditing && profileData?.channel_url && (
-                <div className="pt-4 border-t border-gray-200">
-                    <h4 className="text-sm font-medium text-gray-900 mb-2">チャンネルURL</h4>
+                <div className="pt-4 border-t border-gray-200 dark:border-dark-border">
+                    <h4 className="text-sm font-medium text-gray-900 dark:text-dark-text-primary mb-2">チャンネルURL</h4>
                     <a 
                         href={profileData.channel_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-indigo-600 hover:text-indigo-500 break-all"
+                        className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 break-all"
                     >
                         {profileData.channel_url}
                     </a>
