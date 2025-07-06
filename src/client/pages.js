@@ -8,6 +8,7 @@ export { default as Register } from "./pages/Register";
 export { default as ForgotPassword } from "./pages/ForgotPassword";
 export { default as ResetPassword } from "./pages/ResetPassword";
 export { default as NotFound } from "./pages/NotFound";
+export { default as RubiksCubeGuide } from "./pages/RubiksCubeGuide";
 
 // Firebase認証関連の追加ページ
 export { default as EmailVerification } from "./pages/EmailVerification";
