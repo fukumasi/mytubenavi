@@ -17,6 +17,7 @@ import EditProfile from './pages/EditProfile';
 import ForgotPassword from './pages/ForgotPassword';
 import EmailVerification from './pages/EmailVerification';
 import GenrePage from './pages/GenrePage';
+import RubiksCubeGuide from './pages/RubiksCubeGuide';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -94,6 +95,7 @@ function AppContent() {
               />
               <Route path="/genres" element={<GenrePage level={0} />} />
               <Route path="/genre/:level/:genreId" element={<GenrePage />} />
+              <Route path="/rubiks-cube-guide" element={<RubiksCubeGuide />} />
             </Routes>
           }
         />

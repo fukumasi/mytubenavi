@@ -120,5 +120,21 @@
   "parentGenre": "親ジャンル",
   "genres": "ジャンル",
   "publishDate": "公開日",
-  "errorFetchingGenreData": "ジャンルデータの取得中にエラーが発生しました"
+  "errorFetchingGenreData": "ジャンルデータの取得中にエラーが発生しました",
+  "footer": {
+    "appName": "MyTubeNavi",
+    "home": "ホーム",
+    "about": "MyTubeNaviについて",
+    "contact": "お問い合わせ",
+    "legalInfo": "法的情報",
+    "terms": "利用規約",
+    "privacy": "プライバシー",
+    "copyright": "著作権",
+    "followUs": "フォローする",
+    "twitter": "Twitter",
+    "facebook": "Facebook",
+    "instagram": "Instagram",
+    "youtube": "YouTube",
+    "rubiksCubeGuide": "ルービックキューブのそろえ方"
+  }
 }

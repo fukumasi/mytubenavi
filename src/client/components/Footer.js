@@ -90,6 +90,9 @@ const Footer = () => {
           <FooterLink to="/">{t('footer.home')}</FooterLink>
           <FooterLink to="/about">{t('footer.about')}</FooterLink>
           <FooterLink to="/contact">{t('footer.contact')}</FooterLink>
+          <FooterLink to="/rubiks-cube-guide">
+            {t('footer.rubiksCubeGuide')}
+          </FooterLink>
         </FooterSection>
         <FooterSection>
           <FooterTitle>{t('footer.legalInfo')}</FooterTitle>
