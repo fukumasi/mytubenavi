@@ -68,7 +68,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     }
 });
 
-// 型定義を追加
+// SupabaseVideo型からVideo型への変換用の内部インターフェース
 interface SupabaseVideoResponse {
     id: string;
     title?: string;
@@ -86,35 +86,101 @@ interface SupabaseVideoResponse {
     avg_rating?: number;
     created_at?: string;
     updated_at?: string;
+    tags?: string[];
+    ratings?: Ratings | string | null;
 }
 
-// SupabaseVideo型からVideo型への変換
+// SupabaseVideoResponse | VideoReviewCountResponse → Video型 変換ヘルパー
 const mapSupabaseVideoToVideo = (video: SupabaseVideoResponse | VideoReviewCountResponse): Video => {
-    const isSupabaseVideoResponse = (video: SupabaseVideoResponse | VideoReviewCountResponse): video is SupabaseVideoResponse => {
-        return 'description' in video;
-    };
-
+    const isSupabaseResponse = (v: any): v is SupabaseVideoResponse => 'description' in v;
     const base: Video = {
         id: video.id,
-        title: video.title || '',
-        description: isSupabaseVideoResponse(video) ? video.description || '' : '',
-        thumbnail: isSupabaseVideoResponse(video) ? video.thumbnail || '' : '',
-        duration: isSupabaseVideoResponse(video) ? video.duration || '' : '',
-        view_count: isSupabaseVideoResponse(video) ? video.view_count || 0 : 0,
-        rating: isSupabaseVideoResponse(video) ? (typeof video.rating === 'string' ? parseFloat(video.rating) : video.rating || 0) : 0,
-        genre_id: isSupabaseVideoResponse(video) ? video.genre_id : undefined,
-        published_at: isSupabaseVideoResponse(video) ? video.published_at || '' : '',
-        channel_title: isSupabaseVideoResponse(video) ? video.channel_title || '' : '',
-        youtuber: isSupabaseVideoResponse(video) ? video.youtuber : undefined,
-        youtube_id: video.youtube_id || '',
-        review_count: video.review_count || 0,
-        avg_rating: isSupabaseVideoResponse(video) ? video.avg_rating || 0 : 0,
-        created_at: isSupabaseVideoResponse(video) ? video.created_at || new Date().toISOString() : new Date().toISOString(),
-        updated_at: isSupabaseVideoResponse(video) ? video.updated_at || new Date().toISOString() : new Date().toISOString(),
+        title: isSupabaseResponse(video) ? video.title || '' : '',
+        description: isSupabaseResponse(video) ? video.description || '' : '',
+        thumbnail: isSupabaseResponse(video) ? video.thumbnail || '' : '',
+        duration: isSupabaseResponse(video) ? video.duration || '' : '',
+        view_count: isSupabaseResponse(video) ? video.view_count || 0 : 0,
+        rating: isSupabaseResponse(video)
+            ? (typeof video.rating === 'string' ? parseFloat(video.rating) : video.rating || 0)
+            : 0,
+        genre_id: isSupabaseResponse(video) ? video.genre_id : undefined,
+        published_at: isSupabaseResponse(video) ? video.published_at || '' : '',
+        channel_title: isSupabaseResponse(video) ? video.channel_title || '' : '',
+        youtuber: isSupabaseResponse(video) ? video.youtuber : undefined,
+        youtube_id: isSupabaseResponse(video) ? video.youtube_id || '' : '',
+        review_count: (video as any).review_count || 0,
+        avg_rating: isSupabaseResponse(video) ? video.avg_rating || 0 : 0,
+        created_at: isSupabaseResponse(video)
+            ? video.created_at || new Date().toISOString()
+            : new Date().toISOString(),
+        updated_at: isSupabaseResponse(video)
+            ? video.updated_at || new Date().toISOString()
+            : new Date().toISOString(),
     };
+
+    // JSONB「ratings」カラムを Video.ratings にマッピング
+    if (isSupabaseResponse(video) && video.ratings) {
+        let r: any = video.ratings;
+        if (typeof r === 'string') {
+            try { r = JSON.parse(r); } catch { r = {}; }
+        }
+        base.ratings = {
+            overall: {
+                averageRating: r.overall?.averageRating || 0,
+                totalRatings: r.overall?.totalRatings || 0,
+                distribution: typeof r.overall?.distribution === 'string'
+                    ? JSON.parse(r.overall.distribution || '{}')
+                    : r.overall?.distribution || {},
+            },
+            reliability: {
+                averageRating: r.reliability?.averageRating || 0,
+                totalRatings: r.reliability?.totalRatings || 0,
+                distribution: typeof r.reliability?.distribution === 'string'
+                    ? JSON.parse(r.reliability.distribution || '{}')
+                    : r.reliability?.distribution || {},
+            },
+            entertainment: {
+                averageRating: r.entertainment?.averageRating || 0,
+                totalRatings: r.entertainment?.totalRatings || 0,
+                distribution: typeof r.entertainment?.distribution === 'string'
+                    ? JSON.parse(r.entertainment.distribution || '{}')
+                    : r.entertainment?.distribution || {},
+            },
+            usefulness: {
+                averageRating: r.usefulness?.averageRating || 0,
+                totalRatings: r.usefulness?.totalRatings || 0,
+                distribution: typeof r.usefulness?.distribution === 'string'
+                    ? JSON.parse(r.usefulness.distribution || '{}')
+                    : r.usefulness?.distribution || {},
+            },
+            quality: {
+                averageRating: r.quality?.averageRating || 0,
+                totalRatings: r.quality?.totalRatings || 0,
+                distribution: typeof r.quality?.distribution === 'string'
+                    ? JSON.parse(r.quality.distribution || '{}')
+                    : r.quality?.distribution || {},
+            },
+            originality: {
+                averageRating: r.originality?.averageRating || 0,
+                totalRatings: r.originality?.totalRatings || 0,
+                distribution: typeof r.originality?.distribution === 'string'
+                    ? JSON.parse(r.originality.distribution || '{}')
+                    : r.originality?.distribution || {},
+            },
+            clarity: {
+                averageRating: r.clarity?.averageRating || 0,
+                totalRatings: r.clarity?.totalRatings || 0,
+                distribution: typeof r.clarity?.distribution === 'string'
+                    ? JSON.parse(r.clarity.distribution || '{}')
+                    : r.clarity?.distribution || {},
+            },
+        };
+    }
+
     return base;
 };
 
+// --- fetch / RPC 実装 ---
 
 // 最近の動画取得
 export const getRecentVideos = async (limit: number = 30): Promise<Video[]> => {
@@ -126,7 +192,7 @@ export const getRecentVideos = async (limit: number = 30): Promise<Video[]> => {
             .limit(limit);
 
         if (error) throw error;
-        return (data || []).map(video => mapSupabaseVideoToVideo(video as SupabaseVideoResponse));
+        return (data || []).map(v => mapSupabaseVideoToVideo(v as SupabaseVideoResponse));
     } catch (err) {
         console.error('Error fetching recent videos:', err);
         return [];
@@ -143,7 +209,7 @@ export const getPopularVideos = async (limit: number = 10): Promise<Video[]> => 
             .limit(limit);
 
         if (error) throw error;
-        return (data || []).map(video => mapSupabaseVideoToVideo(video as SupabaseVideoResponse));
+        return (data || []).map(v => mapSupabaseVideoToVideo(v as SupabaseVideoResponse));
     } catch (err) {
         console.error('Error fetching popular videos:', err);
         return [];
@@ -160,77 +226,46 @@ export const getPopularVideosByRating = async (limit: number = 10): Promise<Vide
             .from('videos')
             .select('*')
             .order('created_at', { ascending: false })
-            .limit(30); // より多くの候補を取得
+            .limit(30);
 
         if (videosError) throw videosError;
-
         if (!videos || videos.length === 0) return [];
 
         // 2. レビューデータを取得
         const { data: reviewData, error: reviewError } = await supabase
-            .from('video_ratings')  // ここを変更
+            .from('video_ratings')
             .select('*');
-
         if (reviewError) throw reviewError;
 
-        // 3. 各動画のレビュー数をカウント
-        const videoReviewCounts: Record<string, number> = {};
-        const videoRatings: Record<string, number[]> = {};
-
-        if (reviewData && reviewData.length > 0) {
-            reviewData.forEach(review => {
-                // レビュー数をカウント
-                if (!videoReviewCounts[review.video_id]) {
-                    videoReviewCounts[review.video_id] = 0;
-                    videoRatings[review.video_id] = [];
-                }
-                videoReviewCounts[review.video_id]++;
-
-                // 評価を記録
-                if (review.rating) {
-                    videoRatings[review.video_id].push(review.rating);
-                }
-            });
-        }
-
-        // 4. 動画データに評価情報を追加
-        const videosWithReviews = videos.map(video => {
-            const reviewCount = videoReviewCounts[video.id] || 0;
-            const ratings = videoRatings[video.id] || [];
-            const avgRating = ratings.length > 0
-                ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
-                : 0;
-
-            return {
-                ...video,
-                review_count: reviewCount,
-                avg_rating: avgRating
-            };
+        // 3. 各動画でレビュー数＆評価を集計
+        const counts: Record<string, number> = {};
+        const ratingsMap: Record<string, number[]> = {};
+        reviewData.forEach(r => {
+            counts[r.video_id] = (counts[r.video_id] || 0) + 1;
+            if (r.rating != null) ratingsMap[r.video_id] = (ratingsMap[r.video_id] || []).concat(r.rating);
         });
 
-        // 5. レビュー数とレーティングでソート（条件を緩和：レビュー数0も含める）
-        const sortedVideos = videosWithReviews
-            .sort((a, b) => {
-                // まずレビュー数でソート
-                const reviewDiff = (b.review_count || 0) - (a.review_count || 0);
-                if (reviewDiff !== 0) return reviewDiff;
+        // 4. 平均評価を計算してマージ
+        const withStats = videos.map(v => {
+            const c = counts[v.id] || 0;
+            const arr = ratingsMap[v.id] || [];
+            const avg = arr.length ? arr.reduce((s, x) => s + x, 0) / arr.length : 0;
+            return { ...v, review_count: c, avg_rating: avg };
+        });
 
-                // レビュー数が同じなら評価でソート
-                return (b.avg_rating || 0) - (a.avg_rating || 0);
-            })
+        // 5. ソート＆切り出し
+        const sorted = withStats
+            .sort((a, b) => (b.review_count || 0) - (a.review_count || 0) || (b.avg_rating || 0) - (a.avg_rating || 0))
             .slice(0, limit);
 
-        console.log('Filtered popular videos:', sortedVideos);
-
-        return sortedVideos.map(video => mapSupabaseVideoToVideo(video as SupabaseVideoResponse));
+        return sorted.map(v => mapSupabaseVideoToVideo(v as SupabaseVideoResponse));
     } catch (err) {
         console.error('Error fetching popular videos by rating:', err);
         return [];
     }
 };
 
-
-// 接続チェック用の関数
+// 接続チェック用
 export const checkSupabaseConnection = async (): Promise<{ connected: boolean; error?: string }> => {
     try {
         const { error } = await supabase.from('profiles').select('count').limit(1);
@@ -238,32 +273,25 @@ export const checkSupabaseConnection = async (): Promise<{ connected: boolean; e
             if (error.code === '42P01') {
                 return {
                     connected: false,
-                    error: 'データベーステーブルが見つかりません。マイグレーションを実行してください。'
+                    error: 'テーブルがありません。マイグレーションを実行してください。'
                 };
             }
-            return {
-                connected: false,
-                error: `データベース接続エラー: ${error.message}`
-            };
+            return { connected: false, error: `接続エラー: ${error.message}` };
         }
         return { connected: true };
-    } catch (err) {
-        return {
-            connected: false,
-            error: 'Supabaseサービスに接続できません。'
-        };
+    } catch {
+        return { connected: false, error: 'Supabase に接続できません。' };
     }
 };
 
-// ジャンル関連の関数
+// ジャンル関連
 export const getMainGenres = async (): Promise<Genre[]> => {
     try {
         const { data, error } = await supabase
             .from('genres')
             .select('*')
-            .is('parent_genre_id', null)  // 大ジャンルのみを取得
-            .order('order', { ascending: true });  // 順序通りに表示
-
+            .is('parent_genre_id', null)
+            .order('order', { ascending: true });
         if (error) throw error;
         return data || [];
     } catch (err) {
@@ -274,108 +302,90 @@ export const getMainGenres = async (): Promise<Genre[]> => {
 
 export const getSubGenres = async (slug: string): Promise<Genre[]> => {
     try {
-        // single() -> limit(1)に変更
-        const { data: parentData, error: parentError } = await supabase
+        const { data: pd, error: pe } = await supabase
             .from('genres')
             .select('id')
             .eq('slug', slug.toLowerCase())
             .limit(1);
-
-        if (parentError || !parentData || parentData.length === 0) return [];
-        const parent = parentData[0];
-
+        if (pe || !pd?.length) return [];
         const { data, error } = await supabase
             .from('genres')
             .select('*')
-            .eq('parent_genre_id', parent.id)
+            .eq('parent_genre_id', pd[0].id)
             .order('order');
-
         if (error) throw error;
         return data || [];
-    } catch (err) {
-        console.error('Error fetching sub genres:', err);
+    } catch {
         return [];
     }
 };
 
 export const getGenreInfo = async (slug: string): Promise<Genre | null> => {
     try {
-        // single() -> limit(1)に変更
         const { data, error } = await supabase
             .from('genres')
             .select('*')
             .eq('slug', slug.toLowerCase())
             .limit(1);
-
         if (error) return null;
-        return data && data.length > 0 ? data[0] : null;
-    } catch (err) {
-        console.error('Error fetching genre info:', err);
+        return data?.[0] || null;
+    } catch {
         return null;
     }
 };
 
-// プロフィール関連の関数
+// プロフィール関連
 export const getProfile = async (): Promise<Profile | null> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
-
-    // single() -> limit(1)に変更
     const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .limit(1);
-
     if (error) {
         console.error('Error fetching profile:', error);
         return null;
     }
-    return data && data.length > 0 ? data[0] as Profile : null;
+    return data?.[0] as Profile;
 };
 
 export const updateProfile = async (profile: Partial<Profile>): Promise<void> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
-
     const { error } = await supabase
         .from('profiles')
         .update(profile)
         .eq('id', user.id);
-
     if (error) throw error;
 };
 
 export const uploadAvatar = async (file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random()}.${fileExt}`;
-
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase
+        .storage
         .from('avatars')
         .upload(fileName, file);
-
     if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage
+    const { data } = supabase
+        .storage
         .from('avatars')
         .getPublicUrl(fileName);
-
     return data.publicUrl;
 };
 
-// YouTube URLから動画情報を取得してDBに保存
+// YouTube URLからDB登録
 export const addVideoToDatabase = async (videoUrl: string): Promise<void> => {
     try {
         const videoId = extractVideoId(videoUrl);
         if (!videoId) {
             throw new Error('Invalid YouTube URL format');
         }
-
         const videoDetails = await YouTubeAPI.getVideoDetails(videoId);
-        if (!videoDetails || videoDetails.length === 0) {
+        if (!videoDetails?.length) {
             throw new Error('動画情報の取得に失敗しました');
         }
-
         const details = videoDetails[0];
         const { error } = await supabase.from('videos').upsert({
             id: details.id,
@@ -392,7 +402,7 @@ export const addVideoToDatabase = async (videoUrl: string): Promise<void> => {
             youtuber: {
                 channelName: details.snippet?.channelTitle || '',
                 channelUrl: `https://www.youtube.com/channel/${details.snippet?.channelId || ''}`,
-                verificationStatus: 'pending' as const, // 'unknown'から'pending'に変更
+                verificationStatus: 'pending' as const,
                 channel_id: details.snippet?.channelId,
                 avatar_url: undefined,
                 subscribers: undefined
@@ -400,7 +410,6 @@ export const addVideoToDatabase = async (videoUrl: string): Promise<void> => {
             youtube_id: details.id,
             genre_id: null
         });
-
         if (error) {
             console.error('Error saving video to Supabase:', error);
             throw error;
@@ -411,119 +420,87 @@ export const addVideoToDatabase = async (videoUrl: string): Promise<void> => {
     }
 };
 
-// お気に入り関連の関数
+// お気に入り関連
 export const getFavoriteVideos = async (): Promise<Video[]> => {
     const { data, error } = await supabase
         .from('favorites')
         .select(`
-     video_id,
-     videos:video_id (*)
-   `)
+            video_id,
+            videos:video_id (*)
+        `)
         .order('created_at', { ascending: false });
-
     if (error) throw error;
-
     return (data || [])
-        .map(item => {
-            if (item.videos && typeof item.videos === 'object' && !Array.isArray(item.videos)) {
-                return mapSupabaseVideoToVideo(item.videos as SupabaseVideoResponse);
-            }
-            return null;
-        })
-        .filter((video): video is Video => video !== null);
+        .map(item =>
+            item.videos && typeof item.videos === 'object' && !Array.isArray(item.videos)
+                ? mapSupabaseVideoToVideo(item.videos as SupabaseVideoResponse)
+                : null
+        )
+        .filter((v): v is Video => v !== null);
 };
 
 export const getFavoriteStatus = async (videoId: string): Promise<boolean> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return false;
-
-    // maybeSingle() -> limit(1)に変更
     const { data, error } = await supabase
         .from('favorites')
         .select('id')
         .eq('user_id', user.id)
         .eq('video_id', videoId)
         .limit(1);
-
     if (error) {
         console.error('Error checking favorite status:', error);
         return false;
     }
-
-    return data && data.length > 0;
+    return (data || []).length > 0;
 };
 
 export const toggleFavorite = async (videoId: string): Promise<boolean> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
-
-    // maybeSingle() -> limit(1)に変更
     const { data: existingData, error: existingError } = await supabase
         .from('favorites')
-        .select('id')
+        .select('id')  
         .eq('user_id', user.id)
         .eq('video_id', videoId)
         .limit(1);
-        
-    const existing = existingData && existingData.length > 0 ? existingData[0] : null;
-
-    if (existingError) {
-        console.error('Error checking favorite status:', existingError);
-        throw existingError;
-    }
-
-    if (existing) {
+    if (existingError) throw existingError;
+    const exists = (existingData || []).length > 0;
+    if (exists) {
         const { error } = await supabase
             .from('favorites')
             .delete()
             .eq('user_id', user.id)
             .eq('video_id', videoId);
-
         if (error) throw error;
         return false;
     } else {
         const { error } = await supabase
             .from('favorites')
-            .insert([{
-                user_id: user.id,
-                video_id: videoId
-            }]);
-
+            .insert([{ user_id: user.id, video_id: videoId }]);
         if (error) throw error;
         return true;
     }
 };
-
-// レビュー関連の関数
+// レビュー関連
 export const getVideoReviews = async (videoId: string): Promise<Review[]> => {
-    console.warn('video_reviews テーブルは削除されました。代わりにvideo_ratingsテーブルを使用してください。');
-    return getAllVideoRatings(videoId) as any; // 型アサーションを追加
+    console.warn('video_reviews テーブルは削除されました。代わりに video_ratings テーブルを使用してください。');
+    return getAllVideoRatings(videoId) as any;
 };
 
-
-// ビデオ評価を取得する関数
 export const getVideoRating = async (videoId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
-
     const { data, error } = await supabase
         .rpc('get_video_rating', { p_video_id: videoId });
-
     if (error) {
         console.error('Error fetching video rating:', error);
         throw error;
     }
-
     return data;
 };
 
-// レビュー投稿
-export const postReview = async (
-    videoId: string,
-    rating: number,
-    comment: string
-) => {
-    // video_ratings テーブルに評価を投稿するように変更
+export const postReview = async (videoId: string, rating: number, comment: string) => {
     return submitVideoRating(
         videoId,
         rating,  // overall
@@ -537,113 +514,83 @@ export const postReview = async (
     );
 };
 
-// レビュー更新
-export const updateReview = async (
-    _reviewId: string,
-    _rating: number,
-    _comment: string
-) => {
-    console.warn('updateReview関数は廃止されました。代わりにsubmitVideoRating関数を使用してください。');
-
-    // reviewIdの代わりにvideoIdが必要なため、エラーを投げる
-    throw new Error('この関数は使用できません。submitVideoRating関数を使用してください。');
+export const updateReview = async (_reviewId: string, _rating: number, _comment: string) => {
+    console.warn('updateReview 関数は廃止されました。submitVideoRating 関数を使用してください。');
+    throw new Error('この関数は使用できません。submitVideoRating を使用してください。');
 };
 
-// レビュー削除
 export const deleteReview = async (_reviewId: string) => {
-    console.warn('deleteReview関数は廃止されました。');
-
-    // 削除機能が必要な場合は新しい実装を検討
+    console.warn('deleteReview 関数は廃止されました。');
     throw new Error('レビュー削除機能は現在利用できません。');
 };
 
 export const getUserReviews = async (): Promise<Review[]> => {
-    console.warn('getUserReviews関数は削除されました。');
-
-    // 代替の実装が必要な場合は、video_ratingsテーブルから取得
+    console.warn('getUserReviews 関数は廃止されました。');
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
-
     const { data, error } = await supabase
         .from('video_ratings')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-
     if (error) {
         console.error('Error fetching user reviews:', error);
         return [];
     }
-
-    return (data || []) as any; // 型アサーションを追加
+    return data;
 };
 
-
-// 検索関連の関数
-export const searchVideos = async (
-    query: string,
-): Promise<SearchResult> => {
+// 検索関連
+export const searchVideos = async (query: string): Promise<SearchResult> => {
     try {
         const { data, error } = await supabase
             .from('videos')
             .select('*')
             .ilike('title', `%${query}%`)
             .order('published_at', { ascending: false });
-
         if (error) {
             console.error('Search error:', error);
             return { videos: [], totalPages: 0 };
         }
-
-        const videos = (data || []).map(video => mapSupabaseVideoToVideo(video as SupabaseVideoResponse));
-
-        return {
-            videos,
-            totalPages: Math.ceil((data?.length || 0) / 10)
-        };
-    } catch (error) {
-        console.error('Search error:', error);
+        const videos = (data || []).map(v => mapSupabaseVideoToVideo(v as SupabaseVideoResponse));
+        return { videos, totalPages: Math.ceil((data?.length || 0) / 10) };
+    } catch (err) {
+        console.error('Search error:', err);
         return { videos: [], totalPages: 0 };
     }
 };
 
-// イベント関連の関数
+// イベント関連
 export const createEvent = async (eventData: Omit<Event, 'id' | 'createdAt' | 'updatedAt'>): Promise<Event> => {
-    // single() -> limit(1)に変更
     const { data, error } = await supabase
         .from('events')
         .insert([eventData])
         .select()
         .limit(1);
-
     if (error) throw error;
-    if (!data || data.length === 0) throw new Error('Failed to create event');
+    if (!data?.length) throw new Error('Failed to create event');
     return data[0];
 };
 
 export const getEvent = async (eventId: string): Promise<Event | null> => {
-    // single() -> limit(1)に変更
     const { data, error } = await supabase
         .from('events')
         .select('*')
         .eq('id', eventId)
         .limit(1);
-
     if (error) throw error;
-    return data && data.length > 0 ? data[0] : null;
+    return data?.[0] || null;
 };
 
 export const updateEvent = async (eventId: string, updates: Partial<Event>): Promise<Event> => {
-    // single() -> limit(1)に変更
     const { data, error } = await supabase
         .from('events')
         .update(updates)
         .eq('id', eventId)
         .select()
         .limit(1);
-
     if (error) throw error;
-    if (!data || data.length === 0) throw new Error('Failed to update event');
+    if (!data?.length) throw new Error('Failed to update event');
     return data[0];
 };
 
@@ -651,11 +598,10 @@ export const getEventParticipants = async (eventId: string): Promise<EventPartic
     const { data, error } = await supabase
         .from('event_participants')
         .select(`
-     *,
-     profiles (username, avatar_url)
-   `)
+            *,
+            profiles (username, avatar_url)
+        `)
         .eq('event_id', eventId);
-
     if (error) throw error;
     return data;
 };
@@ -664,15 +610,13 @@ export const participateInEvent = async (eventId: string): Promise<void> => {
     const { error } = await supabase
         .from('event_participants')
         .insert([{ event_id: eventId }]);
-
     if (error) throw error;
 };
 
-// チャンネル統計を取得する関数
+// チャンネル統計取得
 export const getChannelStats = async (userId?: string | null): Promise<ChannelStats> => {
     try {
         const { data: { user } } = await supabase.auth.getUser();
-
         if (!user) {
             return {
                 totalViews: 0,
@@ -687,18 +631,14 @@ export const getChannelStats = async (userId?: string | null): Promise<ChannelSt
                 subscribersData: []
             };
         }
-
-        // userIdパラメータを使用して特定のユーザーの統計を取得
         const targetUserId = userId || user.id;
-
-        // 動画統計の取得
         const { data: videoStats } = await supabase
             .from('videos')
             .select('view_count, published_at')
             .eq('user_id', targetUserId);
 
         return {
-            totalViews: videoStats?.reduce((sum, video) => sum + (video.view_count || 0), 0) || 0,
+            totalViews: videoStats?.reduce((s, v) => s + (v.view_count || 0), 0) || 0,
             totalSubscribers: 0,
             averageRating: 0,
             totalVideos: videoStats?.length || 0,
@@ -709,8 +649,8 @@ export const getChannelStats = async (userId?: string | null): Promise<ChannelSt
             viewsData: [],
             subscribersData: []
         };
-    } catch (error) {
-        console.error('チャンネル統計の取得に失敗:', error);
+    } catch (err) {
+        console.error('チャンネル統計取得失敗:', err);
         return {
             totalViews: 0,
             totalSubscribers: 0,
@@ -727,103 +667,68 @@ export const getChannelStats = async (userId?: string | null): Promise<ChannelSt
 };
 
 export const publishVideo = async (videoId: string): Promise<void> => {
-    try {
-        const { error } = await supabase
-            .from('videos')
-            .update({ published_at: new Date().toISOString() })
-            .eq('id', videoId);
-
-        if (error) throw error;
-    } catch (err) {
-        console.error('動画の公開に失敗:', err);
-        throw err;
-    }
+    const { error } = await supabase
+        .from('videos')
+        .update({ published_at: new Date().toISOString() })
+        .eq('id', videoId);
+    if (error) throw error;
 };
 
 export const deleteVideo = async (videoId: string): Promise<void> => {
-    try {
-        const { error } = await supabase
-            .from('videos')
-            .delete()
-            .eq('id', videoId);
-
-        if (error) throw error;
-    } catch (err) {
-        console.error('動画の削除に失敗:', err);
-        throw err;
-    }
+    const { error } = await supabase
+        .from('videos')
+        .delete()
+        .eq('id', videoId);
+    if (error) throw error;
 };
 
-// 認証状態の確認
+// 認証状態確認
 export const checkAuth = async () => {
-    try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-
-        console.log('Current User:', user);
-        console.log('Authentication Error:', error);
-
-        if (error) {
-            console.error('認証エラー:', error.message);
-            return null;
-        }
-
-        return user;
-    } catch (error) {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) {
         console.error('認証チェックエラー:', error);
         return null;
     }
+    return user;
 };
 
-// 視聴履歴の追加 (userId を引数に取るバージョン)
+// 視聴履歴追加
 export const addViewHistory = async (videoId: string, userId: string) => {
-    try {
-        const { error } = await supabase
-            .from('view_history')
-            .upsert({
-                user_id: userId,
-                video_id: videoId,
-                viewed_at: new Date().toISOString()
-            }, {
-                onConflict: 'user_id,video_id'
-            });
-
-        if (error) throw error;
-    } catch (error) {
-        console.error('視聴履歴の追加に失敗:', error);
-        throw error;
-    }
+    const { error } = await supabase
+        .from('view_history')
+        .upsert({
+            user_id: userId,
+            video_id: videoId,
+            viewed_at: new Date().toISOString()
+        }, {
+            onConflict: 'user_id,video_id'
+        });
+    if (error) throw error;
 };
 
-// 視聴履歴の取得 (userId を引数に取るバージョン)
+// 視聴履歴取得
 export const getViewHistory = async (userId: string) => {
-    try {
-        const { data, error } = await supabase
-            .from('view_history')
-            .select(`
-               *,
-               videos (
-                   id,
-                   title,
-                   thumbnail,
-                   channel_title,
-                   view_count,
-                   rating,
-                   duration
-               )
-           `)
-            .eq('user_id', userId)
-            .order('viewed_at', { ascending: false });
-
-        if (error) throw error;
-        return data;
-    } catch (error) {
-        console.error('視聴履歴の取得に失敗:', error);
-        return [];
-    }
+    const { data, error } = await supabase
+        .from('view_history')
+        .select(`
+            *,
+            videos (
+                id,
+                title,
+                thumbnail,
+                channel_title,
+                view_count,
+                rating,
+                duration
+            )
+        `)
+        .eq('user_id', userId)
+        .order('viewed_at', { ascending: false });
+    if (error) throw error;
+    return data;
 };
 
-
-// 7項目評価データの保存送信
+// 7項目評価送信
 export const submitVideoRating = async (
     videoId: string,
     overall: number,
@@ -837,34 +742,17 @@ export const submitVideoRating = async (
 ) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
-    
-    // UUIDからYouTube IDに変換
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(videoId);
     let youtube_id = videoId;
-    
     if (isUuid) {
-        // single() -> limit(1)に変更
-        const { data: videoData, error: videoError } = await supabase
+        const { data: vd, error: ve } = await supabase
             .from('videos')
             .select('youtube_id')
             .eq('id', videoId)
             .limit(1);
-            
-        if (videoError) {
-            console.error('Error getting YouTube ID from UUID:', videoError);
-            throw videoError;
-        }
-        
-        if (!videoData || videoData.length === 0 || !videoData[0].youtube_id) {
-            console.error('No YouTube ID found for UUID:', videoId);
-            throw new Error('No YouTube ID found for this video');
-        }
-        
-        youtube_id = videoData[0].youtube_id;
+        if (ve || !vd?.length) throw ve || new Error('No YouTube ID');
+        youtube_id = vd[0].youtube_id!;
     }
-
-    // YouTube IDを使用して評価を保存
-    // single() -> limit(1)に変更
     const { data, error } = await supabase
         .from('video_ratings')
         .upsert([{
@@ -883,47 +771,25 @@ export const submitVideoRating = async (
         })
         .select()
         .limit(1);
-
-    if (error) {
-        console.error('評価送信エラー:', error);
-        throw error;
-    }
-
-    return data && data.length > 0 ? data[0] : null;
+    if (error) throw error;
+    return data?.[0] || null;
 };
 
-// getAllVideoRatings 関数の修正
+// 全レビュー取得
 export const getAllVideoRatings = async (videoId: string) => {
     try {
-        // UUIDか判断
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(videoId);
-        
         let youtube_id = videoId;
-        
-        // UUIDの場合はYouTube IDを取得
         if (isUuid) {
-            // single() -> limit(1)に変更
-            const { data: videoData, error: videoError } = await supabase
+            const { data: vd, error: ve } = await supabase
                 .from('videos')
                 .select('youtube_id')
                 .eq('id', videoId)
                 .limit(1);
-                
-            if (videoError) {
-                console.error('Error getting YouTube ID from UUID:', videoError);
-                return [];
-            }
-            
-            if (!videoData || videoData.length === 0 || !videoData[0].youtube_id) {
-                console.error('No YouTube ID found for UUID:', videoId);
-                return [];
-            }
-            
-            youtube_id = videoData[0].youtube_id;
+            if (!vd?.length || ve) return [];
+            youtube_id = vd[0].youtube_id!;
         }
-        
-        // YouTube IDで評価データを取得
-        const { data: ratingsData, error: ratingsError } = await supabase
+        const { data: ratingsData, error: re } = await supabase
             .from('video_ratings')
             .select(`
                 *,
@@ -935,57 +801,30 @@ export const getAllVideoRatings = async (videoId: string) => {
             `)
             .eq('video_id', youtube_id)
             .order('created_at', { ascending: false });
-            
-        if (ratingsError) {
-            console.error('Error fetching video ratings:', ratingsError);
-            return [];
-        }
-        
-        console.log(`Found ${ratingsData?.length || 0} ratings for video ${youtube_id}`);
-        return (ratingsData || []);
-        
-    } catch (error) {
-        console.error('Error in getAllVideoRatings:', error);
+        if (re) return [];
+        return ratingsData || [];
+    } catch {
         return [];
     }
 };
 
-
-// getUserVideoRating 関数も同様に修正
+// ユーザー単体レビュー取得
 export const getUserVideoRating = async (videoId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
-
     try {
-        // UUIDか判断
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(videoId);
-        
         let youtube_id = videoId;
-        
-        // UUIDの場合はYouTube IDを取得
         if (isUuid) {
-            // single() -> limit(1)に変更
-            const { data: videoData, error: videoError } = await supabase
+            const { data: vd, error: ve } = await supabase
                 .from('videos')
                 .select('youtube_id')
                 .eq('id', videoId)
                 .limit(1);
-                
-            if (videoError) {
-                console.error('Error getting YouTube ID from UUID:', videoError);
-                return null;
-            }
-            
-            if (!videoData || videoData.length === 0 || !videoData[0].youtube_id) {
-                console.error('No YouTube ID found for UUID:', videoId);
-                return null;
-            }
-            
-            youtube_id = videoData[0].youtube_id;
+            if (ve || !vd?.length) return null;
+            youtube_id = vd[0].youtube_id!;
         }
-
-        // maybeSingle() -> limit(1)に変更
-        const { data: ratingData, error: ratingError } = await supabase
+        const { data: rd, error: re } = await supabase
             .from('video_ratings')
             .select(`
                 *,
@@ -995,200 +834,96 @@ export const getUserVideoRating = async (videoId: string) => {
                     avatar_url
                 )
             `)
-            .eq('video_id', youtube_id)  // ここでYouTube IDを使用している
+            .eq('video_id', youtube_id)
             .eq('user_id', user.id)
             .limit(1);
-
-        if (ratingError) {
-            console.error('Error fetching user video rating:', ratingError);
-            return null;
-        }
-
-        return ratingData && ratingData.length > 0 ? ratingData[0] : null;
-
-    } catch (error) {
-        console.error('Error in getUserVideoRating:', error);
+        if (re) return null;
+        return rd?.[0] || null;
+    } catch {
         return null;
     }
 };
 
-
+// レビュー数更新 RPC 代替
 export const updateVideoReviewCount = async (videoId: string): Promise<number> => {
     try {
-        // IDの形式判断
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(videoId);
-        
-        let uuid_id = videoId;
-        let youtube_id = videoId;
-        
+        let uuid_id = videoId, youtube_id = videoId;
         if (isUuid) {
-            // UUIDからYouTube IDを取得
-            // single() -> limit(1)に変更
-            const { data: videoData, error: videoError } = await supabase
-                .from('videos')
-                .select('youtube_id')
-                .eq('id', videoId)
-                .limit(1);
-
-            if (videoError) {
-                console.error('Error getting YouTube ID from UUID:', videoError);
-                throw videoError;
-            }
-            
-            if (videoData && videoData.length > 0 && videoData[0].youtube_id) {
-                youtube_id = videoData[0].youtube_id;
-            }
+            const { data: vd } = await supabase.from('videos')
+                .select('youtube_id').eq('id', videoId).limit(1);
+            if (vd?.[0]?.youtube_id) youtube_id = vd[0].youtube_id;
         } else {
-            // YouTube IDからUUIDを取得
-            // single() -> limit(1)に変更
-            const { data: videoData, error: videoError } = await supabase
-                .from('videos')
-                .select('id')
-                .eq('youtube_id', videoId)
-                .limit(1);
-
-            if (videoError) {
-                console.error('Error getting UUID from YouTube ID:', videoError);
-                throw videoError;
-            }
-            
-            if (videoData && videoData.length > 0) {
-                uuid_id = videoData[0].id;
-            }
+            const { data: vd } = await supabase.from('videos')
+                .select('id').eq('youtube_id', videoId).limit(1);
+            if (vd?.[0]?.id) uuid_id = vd[0].id;
         }
-
-        // レビュー数を集計（YouTube IDを使用）
-        const { count, error: reviewError } = await supabase
-            .from('video_ratings')
+        const { count } = await supabase.from('video_ratings')
             .select('*', { count: 'exact' })
             .eq('video_id', youtube_id);
-
-        if (reviewError) {
-            console.error('Error getting review count:', reviewError);
-            throw reviewError;
-        }
-
-        // レビュー数をUUIDで更新
-        const { error: updateError } = await supabase
-            .from('videos')
+        await supabase.from('videos')
             .update({ review_count: count })
             .eq('id', uuid_id);
-
-        if (updateError) {
-            console.error('Error updating video review count:', updateError);
-            throw updateError;
-        }
-
         return count || 0;
-    } catch (err) {
-        console.error('レビュー数の更新に失敗:', err);
-        throw err;
+    } catch {
+        throw new Error('レビュー数更新に失敗');
     }
 };
 
+// レビュー数順取得
 export const getVideosByReviewCount = async (limit = 10, minReviews = 1): Promise<Video[]> => {
     try {
-      console.log('Fetching videos by review count...');
-  
-      const { data, error } = await supabase
-        .from('videos')
-        .select('id, title, youtube_id, review_count, thumbnail, channel_title, avg_rating, duration, genre_id')
-        .gt('review_count', minReviews - 1) // レビュー数が1以上（デフォルト）の動画のみ取得
-        .order('review_count', { ascending: false })
-        .limit(limit);
-  
-      if (error) {
-        console.error('Error fetching videos by review count:', error);
+        const { data, error } = await supabase.from('videos')
+            .select('id, title, youtube_id, review_count, thumbnail, channel_title, avg_rating, duration, genre_id, published_at, created_at, updated_at')
+            .gt('review_count', minReviews - 1)
+            .order('review_count', { ascending: false })
+            .limit(limit);
+        if (error) return [];
+        return (data || []).map(vd => ({
+            id: vd.id,
+            title: vd.title || '',
+            youtube_id: vd.youtube_id || '',
+            review_count: vd.review_count || 0,
+            thumbnail: vd.thumbnail || `https://i.ytimg.com/vi/${vd.youtube_id}/hqdefault.jpg`,
+            channel_title: vd.channel_title || '',
+            avg_rating: vd.avg_rating || 0,
+            rating: vd.avg_rating || 0,
+            description: '',
+            view_count: 0,
+            published_at: vd.published_at || '',
+            genre_id: vd.genre_id || '',
+            duration: vd.duration || '',
+            created_at: vd.created_at || new Date().toISOString(),
+            updated_at: vd.updated_at || new Date().toISOString(),
+            youtuber: undefined
+        }));
+    } catch {
         return [];
-      }
-  
-      return (data || []).map(videoData => ({
-        id: videoData.id,
-        title: videoData.title || '',
-        youtube_id: videoData.youtube_id || '',
-        review_count: videoData.review_count || 0,
-        thumbnail: videoData.thumbnail || `https://i.ytimg.com/vi/${videoData.youtube_id}/hqdefault.jpg`,
-        channel_title: videoData.channel_title || '',
-        avg_rating: videoData.avg_rating || 0,
-        rating: videoData.avg_rating || 0,
-        description: '',
-        view_count: 0,
-        published_at: '',
-        genre_id: videoData.genre_id || '',
-        duration: videoData.duration || '',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        youtuber: undefined
-      } as Video));
-    } catch (error) {
-      console.error('Error fetching videos by review count:', error);
-      return [];
     }
-  };
-  
+};
+
 /**
- * 最新のレビューIDを取得する
- * @param internalVideoId 内部ビデオID
- * @returns レビューID
+ * 最新レビューID取得
  */
 export async function getLatestReviewId(internalVideoId: string): Promise<string | null> {
     try {
-      console.log(`getLatestReviewId: 内部ビデオID=${internalVideoId}のレビューを検索中...`);
-      
-      // まずは内部IDからYouTubeビデオIDを取得する
-      const { data: videoData, error: videoError } = await supabase
-        .from('videos')
-        .select('id, youtube_id')
-        .eq('id', internalVideoId)
-        .single();
-      
-      if (videoError || !videoData) {
-        console.error('ビデオデータ取得エラー:', videoError);
+        const { data: vd } = await supabase.from('videos')
+            .select('id, youtube_id')
+            .eq('id', internalVideoId)
+            .single();
+        if (!vd?.youtube_id) return null;
+        const youtubeVideoId = vd.youtube_id;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return null;
+        const { data, error } = await supabase.from('video_ratings')
+            .select('id')
+            .eq('video_id', youtubeVideoId)
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(1);
+        if (error || !data?.length) return null;
+        return data[0].id;
+    } catch {
         return null;
-      }
-      
-      const youtubeVideoId = videoData.youtube_id;
-      console.log(`内部ID ${internalVideoId} のYouTubeビデオID: ${youtubeVideoId}`);
-      
-      if (!youtubeVideoId) {
-        console.warn('YouTubeビデオIDが見つかりません');
-        return null;
-      }
-      
-      // 認証ユーザーの取得
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        console.warn('ユーザーが認証されていません');
-        return null;
-      }
-      
-      console.log(`認証ユーザーID: ${user.id}`);
-      
-      // video_ratings テーブルから特定のユーザーによる特定のビデオの評価を取得
-      // ここでvideo_idはYouTubeのビデオIDを使用する
-      const { data, error } = await supabase
-        .from('video_ratings')
-        .select('id')
-        .eq('video_id', youtubeVideoId) // YouTubeビデオIDを使用
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      
-      if (error) {
-        console.error('最新レビューID取得エラー:', error);
-        return null;
-      }
-      
-      if (!data || data.length === 0) {
-        console.warn(`ユーザー${user.id}のビデオ${youtubeVideoId}に対するレビューが見つかりません`);
-        return null;
-      }
-      
-      console.log('取得したレビューID:', data[0].id);
-      return data[0].id;
-    } catch (err) {
-      console.error('レビューID取得エラー:', err);
-      return null;
     }
-  }
+}

@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AnalyticsDashboard from './AnalyticsDashboard';
 import { usePromotionStats } from '@/hooks/usePromotionStats';
-import PromotionCharts from './PromotionCharts';
 import {
   AlertCircle,
   Loader2,
@@ -20,13 +19,6 @@ import {
 type TimeRange = 'week' | 'month' | 'year';
 type TrendDirection = 'up' | 'down' | 'neutral';
 
-interface ChartDataItem {
-  date: string;
-  impressions: number;
-  clicks: number;
-  ctr: number;
-  revenue?: number;
-}
 
 export default function PromotionAnalytics() {
   const [timeRange, setTimeRange] = useState<TimeRange>('month');
@@ -243,32 +235,32 @@ export default function PromotionAnalytics() {
             )}
             
             {/* 詳細分析リンク - 常に表示 */}
-<div className="mt-8 border-t border-gray-200 pt-6">
-  <h3 className="text-lg font-medium text-gray-900 mb-4">詳細な掲載効果分析</h3>
-  <p className="text-sm text-gray-600 mb-4">
-    より詳しい掲載効果の分析や、掲載前後の比較データを確認するには詳細分析をご利用ください。
-  </p>
-  <div className="flex flex-wrap gap-2">
-    <button
-      onClick={() => handleDetailedTabSelect('video')}
-      className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
-    >
-      動画パフォーマンス分析
-    </button>
-    <button
-      onClick={() => handleDetailedTabSelect('effect')}
-      className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
-    >
-      掲載効果分析を見る
-    </button>
-    <button
-      onClick={() => handleDetailedTabSelect('genre')}
-      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-    >
-      ジャンル別分析
-    </button>
-  </div>
-</div>
+            <div className="mt-8 border-t border-gray-200 pt-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">詳細な掲載効果分析</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                より詳しい掲載効果の分析や、掲載前後の比較データを確認するには詳細分析をご利用ください。
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleDetailedTabSelect('video')}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+                >
+                  動画パフォーマンス分析
+                </button>
+                <button
+                  onClick={() => handleDetailedTabSelect('effect')}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                >
+                  掲載効果分析を見る
+                </button>
+                <button
+                  onClick={() => handleDetailedTabSelect('genre')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  ジャンル別分析
+                </button>
+              </div>
+            </div>
             
             {/* データがない場合のメッセージ */}
             {(!chartData || chartData.length === 0) && !loading && (
@@ -344,56 +336,4 @@ function StatCard({ label, value, trend, subValue, icon: CustomIcon, growthRate 
   );
 }
 
-function DataTable({ data }: { data: ChartDataItem[] }) {
-  const headers = [
-    { key: 'date', label: '日付' },
-    { key: 'impressions', label: 'インプレッション' },
-    { key: 'clicks', label: 'クリック数' },
-    { key: 'ctr', label: 'CTR' },
-    { key: 'revenue', label: '掲載費' }
-  ];
 
-  return (
-    <div className="mt-6">
-      <h3 className="text-sm font-medium text-gray-900 mb-4">詳細データ</h3>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">
-          <thead className="bg-gray-50">
-            <tr>
-              {headers.map(({ key, label }) => (
-                <th
-                  key={key}
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  {label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {data.map((item) => (
-              <tr key={item.date} className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {new Date(item.date).toLocaleDateString('ja-JP')}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {item.impressions.toLocaleString()}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {item.clicks.toLocaleString()}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {item.ctr.toFixed(2)}%
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {item.revenue ? `¥${item.revenue.toLocaleString()}` : '-'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}

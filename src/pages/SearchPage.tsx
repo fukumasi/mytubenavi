@@ -395,28 +395,28 @@ const SearchPage: React.FC = () => {
                           className="border-b border-gray-200 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors"
                         >
                           <td className="p-2">
-                            <div className="flex items-center">
-                              {/* サムネイル */}
-                              <div className="w-20 h-12 flex-shrink-0 mr-2">
-                                <img
-                                  src={video.thumbnail || video.thumbnail_url || '/placeholder.jpg'}
-                                  alt={video.title}
-                                  className="w-full h-full object-cover rounded"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.onerror = null;
-                                    target.src = '/placeholder.jpg';
-                                  }}
-                                  loading="lazy"
-                                />
-                              </div>
-                              
-                              {/* タイトル */}
-                              <span className="text-xs sm:text-sm text-gray-800 dark:text-dark-text-primary line-clamp-2">
-                                {video.title}
-                              </span>
-                            </div>
-                          </td>
+  <div className="flex items-center">
+    {/* サムネイル */}
+    <div className="w-40 h-24 flex-shrink-0 mr-4">
+      <img
+        src={video.thumbnail || video.thumbnail_url || '/placeholder.jpg'}
+        alt={video.title}
+        className="w-full h-full object-cover rounded"
+        onError={(e) => {
+          const target = e.target as HTMLImageElement;
+          target.onerror = null;
+          target.src = '/placeholder.jpg';
+        }}
+        loading="lazy"
+      />
+    </div>
+    
+    {/* タイトル */}
+    <span className="text-xs sm:text-sm text-gray-800 dark:text-dark-text-primary line-clamp-2">
+      {video.title}
+    </span>
+  </div>
+</td>
                           
                           <td className="p-2 text-center text-xs text-gray-700 dark:text-dark-text-secondary">
                             {(video.rating || video.avg_rating || 0).toFixed(1)}

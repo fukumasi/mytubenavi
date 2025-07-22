@@ -20,9 +20,9 @@ const PremiumUpgradePage: React.FC = () => {
     <>
       <Header />
 
-      <main className="min-h-screen bg-gray-50 pt-6 pb-12">
+      <main className="min-h-screen bg-gray-50 dark:bg-dark-bg pt-6 pb-12">
         <div className="container mx-auto px-4">
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm overflow-hidden">
             <PremiumUpgrade />
           </div>
         </div>

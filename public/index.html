@@ -1,67 +1,41 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>MyTubeNavi</title>
-
-    <!-- Firebase SDK -->
-    <script defer src="/__/firebase/11.1.0/firebase-app-compat.js"></script>
-    <script defer src="/__/firebase/11.1.0/firebase-auth-compat.js"></script>
-    <script defer src="/__/firebase/11.1.0/firebase-firestore-compat.js"></script>
-    <script defer src="/__/firebase/init.js"></script>
-
-    <style media="screen">
-      body {
-        background: #f9fafb;
-        color: #333;
-        font-family: Arial, sans-serif;
-        margin: 0;
-        padding: 0;
-      }
-      #app {
-        max-width: 1200px;
-        margin: 50px auto;
-        padding: 20px;
-        background: #fff;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      }
-      h1 {
-        font-size: 24px;
-        color: #1f2937;
-      }
-      p {
-        line-height: 1.5;
-        color: #4b5563;
-      }
-      a {
-        color: #2563eb;
-        text-decoration: none;
-      }
-      a:hover {
-        text-decoration: underline;
-      }
-    </style>
+    
+    <!-- PWA関連のメタタグ -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0ea5e9">
+    <meta name="description" content="YouTube動画の検索、口コミ評価、コミュニティ機能が利用できるプラットフォーム">
+    
+    <!-- iOS向けPWA対応 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MyTubeNavi">
+    
+    <!-- iOS向けアイコン -->
+    <link rel="apple-touch-icon" href="/icons/icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-152x152.png">
+    
+    <!-- ファビコン -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-72x72.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-72x72.png">
+    
+    <!-- スプラッシュスクリーン画像 -->
+    <link rel="apple-touch-startup-image" href="/icons/splash-640x1136.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/icons/splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/icons/splash-1242x2208.png" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/icons/splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/icons/splash-1536x2048.png" media="(min-device-width: 768px) and (max-device-width: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/icons/splash-1668x2224.png" media="(min-device-width: 834px) and (max-device-width: 834px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="/icons/splash-2048x2732.png" media="(min-device-width: 1024px) and (max-device-width: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
   </head>
   <body>
-    <div id="app">
-      <h1>Welcome to MyTubeNavi</h1>
-      <p>Your app is now configured with Firebase. Start building your project!</p>
-      <p>
-        <a href="https://firebase.google.com/docs/hosting/" target="_blank">Learn more about Firebase Hosting</a>
-      </p>
-    </div>
-
-    <script>
-      document.addEventListener('DOMContentLoaded', function () {
-        try {
-          const app = firebase.app();
-          console.log('Firebase App initialized:', app.name);
-        } catch (error) {
-          console.error('Error initializing Firebase App:', error);
-        }
-      });
-    </script>
+    <div id="root"></div>
+    <!-- Service Workerの登録はTypeScriptコード内で行うため、ここでの登録コードは削除 -->
   </body>
 </html>

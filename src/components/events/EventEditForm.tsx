@@ -23,7 +23,7 @@ interface EventFormData {
 export default function EventEditForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { user } = useAuth();
   const [formData, setFormData] = useState<EventFormData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -51,7 +51,7 @@ export default function EventEditForm() {
         return;
       }
 
-      if (event.organizer_id !== currentUser?.id) {
+      if (event.organizer_id !== user?.id) {
         setError('このイベントを編集する権限がありません');
         return;
       }
@@ -134,7 +134,7 @@ export default function EventEditForm() {
   const handleSubmit = async (e: React.FormEvent, saveAsDraft: boolean = false) => {
     e.preventDefault();
     
-    if (!currentUser || !formData) {
+    if (!user || !formData) {
       setError('ログインが必要です');
       return;
     }

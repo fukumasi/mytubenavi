@@ -87,14 +87,14 @@ export default function Login() {
 
   return (
     <div className="max-w-md mx-auto mt-8">
-      <div className="bg-white py-8 px-6 shadow-sm rounded-lg">
-        <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">
+      <div className="bg-white dark:bg-dark-surface py-8 px-6 shadow-sm dark:shadow-gray-900/30 rounded-lg">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-dark-text-primary text-center mb-8">
           ログイン
         </h2>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
-            <div className="flex items-center text-red-600">
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+            <div className="flex items-center text-red-600 dark:text-red-400">
               <AlertCircle className="h-5 w-5 mr-2" />
               <span className="text-sm">{error}</span>
             </div>
@@ -105,7 +105,7 @@ export default function Login() {
           <button
             onClick={handleGoogleLogin}
             disabled={loading}
-            className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-dark-border rounded-md shadow-sm dark:shadow-gray-900/30 text-sm font-medium text-gray-700 dark:text-dark-text-primary bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-dark-surface focus:ring-indigo-500 dark:focus:ring-indigo-400"
           >
             <img
               src="https://www.google.com/favicon.ico"
@@ -118,21 +118,21 @@ export default function Login() {
 
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300"></div>
+            <div className="w-full border-t border-gray-300 dark:border-dark-border"></div>
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white text-gray-500">または</span>
+            <span className="px-2 bg-white dark:bg-dark-surface text-gray-500 dark:text-dark-text-secondary">または</span>
           </div>
         </div>
 
         <form onSubmit={handleEmailLogin} className="space-y-6">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-dark-text-primary">
               メールアドレス
             </label>
             <div className="mt-1 relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Mail className="h-5 w-5 text-gray-400" />
+                <Mail className="h-5 w-5 text-gray-400 dark:text-gray-500" />
               </div>
               <input
                 id="email"
@@ -140,19 +140,19 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-dark-border rounded-md shadow-sm dark:shadow-gray-900/30 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-indigo-500 dark:focus:border-indigo-400 sm:text-sm bg-white dark:bg-dark-surface text-gray-900 dark:text-dark-text-primary"
                 placeholder="your@email.com"
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-dark-text-primary">
               パスワード
             </label>
             <div className="mt-1 relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-5 w-5 text-gray-400" />
+                <Lock className="h-5 w-5 text-gray-400 dark:text-gray-500" />
               </div>
               <input
                 id="password"
@@ -160,7 +160,7 @@ export default function Login() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-dark-border rounded-md shadow-sm dark:shadow-gray-900/30 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-indigo-500 dark:focus:border-indigo-400 sm:text-sm bg-white dark:bg-dark-surface text-gray-900 dark:text-dark-text-primary"
                 placeholder="パスワードを入力"
               />
             </div>
@@ -170,7 +170,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm dark:shadow-gray-900/30 text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-700 hover:bg-indigo-700 dark:hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-dark-surface focus:ring-indigo-500 dark:focus:ring-indigo-400 disabled:opacity-50"
             >
               {loading ? 'ログイン中...' : 'ログイン'}
             </button>
@@ -178,9 +178,9 @@ export default function Login() {
         </form>
 
         <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-dark-text-secondary">
             アカウントをお持ちでない方は
-            <Link to="/signup" className="font-medium text-indigo-600 hover:text-indigo-500">
+            <Link to="/signup" className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300">
               新規登録
             </Link>
           </p>

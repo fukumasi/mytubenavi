@@ -1,7 +1,5 @@
-// src/components/profile/ProfileRoutes.tsx
-
-import { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import { useLocation, Routes, Route, Navigate, Link } from 'react-router-dom';
+import useMediaQuery from '@/hooks/useMediaQuery';
 import UserProfile from './UserProfile';
 import FavoriteVideos from './FavoriteVideos';
 import ReviewHistory from './ReviewHistory';
@@ -10,191 +8,82 @@ import NotificationsPage from './NotificationsPage';
 import NotificationSettings from './NotificationSettings';
 import SettingsPage from './SettingsPage';
 import VerificationPage from './VerificationPage';
-import MatchingSystem from '../matching/MatchingSystem';
-import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/contexts/AuthContext';
-import { Users, Shield } from 'lucide-react';
+import MatchingCandidates from './MatchingCandidates';
+import IncomingLikes from './IncomingLikes';
+import LikedUsers from './LikedUsers';
+import MatchHistory from './MatchHistory';
+import MessagesPage from './MessagesPage';
+import {
+  User, Heart, Star, History, Users, HeartHandshake, ThumbsUp, Clock,
+  Bell, BellRing, Shield, Settings, MessageCircle
+} from 'lucide-react';
 
 export default function ProfileRoutes() {
   const location = useLocation();
-  const { user, isPremium } = useAuth();
-  const [matchCount, setMatchCount] = useState<number>(0);
-  const [loading, setLoading] = useState<boolean>(true);
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
-  useEffect(() => {
-    if (!user) return;
-
-    const fetchMatchCount = async () => {
-      try {
-        setLoading(true);
-        // プロフィールデータを取得して、マッチ可能なユーザー数をカウント
-        const { data: profiles, error } = await supabase
-          .from('profiles')
-          .select('id')
-          .neq('id', user.id);
-
-        if (error) {
-          console.error('マッチングカウント取得エラー:', error);
-        } else {
-          // この例では単純にユーザー数をカウントしていますが、
-          // 実際のマッチングロジックに応じてフィルタリングするとよいでしょう
-          setMatchCount(profiles?.length || 0);
-        }
-      } catch (err) {
-        console.error('マッチングカウント取得エラー:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMatchCount();
-  }, [user]);
-
-  // アクティブなタブをチェックする関数
   const isActive = (path: string) => {
     return location.pathname === `/profile${path}`;
   };
 
-  return (
-    <div className="bg-white dark:bg-dark-surface shadow dark:shadow-none dark:border dark:border-dark-border rounded-lg overflow-hidden">
-      <div className="border-b dark:border-dark-border">
-        <nav className="flex overflow-x-auto">
-          <Link
-            to="/profile"
-            className={`px-6 py-4 text-sm font-medium ${
-              isActive('') 
-                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' 
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-          >
-            プロフィール
-          </Link>
-          <Link
-            to="/profile/favorites"
-            className={`px-6 py-4 text-sm font-medium ${
-              isActive('/favorites') 
-                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' 
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-          >
-            お気に入り動画
-          </Link>
-          <Link
-            to="/profile/reviews"
-            className={`px-6 py-4 text-sm font-medium ${
-              isActive('/reviews') 
-                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' 
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-          >
-            口コミ・評価履歴
-          </Link>
-          <Link
-            to="/profile/history"
-            className={`px-6 py-4 text-sm font-medium ${
-              isActive('/history') 
-                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' 
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-          >
-            視聴履歴
-          </Link>
-          <Link
-            to="/profile/matching"
-            className={`px-6 py-4 text-sm font-medium flex items-center ${
-              isActive('/matching') 
-                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' 
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-          >
-            おすすめユーザー
-            {!loading && matchCount > 0 && (
-              <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-indigo-100 bg-indigo-600 dark:bg-indigo-700 rounded-full">
-                {matchCount}
-              </span>
-            )}
-          </Link>
-          <Link
-            to="/profile/notifications"
-            className={`px-6 py-4 text-sm font-medium ${
-              isActive('/notifications') 
-                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' 
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-          >
-            通知
-          </Link>
-          <Link
-            to="/profile/verification"
-            className={`px-6 py-4 text-sm font-medium flex items-center ${
-              isActive('/verification') 
-                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' 
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-          >
-            アカウント認証
-            <Shield className="ml-1 h-4 w-4" />
-          </Link>
-          <Link
-            to="/profile/settings"
-            className={`px-6 py-4 text-sm font-medium ${
-              isActive('/settings') 
-                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' 
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-          >
-            設定
-          </Link>
-        </nav>
-      </div>
+  const allTabs = [
+    { path: '', label: 'プロフィール', icon: <User className="h-5 w-5" /> },
+    { path: '/favorites', label: 'お気に入り', icon: <Heart className="h-5 w-5" /> },
+    { path: '/reviews', label: '評価履歴', icon: <Star className="h-5 w-5" /> },
+    { path: '/history', label: '視聴履歴', icon: <History className="h-5 w-5" /> },
+    { path: '/matching', label: 'おすすめ', icon: <Users className="h-5 w-5" /> },
+    { path: '/incoming-likes', label: 'いいねされた', icon: <HeartHandshake className="h-5 w-5" /> },
+    { path: '/liked-users', label: 'いいねした', icon: <ThumbsUp className="h-5 w-5" /> },
+    { path: '/match-history', label: 'マッチ履歴', icon: <Clock className="h-5 w-5" /> },
+    { path: '/messages', label: 'メッセージ', icon: <MessageCircle className="h-5 w-5" /> },
+    { path: '/notifications', label: '通知', icon: <Bell className="h-5 w-5" /> },
+    { path: '/notification-settings', label: '通知設定', icon: <BellRing className="h-5 w-5" /> },
+    { path: '/verification', label: 'アカウント認証', icon: <Shield className="h-5 w-5" /> },
+    { path: '/settings', label: '設定', icon: <Settings className="h-5 w-5" /> },
+  ];
 
-      <div className="p-6">
+  return (
+    <div className="bg-white dark:bg-dark-surface shadow-sm dark:shadow-none dark:border dark:border-dark-border rounded-lg overflow-hidden">
+      
+      {/* PC版はタブ型ナビゲーション */}
+      {!isMobile && (
+        <div className="border-b dark:border-dark-border">
+          <nav className="flex overflow-x-auto">
+            {allTabs.map(tab => (
+              <Link
+                key={tab.path}
+                to={`/profile${tab.path}`}
+                className={`px-6 py-4 text-sm font-semibold flex items-center whitespace-nowrap transition-colors ${
+                  isActive(tab.path)
+                    ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                {tab.icon}
+                <span className="ml-2">{tab.label}</span>
+              </Link>
+            ))}
+          </nav>
+        </div>
+      )}
+
+      
+
+      {/* メインコンテンツ */}
+      <div className={`p-6 ${isMobile ? 'pb-20' : ''}`}>
         <Routes>
           <Route path="/" element={<UserProfile />} />
           <Route path="/favorites" element={<FavoriteVideos />} />
           <Route path="/reviews" element={<ReviewHistory />} />
           <Route path="/history" element={<ViewHistory />} />
-          <Route path="/verification" element={<VerificationPage />} />
-          <Route path="/matching" element={
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold dark:text-dark-text-primary">おすすめユーザー</h2>
-                {!isPremium && (
-                  <Link 
-                    to="/premium/upgrade" 
-                    className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300"
-                  >
-                    プレミアム会員になってフル機能を利用する
-                  </Link>
-                )}
-              </div>
-              
-              {!isPremium && (
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg mb-6">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <Users className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
-                    </div>
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-500">
-                        プレミアム会員限定の機能があります
-                      </h3>
-                      <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-600">
-                        <p>
-                          プレミアム会員になると、メッセージ機能や詳細なユーザー情報の閲覧など、
-                          より充実したマッチング機能をご利用いただけます。
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              <MatchingSystem limit={isPremium ? undefined : 5} />
-            </div>
-          } />
+          <Route path="/matching" element={<MatchingCandidates />} />
+          <Route path="/incoming-likes" element={<IncomingLikes />} />
+          <Route path="/liked-users" element={<LikedUsers />} />
+          <Route path="/match-history" element={<MatchHistory />} />
+          <Route path="/messages" element={<MessagesPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/notification-settings" element={<NotificationSettings />} />
+          <Route path="/verification" element={<VerificationPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/profile" replace />} />
         </Routes>

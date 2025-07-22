@@ -1,6 +1,5 @@
 // src/components/genre/GenreVideoList.tsx
-
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Video } from '@/types';
@@ -9,613 +8,509 @@ import GenreSidebar from './GenreSidebar';
 import AdsSection from '../home/AdsSection';
 import { Star, Eye, Clock, ArrowUp, ArrowDown } from 'lucide-react';
 import {
-    Table,
-    TableHeader,
-    TableBody,
-    TableRow,
-    TableHead,
-    TableCell,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
 } from '@/components/ui/table';
 import useMediaQuery from '@/hooks/useMediaQuery';
 
-
+/* ------------------------------------------------------------------ */
+/*  Component                                                         */
+/* ------------------------------------------------------------------ */
 export default function GenreVideoList() {
-    const { slug } = useParams<{ slug: string }>();
-    const navigate = useNavigate();
-    const [videos, setVideos] = useState<Video[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [page, setPage] = useState(1);
-    const [parentGenreId, setParentGenreId] = useState<string | undefined>(undefined);
-    const [currentGenreName, setCurrentGenreName] = useState<string>('');
-    const itemsPerPage = 20;
-    const [hasMore, setHasMore] = useState(true);
-    const [sortConfig, setSortConfig] = useState<{
-        key: keyof Video;
-        direction: 'asc' | 'desc';
-    } | null>(null);
-    
-    // モバイル表示かどうかを判定
-    const isMobile = useMediaQuery('(max-width: 768px)');
-    
-    // 追加: 表示フィルターの状態
-    const [activeTab, setActiveTab] = useState<'all' | 'normal' | 'shorts'>('all');
+  const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
 
-    // ショート動画かどうかを判定する関数（タイトルに#shortsがあるか、または60秒以下かで判定）
-    const isShortVideo = (video: Video): boolean => {
-        // 1. タイトルに #shorts が含まれているか
-        const hasShortsTag = video.title && (
-            video.title.toLowerCase().includes('#shorts') || 
-            video.title.toLowerCase().includes(' shorts') || 
-            video.title.toLowerCase().includes('#short')
-        );
-        
-        if (hasShortsTag) return true;
-        
-        // 2. 動画の長さが60秒以下かどうか
-        if (video.duration) {
-            // "PT1M34S" のような形式の場合
-            if (video.duration.startsWith('PT')) {
-                const minutes = video.duration.includes('M') 
-                    ? parseInt(video.duration.split('M')[0].replace('PT', '')) 
-                    : 0;
-                
-                const seconds = video.duration.includes('S') 
-                    ? parseInt(video.duration.split('S')[0].split('M').pop() || video.duration.split('S')[0].replace('PT', '')) 
-                    : 0;
-                
-                const totalSeconds = minutes * 60 + seconds;
-                return totalSeconds <= 60;
-            }
-            
-            // "01:00" のような形式の場合
-            if (video.duration.includes(':')) {
-                const parts = video.duration.split(':');
-                if (parts.length === 2) {
-                    const minutes = parseInt(parts[0]);
-                    const seconds = parseInt(parts[1]);
-                    const totalSeconds = minutes * 60 + seconds;
-                    return totalSeconds <= 60;
-                }
-                
-                if (parts.length === 3) { // "00:00:49" のような形式
-                    const hours = parseInt(parts[0]);
-                    const minutes = parseInt(parts[1]);
-                    const seconds = parseInt(parts[2]);
-                    const totalSeconds = hours * 3600 + minutes * 60 + seconds;
-                    return totalSeconds <= 60;
-                }
-            }
+  /* ------------------------------ state --------------------------- */
+  const [videos, setVideos]   = useState<Video[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
+  const [page, setPage]       = useState(1);
+
+  const [parentGenreId, setParentGenreId]   = useState<string>();
+  const [currentGenreName, setCurrentGenreName] = useState('');
+  const itemsPerPage = 20;
+  const [hasMore, setHasMore] = useState(true);
+
+  const [sortConfig, setSortConfig] = useState<
+    | { key: keyof Video; direction: 'asc' | 'desc' }
+    | null
+  >(null);
+
+  const [activeTab, setActiveTab] = useState<'all' | 'normal' | 'shorts'>('all');
+  const isMobile = useMediaQuery('(max-width: 768px)');
+
+  /* ------------------------------ utils --------------------------- */
+  /** タイトルに #shorts / 長さ 60 秒以下ならショート */
+  const isShortVideo = useCallback((v: Video) => {
+    if (
+      v.title &&
+      ['#shorts', ' shorts', '#short'].some(t =>
+        v.title.toLowerCase().includes(t)
+      )
+    )
+      return true;
+
+    if (v.duration) {
+      if (v.duration.startsWith('PT')) {
+        const m = v.duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+        if (m) {
+          const sec =
+            parseInt(m[1] || '0') * 3600 +
+            parseInt(m[2] || '0') * 60 +
+            parseInt(m[3] || '0');
+          return sec > 0 && sec <= 60;
         }
-        
-        return false;
-    };
-
-    const fetchVideosByGenre = useCallback(async () => {
-        if (!slug) return;
-
-        try {
-            setLoading(true);
-            setError(null);
-
-            const { data: genreData, error: genreError } = await supabase
-                .from('genres')
-                .select('id, name, parent_genre_id, parent_genre:parent_genre_id(id, name)')
-                .eq('slug', slug)
-                .single();
-
-            if (genreError || !genreData) {
-                console.error('Genre fetch error:', genreError);
-                setError('ジャンルの取得に失敗しました');
-                return;
-            }
-
-            setParentGenreId(genreData.parent_genre_id || genreData.id);
-            setCurrentGenreName(genreData.name);
-
-            try {
-                // まずYouTube APIを試す - ジャンル名とIDを使用
-                const searchParams = {
-                    page: page,
-                    tags: [genreData.name],
-                    genreId: genreData.id // ジャンルIDを追加
-                };
-                
-                const { videos: fetchedVideos } = await YouTubeAPI.searchVideos(
-                    genreData.name,  // 検索キーワードとしてジャンル名を使用
-                    itemsPerPage,
-                    searchParams
-                );
-
-                if (fetchedVideos && fetchedVideos.length > 0) {
-                    setVideos(prevVideos => page === 1 ? fetchedVideos : [...prevVideos, ...fetchedVideos]);
-                    setHasMore(fetchedVideos.length >= itemsPerPage);
-                    return;
-                } else {
-                    throw new Error('No videos found from YouTube API');
-                }
-            } catch (apiError) {
-                console.error('YouTube API error:', apiError);
-                
-                // API呼び出しに失敗した場合はSupabaseからデータを取得
-                console.log('Falling back to Supabase for video data');
-                
-                // まず特定のジャンルIDに関連する動画を検索
-                const { data: genreVideos, error: genreVideoError } = await supabase
-                    .from('videos')
-                    .select('*')
-                    .eq('genre_id', genreData.id) // ジャンルIDでフィルタリング
-                    .order('published_at', { ascending: false })
-                    .limit(itemsPerPage);
-                
-                if (genreVideoError) {
-                    console.error('Supabase genre videos error:', genreVideoError);
-                    // genreVideoエラーはスローせず、次のフォールバックへ
-                } else if (genreVideos && genreVideos.length > 0) {
-                    setVideos(genreVideos);
-                    setHasMore(genreVideos.length >= itemsPerPage);
-                    return;
-                }
-                
-                // ジャンル特定の検索が失敗した場合、すべての動画からタイトルや説明で検索
-                const { data: searchVideos, error: searchError } = await supabase
-                    .from('videos')
-                    .select('*')
-                    .or(`title.ilike.%${genreData.name}%,description.ilike.%${genreData.name}%`)
-                    .order('published_at', { ascending: false })
-                    .limit(itemsPerPage);
-                
-                if (searchError) {
-                    console.error('Supabase search videos error:', searchError);
-                    // それでも失敗した場合は最新の動画を表示
-                    const { data: fallbackVideos, error: fallbackError } = await supabase
-                        .from('videos')
-                        .select('*')
-                        .order('published_at', { ascending: false })
-                        .limit(itemsPerPage);
-                        
-                    if (fallbackError) {
-                        console.error('Supabase fallback error:', fallbackError);
-                        throw fallbackError;
-                    }
-                    
-                    if (fallbackVideos && fallbackVideos.length > 0) {
-                        setVideos(fallbackVideos);
-                        setHasMore(false); // フォールバックではページネーションを無効に
-                        console.log('Using general fallback videos');
-                    } else {
-                        setVideos([]);
-                        setHasMore(false);
-                        setError('動画が見つかりませんでした。別のジャンルをお試しください。');
-                    }
-                } else if (searchVideos && searchVideos.length > 0) {
-                    setVideos(searchVideos);
-                    setHasMore(searchVideos.length >= itemsPerPage);
-                    console.log('Using keyword search fallback videos');
-                } else {
-                    // すべての検索方法が失敗した場合
-                    setVideos([]);
-                    setHasMore(false);
-                    setError('動画が見つかりませんでした。別のジャンルをお試しください。');
-                }
-            }
-        } catch (err) {
-            console.error('Error in fetchVideosByGenre:', err);
-            setError('動画の取得に失敗しました。時間をおいて再度お試しください。');
-            setHasMore(false);
-        } finally {
-            setLoading(false);
-        }
-    }, [slug, page]);
-
-    useEffect(() => {
-        fetchVideosByGenre();
-    }, [fetchVideosByGenre]);
-
-    const handleVideoClick = (videoId: string) => {
-        navigate(`/video/${videoId}`);
-    };
-
-    const handleSubGenreClick = (slug: string) => {
-        navigate(`/genre/${slug}`);
-    };
-
-    const handleLoadMore = () => {
-        setPage(prev => prev + 1);
-    };
-
-    const handleSort = (key: keyof Video) => {
-        let direction: 'asc' | 'desc' = 'asc';
-        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-            direction = 'desc';
-        }
-        setSortConfig({ key, direction });
-    };
-
-    // ソートロジックを改善
-    const sortedVideos = useCallback(() => {
-        if (!sortConfig) return videos;
-
-        return [...videos].sort((a, b) => {
-            const aValue = a[sortConfig.key];
-            const bValue = b[sortConfig.key];
-            const direction = sortConfig.direction === 'asc' ? 1 : -1;
-
-            // undefined/nullの処理
-            if (aValue === undefined || aValue === null) {
-                return direction * -1; // undefinedは後ろにソート
-            }
-            if (bValue === undefined || bValue === null) {
-                return direction; // undefinedは後ろにソート
-            }
-
-            // 文字列比較
-            if (typeof aValue === 'string' && typeof bValue === 'string') {
-                // published_atは日付文字列として特別扱い
-                if (sortConfig.key === 'published_at') {
-                    return direction * (new Date(aValue).getTime() - new Date(bValue).getTime());
-                }
-                return direction * aValue.localeCompare(bValue);
-            }
-
-            // 数値比較
-            if (
-                (typeof aValue === 'number' || typeof aValue === 'string') &&
-                (typeof bValue === 'number' || typeof bValue === 'string')
-            ) {
-                const aNum = typeof aValue === 'string' ? parseFloat(aValue) : aValue;
-                const bNum = typeof bValue === 'string' ? parseFloat(bValue) : bValue;
-
-                if (!isNaN(aNum) && !isNaN(bNum)) {
-                    return direction * (aNum - bNum);
-                }
-            }
-
-            // オブジェクト比較（万が一のケース）
-            if (typeof aValue === 'object' && typeof bValue === 'object') {
-                if (aValue instanceof Date && bValue instanceof Date) {
-                    return direction * (aValue.getTime() - bValue.getTime());
-                }
-                // JSONに変換して比較
-                return direction * JSON.stringify(aValue).localeCompare(JSON.stringify(bValue));
-            }
-
-            // デフォルト: 変更なし
-            return 0;
-        });
-    }, [videos, sortConfig]);
-
-    // タブに応じてフィルタリングした動画を取得
-    const filteredVideos = useCallback(() => {
-        if (activeTab === 'all') return sortedVideos();
-        
-        return sortedVideos().filter(video => {
-            const isShort = isShortVideo(video);
-            return activeTab === 'shorts' ? isShort : !isShort;
-        });
-    }, [sortedVideos, activeTab]);
-
-    // 各タイプの動画数をカウント
-    const shortsCount = videos.filter(video => isShortVideo(video)).length;
-    const normalCount = videos.length - shortsCount;
-
-    // 現在のタブに基づいて、さらに読み込むべきデータがあるかどうかを判断
-    const shouldShowLoadMore = useCallback(() => {
-        if (!hasMore) return false;
-        if (loading) return false;
-        
-        // カレントのフィルタリング後の動画数が少なすぎる場合は、さらに読み込むボタンを表示
-        const currentFilteredLength = filteredVideos().length;
-        
-        return currentFilteredLength > 0;
-    }, [hasMore, loading, filteredVideos]);
-
-    const formatViewCount = (count?: number) => {
-        if (!count) return '-';
-        if (count >= 10000) {
-            return `${(count / 10000).toFixed(1)}万`;
-        }
-        return count.toLocaleString();
-    };
-
-    const formatDate = (dateString?: string) => {
-        if (!dateString) return '-';
-        return new Date(dateString).toLocaleDateString('ja-JP');
-    };
-
-    if (loading && page === 1) {
-        return (
-            <div className="flex justify-center items-center min-h-[400px]">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-            </div>
-        );
+      }
+      if (v.duration.includes(':')) {
+        const p = v.duration.split(':').map(Number);
+        const sec =
+          p.length === 2
+            ? p[0] * 60 + p[1]
+            : p.length === 3
+            ? p[0] * 3600 + p[1] * 60 + p[2]
+            : 0;
+        return sec > 0 && sec <= 60;
+      }
     }
+    return false;
+  }, []);
 
-    // モバイル表示用ソートボタン
-    const renderSortButtons = () => (
-        <div className="flex flex-wrap gap-2 mb-4 p-3 bg-gray-50 rounded-lg">
-            <span className="text-sm text-gray-500 w-full mb-1">並び替え:</span>
-            <button
-                onClick={() => handleSort('title')}
-                className={`px-2 py-1 text-xs rounded-full border flex items-center ${
-                    sortConfig?.key === 'title' ? 'bg-indigo-600 text-white' : 'bg-white'
-                }`}
-            >
-                タイトル
-                {sortConfig?.key === 'title' && (
-                    sortConfig.direction === 'asc' ? <ArrowUp className="ml-1 w-3 h-3" /> : <ArrowDown className="ml-1 w-3 h-3" />
-                )}
-            </button>
-            <button
-                onClick={() => handleSort('rating')}
-                className={`px-2 py-1 text-xs rounded-full border flex items-center ${
-                    sortConfig?.key === 'rating' ? 'bg-indigo-600 text-white' : 'bg-white'
-                }`}
-            >
-                評価
-                {sortConfig?.key === 'rating' && (
-                    sortConfig.direction === 'asc' ? <ArrowUp className="ml-1 w-3 h-3" /> : <ArrowDown className="ml-1 w-3 h-3" />
-                )}
-            </button>
-            <button
-                onClick={() => handleSort('view_count')}
-                className={`px-2 py-1 text-xs rounded-full border flex items-center ${
-                    sortConfig?.key === 'view_count' ? 'bg-indigo-600 text-white' : 'bg-white'
-                }`}
-            >
-                再生回数
-                {sortConfig?.key === 'view_count' && (
-                    sortConfig.direction === 'asc' ? <ArrowUp className="ml-1 w-3 h-3" /> : <ArrowDown className="ml-1 w-3 h-3" />
-                )}
-            </button>
-            <button
-                onClick={() => handleSort('published_at')}
-                className={`px-2 py-1 text-xs rounded-full border flex items-center ${
-                    sortConfig?.key === 'published_at' ? 'bg-indigo-600 text-white' : 'bg-white'
-                }`}
-            >
-                投稿日
-                {sortConfig?.key === 'published_at' && (
-                    sortConfig.direction === 'asc' ? <ArrowUp className="ml-1 w-3 h-3" /> : <ArrowDown className="ml-1 w-3 h-3" />
-                )}
-            </button>
-        </div>
-    );
+  /* ------------------------------ fetch --------------------------- */
+  const fetchVideosByGenre = useCallback(async () => {
+    if (!slug) return;
 
-    return (
-        <div className="container mx-auto px-4 py-6">
-            <div className="flex flex-col lg:flex-row gap-6">
-                <aside className="hidden lg:block w-64 flex-shrink-0">
-                    <GenreSidebar
-                        activeGenre={currentGenreName}
-                        onSubGenreClick={handleSubGenreClick}
-                        parentGenreId={parentGenreId}
-                    />
-                </aside>
+    page === 1
+      ? (setLoading(true), setVideos([]), setHasMore(true), setError(null))
+      : setLoading(true);
 
-                <div className="flex-grow">
-                    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                        <h1 className="text-xl md:text-2xl font-bold p-4">{currentGenreName}の動画一覧</h1>
+    try {
+      /* genre 情報取得 */
+      const { data: g, error: gErr } = await supabase
+        .from('genres')
+        .select('id, name, parent_genre_id')
+        .eq('slug', slug)
+        .single();
+      if (gErr || !g) throw new Error('ジャンル取得失敗');
 
-                        {/* 動画タイプ切り替えタブを追加 */}
-                        <div className="flex border-b border-gray-200 px-4">
-                            <button
-                                onClick={() => setActiveTab('all')}
-                                className={`px-4 py-2 text-sm font-medium border-b-2 ${
-                                    activeTab === 'all' 
-                                        ? 'border-indigo-600 text-indigo-600' 
-                                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                                }`}
-                            >
-                                すべて ({videos.length})
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('normal')}
-                                className={`px-4 py-2 text-sm font-medium border-b-2 ${
-                                    activeTab === 'normal' 
-                                        ? 'border-indigo-600 text-indigo-600' 
-                                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                                }`}
-                            >
-                                通常動画 ({normalCount})
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('shorts')}
-                                className={`px-4 py-2 text-sm font-medium border-b-2 ${
-                                    activeTab === 'shorts' 
-                                        ? 'border-indigo-600 text-indigo-600' 
-                                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                                }`}
-                            >
-                                ショート ({shortsCount})
-                            </button>
-                        </div>
+      setParentGenreId(g.parent_genre_id || g.id);
+      setCurrentGenreName(g.name);
 
-                        {error && (
-                            <div className="p-4 text-red-600 bg-red-50">{error}</div>
-                        )}
+      let fetched: Video[] = [];
+      let apiOk = false;
 
-                        {!error && filteredVideos().length === 0 ? (
-                            <div className="p-8 text-center text-gray-500">
-                                {activeTab === 'all' 
-                                    ? '動画が見つかりませんでした' 
-                                    : activeTab === 'shorts' 
-                                        ? 'このジャンルにはショート動画がありません' 
-                                        : 'このジャンルには通常動画がありません'}
-                            </div>
-                        ) : (
-                            <>
-                                {/* モバイル表示の場合はソートボタンを表示 */}
-                                {isMobile && renderSortButtons()}
-                                
-                                {isMobile ? (
-                                    // モバイル用カードレイアウト
-                                    <div className="space-y-4 px-3 pb-4">
-                                        {filteredVideos().map((video) => (
-                                            <div
-                                                key={video.id}
-                                                onClick={() => handleVideoClick(video.youtube_id || video.id)}
-                                                className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden border"
-                                            >
-                                                {/* 上段：サムネイルと動画タイトル */}
-                                                <div className="flex flex-row p-2 border-b border-gray-100">
-                                                    {/* サムネイル - 左側に配置 */}
-                                                    <div className="relative w-32 h-20 flex-shrink-0">
-                                                        <img
-                                                            src={video.thumbnail || '/placeholder.jpg'}
-                                                            alt={video.title}
-                                                            className="w-full h-full object-cover rounded-sm"
-                                                            onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                                                                const target = e.currentTarget;
-                                                                target.onerror = null;
-                                                                target.src = '/placeholder.jpg';
-                                                            }}
-                                                            loading="lazy"
-                                                        />
-                                                        {/* ショート動画バッジ */}
-                                                        {isShortVideo(video) && (
-                                                            <div className="absolute top-0 right-0 bg-red-600 text-white text-xs px-1 py-0.5 rounded-bl">
-                                                                ショート
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    
-                                                    {/* タイトル - 右側に配置 */}
-                                                    <div className="flex-1 ml-2 overflow-hidden">
-                                                        <p className="text-xs font-medium line-clamp-3 text-gray-900">
-                                                            {video.title}
-                                                        </p>
-                                                        {video.channel_title && (
-                                                            <p className="text-xs text-gray-600 mt-1 truncate">
-                                                                {video.channel_title}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                
-                                                {/* 下段：評価、再生回数、投稿日 */}
-                                                <div className="flex justify-between px-2 py-1 text-xs text-gray-500 bg-gray-50">
-                                                    {/* 星評価 */}
-                                                    <div className="flex items-center">
-                                                        <Star className="h-3 w-3 text-yellow-400 mr-1" />
-                                                        <span>{video.rating?.toFixed(1) || '-'}</span>
-                                                    </div>
-                                                    
-                                                    {/* 再生回数 */}
-                                                    <div className="flex items-center">
-                                                        <Eye className="h-3 w-3 mr-1" />
-                                                        <span>{formatViewCount(video.view_count)}</span>
-                                                    </div>
-                                                    
-                                                    {/* 投稿日 */}
-                                                    <div className="flex items-center">
-                                                        <Clock className="h-3 w-3 mr-1" />
-                                                        <span>{formatDate(video.published_at)}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    // デスクトップ用テーブルレイアウト
-                                    
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead className="cursor-pointer" onClick={() => handleSort('title')}>
-                                                        タイトル {sortConfig?.key === 'title' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
-                                                    </TableHead>
-                                                    <TableHead className="cursor-pointer" onClick={() => handleSort('rating')}>
-                                                        ★評価 {sortConfig?.key === 'rating' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
-                                                    </TableHead>
-                                                    <TableHead className="cursor-pointer" onClick={() => handleSort('review_count')}>
-                                                        レビュー数 {sortConfig?.key === 'review_count' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
-                                                    </TableHead>
-                                                    <TableHead className="cursor-pointer" onClick={() => handleSort('channel_title')}>
-                                                        チャンネル {sortConfig?.key === 'channel_title' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
-                                                    </TableHead>
-                                                    <TableHead className="cursor-pointer" onClick={() => handleSort('published_at')}>
-                                                        投稿日 {sortConfig?.key === 'published_at' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
-                                                    </TableHead>
-                                                    <TableHead className="cursor-pointer" onClick={() => handleSort('view_count')}>
-                                                        再生回数 {sortConfig?.key === 'view_count' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
-                                                    </TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {filteredVideos().map((video) => (
-                                                    <TableRow
-                                                        key={video.id}
-                                                        onClick={() => handleVideoClick(video.youtube_id || video.id)}
-                                                        className="cursor-pointer hover:bg-gray-50"
-                                                    >
-                                                        <TableCell className="flex items-center space-x-3">
-                                                            <div className="relative">
-                                                                <img
-                                                                    src={video.thumbnail || '/placeholder.jpg'}
-                                                                    alt={video.title}
-                                                                    className="w-24 h-auto rounded"
-                                                                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                                                                        const target = e.currentTarget;
-                                                                        target.onerror = null;
-                                                                        target.src = '/placeholder.jpg';
-                                                                    }}
-                                                                />
-                                                                {/* ショート動画バッジ */}
-                                                                {isShortVideo(video) && (
-                                                                    <div className="absolute top-0 right-0 bg-red-600 text-white text-xs px-1 py-0.5 rounded-bl">
-                                                                        ショート
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <span>{video.title}</span>
-                                                        </TableCell>
-                                                        <TableCell>{video.rating?.toFixed(1) || '-'}</TableCell>
-                                                        <TableCell>{video.review_count?.toLocaleString() || '-'}</TableCell>
-                                                        <TableCell>
-                                                            {video.channel_title && (
-                                                                <a
-                                                                    href={`https://www.youtube.com/channel/${video.channel_id}`}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="text-indigo-600 hover:underline"
-                                                                    onClick={(e: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => e.stopPropagation()}
-                                                                >
-                                                                    {video.channel_title}
-                                                                </a>
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell>{formatDate(video.published_at)}</TableCell>
-                                                        <TableCell>{formatViewCount(video.view_count)} 回視聴</TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    
-                                )}
-                            </>
-                        )}
+      /* 1) YouTube API */
+      try {
+        if (typeof YouTubeAPI.searchVideos === 'function') {
+          const res = await YouTubeAPI.searchVideos(g.name, itemsPerPage, {
+            page,
+          });
+          fetched = res?.videos || [];
+          setHasMore(fetched.length >= itemsPerPage);
+          apiOk = fetched.length > 0;
+        }
+      } catch {
+        /* ignore */
+      }
 
-                        {shouldShowLoadMore() && (
-                            <div className="text-center py-4">
-                                <button
-                                    onClick={handleLoadMore}
-                                    className="px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600 transition"
-                                    disabled={loading}
-                                >
-                                    {loading ? '読み込み中...' : 'さらに読み込む'}
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
+      /* 2) Supabase fallback */
+      if (!apiOk) {
+        const { data: byGenre } = await supabase
+          .from('videos')
+          .select('*')
+          .eq('genre_id', g.id)
+          .order('published_at', { ascending: false })
+          .range((page - 1) * itemsPerPage, page * itemsPerPage - 1);
+        fetched = byGenre || [];
 
-                <aside className="hidden lg:block w-64 flex-shrink-0">
-                    <div className="sticky top-4">
-                        <AdsSection />
-                    </div>
-                </aside>
+        if (!fetched.length) {
+          const { data: byKw } = await supabase
+            .from('videos')
+            .select('*')
+            .or(`title.ilike.%${g.name}%,description.ilike.%${g.name}%`)
+            .order('published_at', { ascending: false })
+            .range((page - 1) * itemsPerPage, page * itemsPerPage - 1);
+          fetched = byKw || [];
+        }
+        setHasMore(fetched.length >= itemsPerPage);
+      }
+
+      /* merge + unique */
+      if (fetched.length) {
+        setVideos(prev =>
+          (page === 1 ? fetched : [...prev, ...fetched]).filter(
+            (v, i, self) => i === self.findIndex(s => s.youtube_id === v.youtube_id)
+          )
+        );
+      } else {
+        if (page === 1)
+          setError('動画が見つかりませんでした。別のジャンルをお試しください。');
+        setHasMore(false);
+      }
+    } catch (e: any) {
+      setError(e.message ?? '動画取得エラー');
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [slug, page, itemsPerPage]);
+
+  /* ------------------------------ effects ------------------------- */
+  useEffect(() => {
+    setPage(1);
+    fetchVideosByGenre();
+  }, [slug]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (page > 1) fetchVideosByGenre();
+  }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ------------------------------ handlers ------------------------ */
+  const handleVideoClick = (id: string | number) => navigate(`/video/${id}`);
+  const handleSubGenreClick = (s: string) => navigate(`/genre/${s}`);
+  const handleLoadMore = () => !loading && hasMore && setPage(p => p + 1);
+
+  const handleSort = (key: keyof Video) => {
+    const dir =
+      sortConfig?.key === key && sortConfig.direction === 'asc' ? 'desc' : 'asc';
+    setSortConfig({ key, direction: dir });
+  };
+
+  /* ------------------------------ derived ------------------------- */
+  const sortedVideos = useCallback((): Video[] => {
+    if (!sortConfig) return videos;
+    const { key, direction } = sortConfig;
+    const dir = direction === 'asc' ? 1 : -1;
+
+    return [...videos].sort((a, b) => {
+      const av = a[key] as any;
+      const bv = b[key] as any;
+      if (av == null && bv == null) return 0;
+      if (av == null) return dir;
+      if (bv == null) return -dir;
+
+      if (
+        ['rating', 'review_count', 'view_count'].includes(key as string) &&
+        !isNaN(Number(av)) &&
+        !isNaN(Number(bv))
+      )
+        return dir * (Number(av) - Number(bv));
+
+      if (key === 'published_at')
+        return dir * (new Date(av).getTime() - new Date(bv).getTime());
+
+      return dir * String(av).localeCompare(String(bv), 'ja');
+    });
+  }, [videos, sortConfig]);
+
+  const filteredVideos = useCallback(() => {
+    const list = sortedVideos();
+    if (activeTab === 'all') return list;
+    return list.filter(v => (activeTab === 'shorts' ? isShortVideo(v) : !isShortVideo(v)));
+  }, [sortedVideos, activeTab, isShortVideo]);
+
+  const totalShorts = videos.filter(isShortVideo).length;
+  const totalNormal = videos.length - totalShorts;
+
+  /* ------------------------------ UI helpers ---------------------- */
+  const fmtView = (n?: number | string | null) => {
+    if (n == null) return '-';
+    const x = Number(n);
+    if (isNaN(x) || x < 0) return '-';
+    if (x >= 1e8) return `${(x / 1e8).toFixed(1)}億`;
+    if (x >= 1e4) return `${(x / 1e4).toFixed(1)}万`;
+    if (x >= 1e3) return `${(x / 1e3).toFixed(1)}K`;
+    return x.toLocaleString();
+  };
+  const fmtDate = (s?: string | null) => {
+    if (!s) return '-';
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  };
+
+  const renderSortButtons = () => (
+    <div className="flex flex-wrap gap-2 mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg text-sm">
+      <span className="text-gray-500 dark:text-dark-text-secondary w-full mb-1">並び替え:</span>
+      {(['title', 'rating', 'view_count', 'published_at'] as (keyof Video)[]).map(k => (
+        <button
+          key={k}
+          onClick={() => handleSort(k)}
+          className={`px-3 py-1 rounded-full border dark:border-dark-border flex items-center ${
+            sortConfig?.key === k ? 'bg-indigo-600 text-white dark:bg-indigo-700'
+                                  : 'bg-white dark:bg-dark-surface dark:text-dark-text-primary'}`}
+        >
+          {k === 'title' ? 'タイトル' : k === 'rating' ? '評価' : k === 'view_count' ? '再生回数' : '投稿日'}
+          {sortConfig?.key === k &&
+            (sortConfig.direction === 'asc' ? <ArrowUp className="ml-1 w-3 h-3" /> 
+                                            : <ArrowDown className="ml-1 w-3 h-3" />)}
+        </button>
+      ))}
+    </div>
+  );
+
+  /* ------------------------------ render -------------------------- */
+  const showInitLoad = loading && page === 1 && videos.length === 0 && !error;
+  const showEmpty    = !loading && videos.length === 0 && !error;
+  const showLoadMore = !loading && hasMore && videos.length > 0;
+
+  return (
+    <div className="container mx-auto px-4 py-6 dark:bg-dark-bg">
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* ------------ Sidebar ------------ */}
+        <aside className="hidden lg:block w-64 flex-shrink-0">
+          <div className="sticky top-4">
+            <GenreSidebar
+              activeGenre={currentGenreName}
+              onSubGenreClick={handleSubGenreClick}
+              parentGenreId={parentGenreId}
+            />
+          </div>
+        </aside>
+
+        {/* ------------ Main ------------ */}
+        <div className="flex-grow">
+          <div className="bg-white dark:bg-dark-surface rounded-lg shadow-sm overflow-hidden">
+            {/* Title */}
+            <h1 className="text-xl md:text-2xl font-bold p-4 dark:text-dark-text-primary">
+              {currentGenreName ? `${currentGenreName}の動画一覧` : '動画一覧'}
+            </h1>
+
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200 dark:border-dark-border px-4">
+              {([
+                ['all', 'すべて', videos.length],
+                ['normal', '通常動画', totalNormal],
+                ['shorts', 'ショート', totalShorts],
+              ] as ['all' | 'normal' | 'shorts', string, number][]).map(
+                ([t, label, n]) => (
+                  <button
+                    key={t}
+                    onClick={() => setActiveTab(t)}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 ${
+                      activeTab === t
+                        ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+                        : 'border-transparent text-gray-500 dark:text-dark-text-secondary hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                  >
+                    {label} ({n})
+                  </button>
+                )
+              )}
             </div>
+
+            {/* Loading / Error / Empty */}
+            {showInitLoad && (
+              <div className="flex justify-center items-center min-h-[200px] dark:bg-dark-bg">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 dark:border-primary-400" />
+              </div>
+            )}
+            {error && (
+              <div className="p-4 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20">
+                エラー: {error}
+              </div>
+            )}
+            {showEmpty && (
+              <div className="p-8 text-center text-gray-500 dark:text-dark-text-secondary">
+                {activeTab === 'shorts'
+                  ? 'このジャンルにはショート動画がありません。'
+                  : activeTab === 'normal'
+                  ? 'このジャンルには通常動画がありません。'
+                  : '動画が見つかりませんでした。'}
+              </div>
+            )}
+
+            {/* List */}
+            {(!error || videos.length) && !showInitLoad && filteredVideos().length > 0 && (
+              <>
+                {isMobile && renderSortButtons()}
+                {/* Mobile card */}
+                {isMobile ? (
+                  <div className="space-y-4 p-3 pb-4">
+                    {filteredVideos().map(v => (
+                      <div
+                        key={v.id}
+                        onClick={() => handleVideoClick(v.youtube_id || v.id)}
+                        className="bg-white dark:bg-dark-surface rounded-lg shadow-sm hover:shadow-md dark:hover:shadow-lg dark:shadow-gray-900/30 transition-shadow cursor-pointer overflow-hidden border dark:border-dark-border"
+                      >
+                        <div className="flex p-2 border-b border-gray-100 dark:border-dark-border">
+                          <div className="relative w-64 h-40 flex-shrink-0">
+                            <img
+                              src={v.thumbnail || '/placeholder.jpg'}
+                              alt={v.title || 'No Title'}
+                              className="w-full h-full object-cover rounded-sm"
+                              loading="lazy"
+                              onError={e => {
+                                const t = e.currentTarget;
+                                t.onerror = null;
+                                t.src = '/placeholder.jpg';
+                              }}
+                            />
+                            {isShortVideo(v) && (
+                              <div className="absolute top-0 right-0 bg-red-600 text-white text-xs px-1 py-0.5 rounded-bl">
+                                ショート
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 ml-2 overflow-hidden">
+                            <p className="text-xs font-medium line-clamp-3 text-gray-900 dark:text-dark-text-primary">
+                              {v.title || 'タイトルなし'}
+                            </p>
+                            {v.channel_title && (
+                              <p className="text-xs text-gray-600 dark:text-dark-text-secondary mt-1 truncate">
+                                {v.channel_title}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex justify-between px-2 py-1 text-xs text-gray-500 dark:text-dark-text-secondary bg-gray-50 dark:bg-gray-800">
+                          <div className="flex items-center">
+                            <Star className="h-3 w-3 text-yellow-400 mr-1" />
+                            <span>{v.rating ? v.rating.toFixed(1) : '-'}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <Eye className="h-3 w-3 mr-1" />
+                            <span>{fmtView(v.view_count)}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <Clock className="h-3 w-3 mr-1" />
+                            <span>{fmtDate(v.published_at)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  /* Desktop table */
+                  <Table>
+                    <TableHeader className="dark:bg-gray-800">
+                      <TableRow className="dark:border-dark-border">
+                        {(
+                          [
+                            ['title', 'タイトル'],
+                            ['rating', '★評価'],
+                            ['review_count', 'レビュー数'],
+                            ['channel_title', 'チャンネル'],
+                            ['published_at', '投稿日'],
+                            ['view_count', '再生回数'],
+                          ] as [keyof Video, string][]
+                        ).map(([k, lbl]) => (
+                          <TableHead
+                            key={k}
+                            onClick={() => handleSort(k)}
+                            className="cursor-pointer dark:text-dark-text-primary"
+                          >
+                            {lbl}{' '}
+                            {sortConfig?.key === k
+                              ? sortConfig.direction === 'asc'
+                                ? '▲'
+                                : '▼'
+                              : ''}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredVideos().map(v => (
+                        <TableRow
+                          key={v.id}
+                          onClick={() => handleVideoClick(v.youtube_id || v.id)}
+                          className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 dark:border-dark-border"
+                        >
+                          <TableCell className="flex items-center space-x-3 dark:text-dark-text-primary">
+                            <div className="relative flex-shrink-0">
+                              <img
+                                src={v.thumbnail || '/placeholder.jpg'}
+                                alt={v.title || 'No Title'}
+                                className="w-48 h-auto rounded"
+                                loading="lazy"
+                                onError={e => {
+                                  const t = e.currentTarget;
+                                  t.onerror = null;
+                                  t.src = '/placeholder.jpg';
+                                }}
+                              />
+                              {isShortVideo(v) && (
+                                <div className="absolute top-0 right-0 bg-red-600 text-white text-xs px-1 py-0.5 rounded-bl">
+                                  ショート
+                                </div>
+                              )}
+                            </div>
+                            <span className="flex-grow text-sm">{v.title || 'タイトルなし'}</span>
+                          </TableCell>
+                          <TableCell className="dark:text-dark-text-primary text-sm">
+                            {v.rating ? v.rating.toFixed(1) : '-'}
+                          </TableCell>
+                          <TableCell className="dark:text-dark-text-primary text-sm">
+                            {v.review_count?.toLocaleString() || '-'}
+                          </TableCell>
+                          <TableCell className="dark:text-dark-text-primary text-sm">
+                            {v.channel_title && v.channel_id ? (
+                              <a
+                                href={`https://www.youtube.com/channel/${v.channel_id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                              >
+                                {v.channel_title}
+                              </a>
+                            ) : (
+                              '-'
+                            )}
+                          </TableCell>
+                          <TableCell className="dark:text-dark-text-primary text-sm">
+                            {fmtDate(v.published_at)}
+                          </TableCell>
+                          <TableCell className="dark:text-dark-text-primary text-sm">
+                            {fmtView(v.view_count)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </>
+            )}
+
+            {/* Infinite loading spinner */}
+            {loading && page > 1 && (
+              <div className="flex justify-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 dark:border-primary-400" />
+              </div>
+            )}
+
+            {/* LoadMore */}
+            {showLoadMore && (
+              <div className="text-center py-4">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loading}
+                  className="px-4 py-2 bg-primary-500 dark:bg-primary-700 text-white rounded hover:bg-primary-600 dark:hover:bg-primary-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  さらに読み込む
+                </button>
+              </div>
+            )}
+
+            {!hasMore && !loading && videos.length > 0 && (
+              <div className="text-center py-4 text-gray-500 dark:text-dark-text-secondary">
+                すべての動画を表示しました
+              </div>
+            )}
+          </div>
         </div>
-    );
+
+        {/* ------------ Ads ------------ */}
+        <aside className="hidden lg:block w-64 flex-shrink-0">
+          <div className="sticky top-4">
+            <AdsSection />
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
 }

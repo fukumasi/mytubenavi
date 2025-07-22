@@ -1,0 +1,79 @@
+{
+  "short_name": "MyTubeNavi",
+  "name": "MyTubeNavi - YouTube動画検索プラットフォーム",
+  "description": "YouTube動画の検索、口コミ評価、コミュニティ機能が利用できるプラットフォーム",
+  "icons": [
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#0ea5e9",
+  "background_color": "#15202B",
+  "orientation": "portrait",
+  "scope": "/",
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "shortcuts": [
+    {
+      "name": "検索",
+      "short_name": "検索",
+      "description": "動画を検索",
+      "url": "/search",
+      "icons": [{ "src": "/icons/search-icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "人気動画",
+      "short_name": "人気",
+      "description": "人気の動画を表示",
+      "url": "/?sort=popular",
+      "icons": [{ "src": "/icons/popular-icon-96x96.png", "sizes": "96x96" }]
+    }
+  ]
+}

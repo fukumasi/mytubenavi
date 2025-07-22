@@ -322,8 +322,8 @@ const PremiumUpgrade: React.FC = () => {
         key={plan.id}
         className={`border rounded-lg p-6 transition-all ${
           isSelected 
-            ? 'border-blue-600 bg-blue-50 shadow-md' 
-            : 'border-gray-200 hover:border-blue-400 hover:shadow-sm'
+            ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400 shadow-md' 
+            : 'border-gray-200 dark:border-dark-border dark:bg-dark-surface hover:border-blue-400 dark:hover:border-blue-400 hover:shadow-sm'
         } ${plan.recommended ? 'relative' : ''}`}
         onClick={() => handlePlanSelect(plan.id)}
       >
@@ -332,26 +332,26 @@ const PremiumUpgrade: React.FC = () => {
             おすすめ
           </div>
         )}
-        <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
-        <div className="text-3xl font-bold mb-4">
+        <h3 className="text-xl font-bold mb-2 dark:text-dark-text-primary">{plan.name}</h3>
+        <div className="text-3xl font-bold mb-4 dark:text-dark-text-primary">
           ¥{plan.price.toLocaleString()}
-          <span className="text-base font-normal ml-1 text-gray-600">
+          <span className="text-base font-normal ml-1 text-gray-600 dark:text-dark-text-secondary">
             {plan.duration === 1 ? '/月' : `/${plan.duration}ヶ月`}
           </span>
         </div>
         <div className="mb-4">
           {plan.features.map((feature, index) => (
             <div key={index} className="flex items-start mb-2">
-              <span className="text-green-500 mr-2">✓</span>
-              <span>{feature}</span>
+              <span className="text-green-500 dark:text-green-400 mr-2">✓</span>
+              <span className="dark:text-dark-text-primary">{feature}</span>
             </div>
           ))}
         </div>
         <button
           className={`w-full py-2 px-4 rounded-md font-medium ${
             isSelected 
-              ? 'bg-blue-600 text-white' 
-              : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+              ? 'bg-blue-600 dark:bg-blue-700 text-white' 
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-dark-text-primary hover:bg-gray-200 dark:hover:bg-gray-600'
           }`}
         >
           {isSelected ? '選択中' : '選択する'}
@@ -365,14 +365,14 @@ const PremiumUpgrade: React.FC = () => {
     if (userGender !== 'female') return null;
     
     return (
-      <div className="bg-green-50 border-l-4 border-green-500 p-6 rounded-lg mb-8">
-        <h2 className="text-xl font-bold text-green-800 mb-2">
+      <div className="bg-green-50 dark:bg-green-900/20 border-l-4 border-green-500 p-6 rounded-lg mb-8">
+        <h2 className="text-xl font-bold text-green-800 dark:text-green-400 mb-2">
           <FontAwesomeIcon icon={faInfoCircle} className="mr-2" />
           女性ユーザー向け特別特典
         </h2>
         {isPhoneVerified ? (
           <div>
-            <p className="text-green-700 mb-2">
+            <p className="text-green-700 dark:text-green-400 mb-2">
               電話番号認証が完了しています。プレミアム機能をすべて無料でご利用いただけます！
             </p>
             <button
@@ -384,7 +384,7 @@ const PremiumUpgrade: React.FC = () => {
           </div>
         ) : (
           <div>
-            <p className="text-green-700 mb-2">
+            <p className="text-green-700 dark:text-green-400 mb-2">
               女性ユーザーは電話番号認証を完了するだけで、すべてのプレミアム機能を無料でご利用いただけます。
             </p>
             <button
@@ -402,131 +402,135 @@ const PremiumUpgrade: React.FC = () => {
   // 決済フォーム表示モードの場合
   if (showPaymentForm) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-6">プレミアム会員のお支払い</h1>
-        
-        <PremiumPaymentForm 
-          selectedPlan={selectedPlan as 'monthly' | 'quarterly' | 'yearly'}
-          onSuccess={handlePaymentSuccess}
-          onCancel={handlePaymentCancel}
-        />
+      <div className="min-h-screen bg-white dark:bg-dark-bg">
+        <div className="max-w-4xl mx-auto px-4 py-8 bg-white dark:bg-dark-surface rounded-lg shadow-sm">
+          <h1 className="text-2xl font-bold mb-6 dark:text-dark-text-primary">プレミアム会員のお支払い</h1>
+          
+          <PremiumPaymentForm 
+            selectedPlan={selectedPlan as 'monthly' | 'quarterly' | 'yearly'}
+            onSuccess={handlePaymentSuccess}
+            onCancel={handlePaymentCancel}
+          />
 
-        <div className="mt-8 bg-blue-50 border-l-4 border-blue-500 p-4 text-blue-800 rounded-r">
-          <p className="text-sm">
-            <strong>お支払い情報は安全に処理されます。</strong> クレジットカード情報はStripeの安全な環境で保管され、当サイトのサーバーには保存されません。
-          </p>
+          <div className="mt-8 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-4 text-blue-800 dark:text-blue-300 rounded-r">
+            <p className="text-sm">
+              <strong>お支払い情報は安全に処理されます。</strong> クレジットカード情報はStripeの安全な環境で保管され、当サイトのサーバーには保存されません。
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <div className="text-center mb-12">
-        <div className="flex justify-center mb-3">
-          <span className="text-4xl text-yellow-500">👑</span>
-        </div>
-        <h1 className="text-3xl font-bold mb-2">MyTubeNaviプレミアム</h1>
-        <p className="text-xl text-gray-600 mb-4">YouTube体験をさらに向上させる特別な機能を解放</p>
-        <div className="max-w-3xl mx-auto">
-          <p className="text-gray-700">
-            プレミアム会員になると、充実したマッチング機能、すべての通知、広告表示の削減などの特典が利用できます。
-            あなたのYouTube視聴体験を最大限にサポートします。
-          </p>
-        </div>
-      </div>
-
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-          {error}
-        </div>
-      )}
-      
-      {/* 女性ユーザー向け特別メッセージ */}
-      {renderFemaleUserMessage()}
-
-      {/* 男性ユーザーまたは性別未設定の場合のみプラン表示 */}
-      {(userGender === 'male' || userGender === null) && (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            {plans.map(renderPlanCard)}
+    <div className="min-h-screen bg-white dark:bg-dark-bg">
+      <div className="max-w-6xl mx-auto px-4 py-8 bg-white dark:bg-dark-surface rounded-lg shadow-sm">
+        <div className="text-center mb-12">
+          <div className="flex justify-center mb-3">
+            <span className="text-4xl text-yellow-500">👑</span>
           </div>
-
-          <div className="bg-gray-50 rounded-lg p-8 mb-12">
-            <h2 className="text-2xl font-bold mb-6">プレミアム会員の特典</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="flex">
-                <div className="flex-shrink-0 mr-4">
-                  <span className="text-2xl text-blue-600">👥</span>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">マッチング機能フル利用</h3>
-                  <p className="text-gray-600">趣味や興味が合うユーザーとつながり、YouTube体験を共有できます。</p>
-                </div>
-              </div>
-              <div className="flex">
-                <div className="flex-shrink-0 mr-4">
-                  <span className="text-2xl text-blue-600">🔔</span>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">すべての通知</h3>
-                  <p className="text-gray-600">重要な更新やお気に入りチャンネルの新着動画をリアルタイムで受け取れます。</p>
-                </div>
-              </div>
-              <div className="flex">
-                <div className="flex-shrink-0 mr-4">
-                  <span className="text-2xl text-blue-600">🔍</span>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">高度な検索機能</h3>
-                  <p className="text-gray-600">詳細な条件で動画を検索し、あなたが求めるコンテンツを素早く見つけられます。</p>
-                </div>
-              </div>
-              <div className="flex">
-                <div className="flex-shrink-0 mr-4">
-                  <span className="text-2xl text-blue-600">⭐</span>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">広告表示の削減</h3>
-                  <p className="text-gray-600">サイト内の広告が減少し、よりクリーンな体験を楽しめます。</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-center">
-            <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-              <button
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={handleUpgrade}
-                disabled={loading}
-              >
-                {loading ? '処理中...' : `Stripeで支払う (¥${plans.find(p => p.id === selectedPlan)?.price.toLocaleString()})`}
-              </button>
-              
-              <button
-                className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-8 rounded-lg shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={handleTempUpgrade}
-                disabled={loading}
-              >
-                {loading ? '処理中...' : `テスト登録 (実際の決済なし)`}
-              </button>
-            </div>
-            
-            <div className="mt-4 bg-yellow-50 border-l-4 border-yellow-500 p-4 text-yellow-800 rounded-r text-left">
-              <p>
-                <strong>開発中の機能：</strong> Stripe決済システムはテスト段階です。実際の決済を行う前に、テスト登録ボタンでプレミアム機能をお試しいただけます。
-              </p>
-            </div>
-            
-            <p className="mt-4 text-gray-600 text-sm">
-              登録することで、<a href="/terms-of-service" className="text-blue-600 hover:underline">利用規約</a>と
-              <a href="/privacy-policy" className="text-blue-600 hover:underline">プライバシーポリシー</a>に同意したものとみなされます。
-              いつでもキャンセル可能です。
+          <h1 className="text-3xl font-bold mb-2 dark:text-dark-text-primary">MyTubeNaviプレミアム</h1>
+          <p className="text-xl text-gray-600 dark:text-dark-text-secondary mb-4">YouTube体験をさらに向上させる特別な機能を解放</p>
+          <div className="max-w-3xl mx-auto">
+            <p className="text-gray-700 dark:text-dark-text-secondary">
+              プレミアム会員になると、充実したマッチング機能、すべての通知、広告表示の削減などの特典が利用できます。
+              あなたのYouTube視聴体験を最大限にサポートします。
             </p>
           </div>
-        </>
-      )}
+        </div>
+
+        {error && (
+          <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-400 px-4 py-3 rounded mb-6">
+            {error}
+          </div>
+        )}
+        
+        {/* 女性ユーザー向け特別メッセージ */}
+        {renderFemaleUserMessage()}
+
+        {/* 男性ユーザーまたは性別未設定の場合のみプラン表示 */}
+        {(userGender === 'male' || userGender === null) && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+              {plans.map(renderPlanCard)}
+            </div>
+
+            <div className="bg-gray-50 dark:bg-dark-surface/50 border dark:border-dark-border rounded-lg p-8 mb-12">
+              <h2 className="text-2xl font-bold mb-6 dark:text-dark-text-primary">プレミアム会員の特典</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="flex">
+                  <div className="flex-shrink-0 mr-4">
+                    <span className="text-2xl text-blue-600 dark:text-blue-400">👥</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2 dark:text-dark-text-primary">マッチング機能フル利用</h3>
+                    <p className="text-gray-600 dark:text-dark-text-secondary">趣味や興味が合うユーザーとつながり、YouTube体験を共有できます。</p>
+                  </div>
+                </div>
+                <div className="flex">
+                  <div className="flex-shrink-0 mr-4">
+                    <span className="text-2xl text-blue-600 dark:text-blue-400">🔔</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2 dark:text-dark-text-primary">すべての通知</h3>
+                    <p className="text-gray-600 dark:text-dark-text-secondary">重要な更新やお気に入りチャンネルの新着動画をリアルタイムで受け取れます。</p>
+                  </div>
+                </div>
+                <div className="flex">
+                  <div className="flex-shrink-0 mr-4">
+                    <span className="text-2xl text-blue-600 dark:text-blue-400">🔍</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2 dark:text-dark-text-primary">高度な検索機能</h3>
+                    <p className="text-gray-600 dark:text-dark-text-secondary">詳細な条件で動画を検索し、あなたが求めるコンテンツを素早く見つけられます。</p>
+                  </div>
+                </div>
+                <div className="flex">
+                  <div className="flex-shrink-0 mr-4">
+                    <span className="text-2xl text-blue-600 dark:text-blue-400">⭐</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2 dark:text-dark-text-primary">広告表示の削減</h3>
+                    <p className="text-gray-600 dark:text-dark-text-secondary">サイト内の広告が減少し、よりクリーンな体験を楽しめます。</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-center">
+              <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+                <button
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleUpgrade}
+                  disabled={loading}
+                >
+                  {loading ? '処理中...' : `Stripeで支払う (¥${plans.find(p => p.id === selectedPlan)?.price.toLocaleString()})`}
+                </button>
+                
+                <button
+                  className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-bold py-3 px-8 rounded-lg shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleTempUpgrade}
+                  disabled={loading}
+                >
+                  {loading ? '処理中...' : `テスト登録 (実際の決済なし)`}
+                </button>
+              </div>
+              
+              <div className="mt-4 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 p-4 text-yellow-800 dark:text-yellow-400 rounded-r text-left">
+                <p>
+                  <strong>開発中の機能：</strong> Stripe決済システムはテスト段階です。実際の決済を行う前に、テスト登録ボタンでプレミアム機能をお試しいただけます。
+                </p>
+              </div>
+              
+              <p className="mt-4 text-gray-600 dark:text-dark-text-secondary text-sm">
+                登録することで、<a href="/terms-of-service" className="text-blue-600 dark:text-blue-400 hover:underline">利用規約</a>と
+                <a href="/privacy-policy" className="text-blue-600 dark:text-blue-400 hover:underline">プライバシーポリシー</a>に同意したものとみなされます。
+                いつでもキャンセル可能です。
+              </p>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };

@@ -1,10 +1,12 @@
-// src/contexts/AuthContext.tsx
-import React, { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
+import { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Session, User } from '@supabase/supabase-js';
+import { Session, User, AuthChangeEvent } from '@supabase/supabase-js';
 import type { Profile } from '@/types';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import verificationService from '@/services/verificationService';
+
+
+
 
 // プレミアム会員のステータス情報を表す型
 interface PremiumStatus {
@@ -222,7 +224,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         // 認証状態変更時のリスナー
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, newSession: Session | null) => {
           console.log('Auth event:', event);
           
           if (newSession) {

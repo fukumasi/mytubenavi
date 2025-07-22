@@ -1,4 +1,3 @@
-// src/hooks/useMediaQuery.ts
 import { useState, useEffect } from 'react';
 
 /**
@@ -11,9 +10,9 @@ function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState<boolean>(false);
 
   useEffect(() => {
-    // ブラウザがmatchMediaをサポートしているかを確認
+    // ブラウザが matchMedia をサポートしているかを確認
     const mediaQueryList = window.matchMedia(query);
-    
+
     // 初期状態を設定
     setMatches(mediaQueryList.matches);
 
@@ -23,15 +22,14 @@ function useMediaQuery(query: string): boolean {
     };
 
     // メディアクエリの変更を監視
-    // 新しいブラウザではaddEventListenerを使用
     if (mediaQueryList.addEventListener) {
       mediaQueryList.addEventListener('change', handleChange);
     } else {
-      // 古いブラウザ（特にIE）向けのフォールバック
+      // 古いブラウザ向けフォールバック
       mediaQueryList.addListener(handleChange);
     }
 
-    // クリーンアップ関数
+    // クリーンアップ
     return () => {
       if (mediaQueryList.removeEventListener) {
         mediaQueryList.removeEventListener('change', handleChange);

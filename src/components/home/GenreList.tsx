@@ -6,13 +6,14 @@ import { Genre } from '@/types';
 import {
   Video, GraduationCap, Code,
   Utensils, Dumbbell, Newspaper, LayoutList,
-  BarChartBig, BookOpenCheck
+  BarChartBig, BookOpenCheck, ChevronRight
 } from 'lucide-react';
 
 interface GenreListProps {
   onGenreClick?: (genre: Genre) => void;
   genres?: Genre[];
   parentGenre?: string;
+  mobileVertical?: boolean; // 縦表示用のプロパティを追加
 }
 
 interface IconRendererProps {
@@ -55,7 +56,7 @@ const getColorForGenre = (genreName: string): string => {
   return colors[genreName] || 'gray';
 };
 
-function GenreList({ onGenreClick, genres: propGenres }: GenreListProps) {
+function GenreList({ onGenreClick, genres: propGenres, mobileVertical = false }: GenreListProps) {
   const [genres, setGenres] = useState<Genre[]>(propGenres || []);
   const [loading, setLoading] = useState(!propGenres);
   const [error, setError] = useState<string | null>(null);
@@ -86,12 +87,12 @@ function GenreList({ onGenreClick, genres: propGenres }: GenreListProps) {
     fetchGenres();
   }, [propGenres]);
 
-  // モバイル表示時に表示するジャンル数を制限
+  // 表示するジャンル数を制限
   const visibleGenres = showAllGenres 
     ? genres.filter(genre => IconRenderer({iconName: genre.name, className: ''}) !== null)
     : genres
         .filter(genre => IconRenderer({iconName: genre.name, className: ''}) !== null)
-        .slice(0, 8); // モバイルでは最初に8つだけ表示
+        .slice(0, mobileVertical ? 15 : 8); // モバイル縦表示では最初に15個まで表示
 
   if (loading) {
     return (
@@ -106,8 +107,61 @@ function GenreList({ onGenreClick, genres: propGenres }: GenreListProps) {
   }
 
   const filteredGenres = genres.filter(genre => IconRenderer({iconName: genre.name, className: ''}) !== null);
-  const hasMoreGenres = filteredGenres.length > 8;
+  const hasMoreGenres = filteredGenres.length > (mobileVertical ? 15 : 8);
 
+  // モバイル用の縦表示レイアウト
+  if (mobileVertical) {
+    return (
+      <div className="space-y-1">
+        <div className="border rounded-lg overflow-hidden bg-white dark:bg-dark-surface dark:border-dark-border">
+          {visibleGenres.map((genre) => (
+            <Link
+              key={genre.id}
+              to={`/genre/${genre.slug}`}
+              onClick={() => onGenreClick && onGenreClick(genre)}
+              className="flex items-center justify-between px-4 py-3 border-b last:border-b-0 hover:bg-gray-50 dark:hover:bg-dark-bg dark:border-dark-border"
+            >
+              <div className="flex items-center">
+                <div
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-white mr-3"
+                  style={{backgroundColor: getColorForGenre(genre.name)}}
+                >
+                  <IconRenderer iconName={genre.name} className="w-4 h-4"/>
+                </div>
+                <span className="text-gray-900 dark:text-dark-text-primary">{genre.name}</span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </Link>
+          ))}
+        </div>
+
+        {/* 「もっと見る」ボタン */}
+        {hasMoreGenres && !showAllGenres && (
+          <div className="flex justify-center mt-3">
+            <button
+              onClick={() => setShowAllGenres(true)}
+              className="text-sm text-indigo-600 hover:text-indigo-800 bg-gray-50 border border-gray-200 rounded-full px-4 py-1.5 dark:bg-dark-surface dark:border-dark-border dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              すべてのジャンルを表示
+            </button>
+          </div>
+        )}
+        
+        {showAllGenres && (
+          <div className="flex justify-center mt-3">
+            <button
+              onClick={() => setShowAllGenres(false)}
+              className="text-sm text-indigo-600 hover:text-indigo-800 bg-gray-50 border border-gray-200 rounded-full px-4 py-1.5 dark:bg-dark-surface dark:border-dark-border dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              表示を減らす
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // 既存のグリッドレイアウト（PC・タブレット用）
   return (
     <div className="space-y-2 sm:space-y-4">
       <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-1 sm:gap-2 overflow-x-auto scrollbar-hide px-1">
@@ -116,7 +170,7 @@ function GenreList({ onGenreClick, genres: propGenres }: GenreListProps) {
             key={genre.id}
             to={`/genre/${genre.slug}`}
             onClick={() => onGenreClick && onGenreClick(genre)}
-            className="flex flex-col items-center gap-1 px-1 sm:px-2 py-1 text-xs sm:text-sm text-center cursor-pointer hover:bg-gray-100 rounded-lg whitespace-nowrap"
+            className="flex flex-col items-center gap-1 px-1 sm:px-2 py-1 text-xs sm:text-sm text-center cursor-pointer hover:bg-gray-100 rounded-lg whitespace-nowrap dark:hover:bg-dark-bg"
           >
             <div
               className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white"
@@ -124,17 +178,17 @@ function GenreList({ onGenreClick, genres: propGenres }: GenreListProps) {
             >
               <IconRenderer iconName={genre.name} className="w-4 h-4 sm:w-6 sm:h-6"/>
             </div>
-            <span className="text-indigo-600 text-xs sm:text-sm line-clamp-1">{genre.name}</span>
+            <span className="text-indigo-600 text-xs sm:text-sm line-clamp-1 dark:text-blue-400">{genre.name}</span>
           </Link>
         ))}
       </div>
 
-      {/* モバイル用の「もっと見る」ボタン */}
+      {/* 「もっと見る」ボタン */}
       {hasMoreGenres && !showAllGenres && (
         <div className="flex justify-center mt-2">
           <button
             onClick={() => setShowAllGenres(true)}
-            className="text-xs sm:text-sm text-indigo-600 hover:text-indigo-800 bg-gray-50 border border-gray-200 rounded-full px-3 py-1"
+            className="text-xs sm:text-sm text-indigo-600 hover:text-indigo-800 bg-gray-50 border border-gray-200 rounded-full px-3 py-1 dark:bg-dark-surface dark:border-dark-border dark:text-blue-400 dark:hover:text-blue-300"
           >
             すべてのジャンルを表示
           </button>
@@ -145,7 +199,7 @@ function GenreList({ onGenreClick, genres: propGenres }: GenreListProps) {
         <div className="flex justify-center mt-2">
           <button
             onClick={() => setShowAllGenres(false)}
-            className="text-xs sm:text-sm text-indigo-600 hover:text-indigo-800 bg-gray-50 border border-gray-200 rounded-full px-3 py-1"
+            className="text-xs sm:text-sm text-indigo-600 hover:text-indigo-800 bg-gray-50 border border-gray-200 rounded-full px-3 py-1 dark:bg-dark-surface dark:border-dark-border dark:text-blue-400 dark:hover:text-blue-300"
           >
             表示を減らす
           </button>

@@ -4,7 +4,6 @@ import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import PremiumBadge from '../profile/PremiumBadge';
-import PremiumFeatures from './PremiumFeatures';
 import MatchingSystem from '@/components/matching/MatchingSystem';
 
 interface PremiumStatus {
@@ -302,40 +301,6 @@ const PremiumDashboard: React.FC = () => {
             <MatchingSystem matchedOnly={true} limit={3} />
           </div>
         )}
-      </div>
-
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-dark-text-primary">プレミアム会員特典</h2>
-          <Link 
-            to="/premium/matching" 
-            className="bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-800 text-white font-medium py-2 px-4 rounded-md transition-colors"
-          >
-            マッチング機能を試す
-          </Link>
-        </div>
-        <PremiumFeatures showUpgradeButton={false} />
-      </div>
-
-      <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-lg">
-        <h2 className="text-xl font-bold mb-3 text-gray-900 dark:text-dark-text-primary">サポートとヘルプ</h2>
-        <p className="text-gray-700 dark:text-dark-text-secondary mb-4">
-          プレミアム会員についてご質問やお困りのことがありましたら、お気軽にサポートチームまでご連絡ください。
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Link 
-            to="/support/premium" 
-            className="bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-dark-text-secondary font-medium py-2 px-4 border border-gray-300 dark:border-dark-border rounded-md transition-colors text-center"
-          >
-            サポートへ問い合わせ
-          </Link>
-          <Link 
-            to="/faq/premium" 
-            className="bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-dark-text-secondary font-medium py-2 px-4 border border-gray-300 dark:border-dark-border rounded-md transition-colors text-center"
-          >
-            よくある質問を確認する
-          </Link>
-        </div>
       </div>
     </div>
   );

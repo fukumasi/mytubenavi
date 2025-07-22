@@ -37,7 +37,6 @@ export type BaseProps = {
     children?: ReactNode;
     className?: string;
 };
-
 export interface Profile {
     id: string;
     username: string;
@@ -52,6 +51,18 @@ export interface Profile {
     subscribers?: number;
     video_count?: number;
     total_views?: number;
+    birth_date?: string | null;
+
+    /** ✅ 追加：ジャンルベースマッチング用の興味ジャンル */
+    interests?: string[];
+}
+
+export interface AggregatedRating {
+  averageRating: number;
+  totalRatings: number;
+  distribution: {
+    [K in RatingValue]: number;
+  };
 }
 
 export interface AggregatedVideoRating {
@@ -62,14 +73,6 @@ export interface AggregatedVideoRating {
   originality: AggregatedRating;
   clarity: AggregatedRating;
   overall: AggregatedRating;
-}
-
-export interface AggregatedRating {
-  averageRating: number;
-  totalRatings: number;
-  distribution: {
-    [K in RatingValue]: number;
-  };
 }
 
 // VideoTypeをvideo.tsからインポートしたものに置き換え
@@ -170,6 +173,7 @@ export interface YouTubePlayerConfig {
         onError?: () => void;
     };
 }
+// 続き
 
 export type Youtuber = {
     channelName: string;
@@ -378,19 +382,13 @@ export class Player {
         }
     ) { }
 
-    playVideo() { }
-    pauseVideo() { }
-    stopVideo() { }
-    destroy() { }
-    getPlayerState(): number {
-        return -1;
-    }
-    getCurrentTime(): number {
-        return 0;
-    }
-    getDuration(): number {
-        return 0;
-    }
+    playVideo() {}
+    pauseVideo() {}
+    stopVideo() {}
+    destroy() {}
+    getPlayerState(): number { return -1; }
+    getCurrentTime(): number { return 0; }
+    getDuration(): number { return 0; }
 }
 
 export interface SupabaseVideoResponse {

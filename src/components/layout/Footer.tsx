@@ -1,162 +1,88 @@
-import { useAuth } from '@/contexts/AuthContext';
-import { useEffect, useState } from 'react';
+// src/components/layout/Footer.tsx
 import { Link } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+
+/** フッターの表示リンクをまとめたデータ */
+const footerSections: {
+  title: string;
+  links: { label: string; to: string }[];
+}[] = [
+  {
+    title: 'サイト情報',
+    links: [
+      { label: 'About', to: '/about' },
+      { label: 'ガイドライン', to: '/guidelines' },
+      { label: 'プライバシー', to: '/privacy' },
+    ],
+  },
+  {
+    title: 'ヘルプ',
+    links: [
+      { label: 'FAQ', to: '/faq' },
+      { label: 'お問い合わせ', to: '/contact' },
+      { label: 'レポート', to: '/report' },
+    ],
+  },
+  {
+    title: 'プレミアム',
+    links: [
+      { label: '機能', to: '/premium/features' },
+      { label: 'アップグレード', to: '/premium/upgrade' },
+      { label: '料金プラン', to: '/plans' },
+    ],
+  },
+  {
+    title: 'SNS',
+    links: [
+      { label: 'Twitter', to: 'https://twitter.com/your_account' },
+      { label: 'Instagram', to: 'https://instagram.com/your_account' },
+      { label: 'YouTube', to: 'https://www.youtube.com/your_channel' },
+    ],
+  },
+];
 
 export default function Footer() {
-  const { user } = useAuth();
-  const [isAdmin, setIsAdmin] = useState(false);
-  
-  useEffect(() => {
-    const checkAdminRole = async () => {
-      if (!user) {
-        setIsAdmin(false);
-        return;
-      }
-      
-      // profilesテーブルからrole情報を取得
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-        
-        if (error) {
-          console.error('管理者権限の確認エラー:', error);
-          setIsAdmin(false);
-          return;
-        }
-        
-        setIsAdmin(data?.role === 'admin');
-      } catch (err) {
-        console.error('管理者権限の確認中にエラーが発生しました:', err);
-        setIsAdmin(false);
-      }
-    };
-    
-    checkAdminRole();
-  }, [user]);
-
   return (
-    <footer className="bg-white dark:bg-dark-bg border-t border-gray-200 dark:border-dark-border mt-12">
-      <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-dark-text-primary tracking-wider uppercase mb-4">
-              サービス
-            </h3>
-            <ul className="space-y-4">
-              <li>
-                <a href="#" className="text-sm text-gray-600 hover:text-gray-900 dark:text-dark-text-secondary dark:hover:text-dark-text-primary">
-                  動画検索
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-sm text-gray-600 hover:text-gray-900 dark:text-dark-text-secondary dark:hover:text-dark-text-primary">
-                  ジャンル一覧
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-sm text-gray-600 hover:text-gray-900 dark:text-dark-text-secondary dark:hover:text-dark-text-primary">
-                  マッチング
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-dark-text-primary tracking-wider uppercase mb-4">
-              サポート
-            </h3>
-            <ul className="space-y-4">
-              <li>
-                <a href="#" className="text-sm text-gray-600 hover:text-gray-900 dark:text-dark-text-secondary dark:hover:text-dark-text-primary">
-                  ヘルプセンター
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-sm text-gray-600 hover:text-gray-900 dark:text-dark-text-secondary dark:hover:text-dark-text-primary">
-                  お問い合わせ
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-sm text-gray-600 hover:text-gray-900 dark:text-dark-text-secondary dark:hover:text-dark-text-primary">
-                  よくある質問
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-dark-text-primary tracking-wider uppercase mb-4">
-              会社情報
-            </h3>
-            <ul className="space-y-4">
-              <li>
-                <a href="#" className="text-sm text-gray-600 hover:text-gray-900 dark:text-dark-text-secondary dark:hover:text-dark-text-primary">
-                  会社概要
-                </a>
-              </li>
-              <li>
-                <a 
-                  href="/privacy-policy.html" 
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-gray-600 hover:text-gray-900 dark:text-dark-text-secondary dark:hover:text-dark-text-primary"
-                >
-                  プライバシーポリシー
-                </a>
-              </li>
-              <li>
-                <a 
-                  href="/terms-of-service.html"
-                  target="_blank"
-                  rel="noopener noreferrer" 
-                  className="text-sm text-gray-600 hover:text-gray-900 dark:text-dark-text-secondary dark:hover:text-dark-text-primary"
-                >
-                  利用規約
-                </a>
-              </li>
-              {isAdmin && (
-                <li>
-                  <Link to="/admin" className="text-sm text-gray-600 hover:text-gray-900 dark:text-dark-text-secondary dark:hover:text-dark-text-primary">
-                    管理者ダッシュボード
-                  </Link>
-                </li>
-              )}
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-dark-text-primary tracking-wider uppercase mb-4">
-              YouTuber向け
-            </h3>
-            <ul className="space-y-4">
-              <li>
-                <a href="#" className="text-sm text-gray-600 hover:text-gray-900 dark:text-dark-text-secondary dark:hover:text-dark-text-primary">
-                  掲載について
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-sm text-gray-600 hover:text-gray-900 dark:text-dark-text-secondary dark:hover:text-dark-text-primary">
-                  広告プラン
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-sm text-gray-600 hover:text-gray-900 dark:text-dark-text-secondary dark:hover:text-dark-text-primary">
-                  ガイドライン
-                </a>
-              </li>
-            </ul>
-          </div>
+    <footer className="bg-gray-100 dark:bg-dark-surface py-10">
+      <div className="container mx-auto px-4">
+        {/* ---- 各セクション ---- */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-8">
+          {footerSections.map((section) => (
+            <div key={section.title}>
+              <h4 className="text-sm font-semibold mb-4 text-gray-700 dark:text-dark-text-primary">
+                {section.title}
+              </h4>
+              <ul className="space-y-2">
+                {section.links.map((item) => (
+                  <li key={item.label}>
+                    {/* 外部リンクは target="_blank" を付ける */}
+                    {item.to.startsWith('http') ? (
+                      <a
+                        href={item.to}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-600 dark:text-dark-text-secondary hover:underline"
+                      >
+                        {item.label}
+                      </a>
+                    ) : (
+                      <Link
+                        to={item.to}
+                        className="text-gray-600 dark:text-dark-text-secondary hover:underline"
+                      >
+                        {item.label}
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
 
-        <div className="mt-8 border-t border-gray-200 dark:border-dark-border pt-8">
-          <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-            &copy; 2024 MyTubeNavi. All rights reserved.
-          </p>
-        </div>
+        {/* ---- コピーライト ---- */}
+        <p className="mt-8 text-center text-xs text-gray-500 dark:text-dark-text-secondary">
+          © {new Date().getFullYear()} MyTubeNavi
+        </p>
       </div>
     </footer>
   );

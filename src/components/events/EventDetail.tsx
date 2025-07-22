@@ -11,7 +11,7 @@ import type { Participant, DatabaseParticipant } from '@/types/events';
 
 export default function EventDetail() {
   const { id } = useParams<{ id: string }>();
-  const { currentUser } = useAuth();
+  const { user } = useAuth();
   const [event, setEvent] = useState<Event | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,7 +78,7 @@ export default function EventDetail() {
       // 修正箇所2を適用
       setIsParticipant(
         formattedParticipants.some((p: Participant) =>
-          p.user_id === currentUser?.id && p.status !== 'cancelled'
+          p.user_id === user?.id && p.status !== 'cancelled'
         )
       );
 
@@ -91,7 +91,7 @@ export default function EventDetail() {
   };
 
   const handleJoinEvent = async () => {
-    if (!currentUser) {
+    if (!user) {
       setError('参加するにはログインが必要です');
       return;
     }
@@ -101,7 +101,7 @@ export default function EventDetail() {
         .from('event_participants')
         .insert([{ 
           event_id: id, 
-          user_id: currentUser.id,
+          user_id: user.id,
           status: 'pending'
         }]);
 
@@ -115,10 +115,10 @@ export default function EventDetail() {
   };
 
   const handleCancelEvent = async () => {
-    if (!currentUser || !event) return;
+    if (!user || !event) return;
 
     try {
-      if (currentUser.id === event.organizerId) {
+      if (user.id === event.organizerId) {
         await supabase
           .from('events')
           .update({ status: 'cancelled' })
@@ -133,7 +133,7 @@ export default function EventDetail() {
           .from('event_participants')
           .update({ status: 'cancelled' })
           .eq('event_id', event.id)
-          .eq('user_id', currentUser.id);
+          .eq('user_id', user.id);
       }
 
       setShowCancelModal(false);
@@ -167,7 +167,7 @@ export default function EventDetail() {
     );
   }
 
-  const isOrganizer = currentUser?.id === event.organizerId;
+  const isOrganizer = user?.id === event.organizerId;
   const participantCount = participants.filter(p => p.status !== 'cancelled').length;
   const isFullyBooked = event.maxParticipants ? participantCount >= event.maxParticipants : false;
 

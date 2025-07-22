@@ -215,7 +215,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
                 <td className="p-2">
                   <div className="flex items-center">
                     {/* サムネイル */}
-                    <div className="w-20 h-12 flex-shrink-0 mr-2">
+                    <div className="w-40 h-24 md:w-80 md:h-48 flex-shrink-0 mr-3">
                       <img
                         src={video.thumbnail || video.thumbnail_url || '/placeholder.jpg'}
                         alt={video.title}

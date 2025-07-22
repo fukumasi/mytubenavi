@@ -1,275 +1,80 @@
-// src/components/ui/MobileMenu.tsx
-import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { X, Home, User, Heart, Star, History, Users, HeartHandshake, ThumbsUp, Clock, MessageCircle, Bell, BellRing, Shield, Settings, Crown, Search, LogIn, UserPlus, Youtube } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Crown, Sparkles, ThumbsUp, Bell, Home, Search, User, Heart, Youtube, LogOut, Users, Moon, Sun } from 'lucide-react';
-import { useTheme } from '@/contexts/ThemeContext'; // テーマコンテキストをインポート
 
 interface MobileMenuProps {
- isOpen: boolean;
- onClose: () => void;
- isPremium?: boolean;
+  isOpen: boolean;
+  onClose: () => void;
+  isPremium: boolean;
 }
 
-const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, isPremium = false }) => {
- const { user, signOut } = useAuth();
- const { theme, toggleTheme } = useTheme(); // テーマコンテキストを使用
- const [menuClasses, setMenuClasses] = useState('translate-x-full');
+export default function MobileMenu({ isOpen, onClose, isPremium }: MobileMenuProps) {
+  const { user } = useAuth();
 
- // マッチングリンク先の決定 - プレミアムユーザーは /premium/matching へ
- const matchingPath = isPremium ? "/premium/matching" : "/matching";
+  if (!isOpen) return null;
 
- // メニューの開閉状態が変わったときにアニメーションクラスを更新
- useEffect(() => {
-   if (isOpen) {
-     setMenuClasses('translate-x-0');
-   } else {
-     setMenuClasses('translate-x-full');
-   }
- }, [isOpen]);
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-end md:items-start md:justify-end bg-black bg-opacity-30"
+      onClick={onClose}
+    >
+      {/* メニュー本体 */}
+      <div
+        className="w-full h-5/6 bg-white dark:bg-dark-surface rounded-t-2xl p-6 overflow-y-auto md:rounded-none md:h-full md:w-80 md:shadow-lg md:border-l md:border-gray-200 dark:md:border-dark-border"
+        onClick={(e) => e.stopPropagation()} // ← 本体クリックで背景閉じない
+      >
+        <div className="flex justify-end mb-4">
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-800 dark:hover:text-white">
+            <X className="h-6 w-6" />
+          </button>
+        </div>
 
- // メニュー項目をクリックしたときの処理
- const handleMenuItemClick = () => {
-   onClose();
- };
+        <nav className="space-y-4">
+          <LinkItem to="/" onClose={onClose} icon={<Home />} label="ホーム" />
 
- // サインアウト処理
- const handleSignOut = async () => {
-   try {
-     await signOut();
-     onClose();
-   } catch (error) {
-     console.error('サインアウトエラー:', error);
-   }
- };
+          {user ? (
+            <>
+              <LinkItem to="/profile" onClose={onClose} icon={<User />} label="プロフィール" />
+              <LinkItem to="/profile/favorites" onClose={onClose} icon={<Heart />} label="お気に入り" />
+              <LinkItem to="/profile/reviews" onClose={onClose} icon={<Star />} label="評価履歴" />
+              <LinkItem to="/profile/history" onClose={onClose} icon={<History />} label="視聴履歴" />
+              <LinkItem to="/profile/matching" onClose={onClose} icon={<Users />} label="おすすめ" />
+              <LinkItem to="/profile/incoming-likes" onClose={onClose} icon={<HeartHandshake />} label="いいねされた" />
+              <LinkItem to="/profile/liked-users" onClose={onClose} icon={<ThumbsUp />} label="いいねした" />
+              <LinkItem to="/profile/match-history" onClose={onClose} icon={<Clock />} label="マッチ履歴" />
+              <LinkItem to="/profile/messages" onClose={onClose} icon={<MessageCircle />} label="メッセージ" />
+              <LinkItem to="/profile/notifications" onClose={onClose} icon={<Bell />} label="通知" />
+              <LinkItem to="/profile/notification-settings" onClose={onClose} icon={<BellRing />} label="通知設定" />
+              <LinkItem to="/profile/verification" onClose={onClose} icon={<Shield />} label="アカウント認証" />
+              <LinkItem to="/profile/settings" onClose={onClose} icon={<Settings />} label="設定" />
+              <LinkItem to="/premium" onClose={onClose} icon={<Crown />} label={isPremium ? 'プレミアム' : 'プレミアム登録'} />
+              <LinkItem to="/premium/advanced-search" onClose={onClose} icon={<Search />} label="動画検索" />
+            </>
+          ) : (
+            <>
+              <LinkItem to="/login" onClose={onClose} icon={<LogIn />} label="ログイン" />
+              <LinkItem to="/signup" onClose={onClose} icon={<UserPlus />} label="新規登録" />
+              <LinkItem to="/youtuber/register" onClose={onClose} icon={<Youtube />} label="YouTuber登録" />
+            </>
+          )}
+        </nav>
+      </div>
+    </div>
+  );
+}
 
- // テーマを切り替える関数
- const handleThemeToggle = () => {
-   toggleTheme();
- };
-
- return (
-   <>
-     {/* オーバーレイ（メニューの背景） */}
-     {isOpen && (
-       <div 
-         className="fixed inset-0 bg-black bg-opacity-50 z-40"
-         onClick={onClose}
-       />
-     )}
-
-     {/* モバイルメニュー */}
-     <div 
-       className={`fixed top-0 right-0 h-full w-72 bg-white dark:bg-dark-surface shadow-lg z-50 transform transition-transform duration-300 ease-in-out ${menuClasses}`}
-     >
-       <div className="flex flex-col h-full">
-         {/* メニューヘッダー */}
-         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-dark-border">
-           <h2 className="text-lg font-semibold text-gray-800 dark:text-dark-text-primary">メニュー</h2>
-           <button 
-             onClick={onClose}
-             className="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white"
-           >
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-             </svg>
-           </button>
-         </div>
-
-         {/* メニュー項目 */}
-         <nav className="flex-1 overflow-y-auto p-4">
-           <ul className="space-y-2">
-             <li>
-               <Link 
-                 to="/"
-                 className="flex items-center px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-dark-border text-gray-800 dark:text-dark-text-primary"
-                 onClick={handleMenuItemClick}
-               >
-                 <Home className="h-5 w-5 mr-3 text-gray-500 dark:text-gray-400" />
-                 ホーム
-               </Link>
-             </li>
-             <li>
-               <Link 
-                 to="/search"
-                 className="flex items-center px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-dark-border text-gray-800 dark:text-dark-text-primary"
-                 onClick={handleMenuItemClick}
-               >
-                 <Search className="h-5 w-5 mr-3 text-gray-500 dark:text-gray-400" />
-                 検索
-               </Link>
-             </li>
-             
-             {/* マッチング機能へのリンク */}
-             <li>
-               <Link 
-                 to={matchingPath}
-                 className="flex items-center px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-dark-border text-gray-800 dark:text-dark-text-primary"
-                 onClick={handleMenuItemClick}
-               >
-                 <Users className="h-5 w-5 mr-3 text-indigo-500 dark:text-indigo-400" />
-                 マッチング
-               </Link>
-             </li>
-             
-             {/* テーマ切り替えボタン */}
-             <li>
-               <button
-                 onClick={handleThemeToggle}
-                 className="flex items-center w-full text-left px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-dark-border text-gray-800 dark:text-dark-text-primary"
-               >
-                 {theme === 'dark' ? (
-                   <>
-                     <Sun className="h-5 w-5 mr-3 text-yellow-500" />
-                     ライトモードに切り替え
-                   </>
-                 ) : (
-                   <>
-                     <Moon className="h-5 w-5 mr-3 text-gray-500" />
-                     ダークモードに切り替え
-                   </>
-                 )}
-               </button>
-             </li>
-             
-             {/* 認証状態に応じた項目の表示 */}
-             {user ? (
-               <>
-                 {/* プレミアム会員メニュー */}
-                 {isPremium ? (
-                   <li>
-                     <Link 
-                       to="/premium"
-                       className="flex items-center px-4 py-2 rounded-md bg-yellow-50 dark:bg-yellow-900/30 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 text-gray-800 dark:text-yellow-100"
-                       onClick={handleMenuItemClick}
-                     >
-                       <Crown className="h-5 w-5 mr-3 text-yellow-500" />
-                       プレミアムダッシュボード
-                     </Link>
-                   </li>
-                 ) : (
-                   <li>
-                     <Link 
-                       to="/premium"
-                       className="flex items-center px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-dark-border text-gray-800 dark:text-dark-text-primary"
-                       onClick={handleMenuItemClick}
-                     >
-                       <Sparkles className="h-5 w-5 mr-3 text-gray-500 dark:text-gray-400" />
-                       プレミアム会員登録
-                     </Link>
-                   </li>
-                 )}
-
-                 <li className="mt-4">
-                   <Link 
-                     to="/profile"
-                     className="flex items-center px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-dark-border text-gray-800 dark:text-dark-text-primary"
-                     onClick={handleMenuItemClick}
-                   >
-                     <User className="h-5 w-5 mr-3 text-gray-500 dark:text-gray-400" />
-                     プロフィール
-                   </Link>
-                 </li>
-                 <li>
-                   <Link 
-                     to="/profile/favorites"
-                     className="flex items-center px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-dark-border text-gray-800 dark:text-dark-text-primary"
-                     onClick={handleMenuItemClick}
-                   >
-                     <Heart className="h-5 w-5 mr-3 text-gray-500 dark:text-gray-400" />
-                     お気に入り
-                   </Link>
-                 </li>
-                 <li>
-                   <Link 
-                     to="/profile/notifications"
-                     className="flex items-center px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-dark-border text-gray-800 dark:text-dark-text-primary"
-                     onClick={handleMenuItemClick}
-                   >
-                     <Bell className="h-5 w-5 mr-3 text-gray-500 dark:text-gray-400" />
-                     通知
-                   </Link>
-                 </li>
-                 <li>
-                   <Link 
-                     to="/profile/ratings"
-                     className="flex items-center px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-dark-border text-gray-800 dark:text-dark-text-primary"
-                     onClick={handleMenuItemClick}
-                   >
-                     <ThumbsUp className="h-5 w-5 mr-3 text-gray-500 dark:text-gray-400" />
-                     評価した動画
-                   </Link>
-                 </li>
-                 
-                 {/* YouTuber向けのリンク */}
-                 <li className="pt-3 mt-3 border-t border-gray-200 dark:border-dark-border">
-                   <Link 
-                     to="/youtuber/dashboard"
-                     className="flex items-center px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-dark-border text-gray-800 dark:text-dark-text-primary"
-                     onClick={handleMenuItemClick}
-                   >
-                     <Youtube className="h-5 w-5 mr-3 text-red-500" />
-                     YouTuberダッシュボード
-                   </Link>
-                 </li>
-                 
-                 <li className="pt-3 mt-3 border-t border-gray-200 dark:border-dark-border">
-                   <button 
-                     onClick={handleSignOut}
-                     className="flex items-center w-full text-left px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-dark-border text-gray-800 dark:text-dark-text-primary"
-                   >
-                     <LogOut className="h-5 w-5 mr-3 text-gray-500 dark:text-gray-400" />
-                     ログアウト
-                   </button>
-                 </li>
-               </>
-             ) : (
-               <>
-                 <li className="pt-3 mt-3 border-t border-gray-200 dark:border-dark-border">
-                   <Link 
-                     to="/login"
-                     className="flex items-center px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-dark-border text-gray-800 dark:text-dark-text-primary"
-                     onClick={handleMenuItemClick}
-                   >
-                     <User className="h-5 w-5 mr-3 text-gray-500 dark:text-gray-400" />
-                     ログイン
-                   </Link>
-                 </li>
-                 <li>
-                   <Link 
-                     to="/signup"
-                     className="flex items-center px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-dark-border text-gray-800 dark:text-dark-text-primary"
-                     onClick={handleMenuItemClick}
-                   >
-                     <Sparkles className="h-5 w-5 mr-3 text-gray-500 dark:text-gray-400" />
-                     新規登録
-                   </Link>
-                 </li>
-                 <li className="pt-3 mt-3 border-t border-gray-200 dark:border-dark-border">
-                   <Link 
-                     to="/youtuber/register"
-                     className="flex items-center px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-dark-border text-red-600 dark:text-red-400"
-                     onClick={handleMenuItemClick}
-                   >
-                     <Youtube className="h-5 w-5 mr-3 text-red-600 dark:text-red-400" />
-                     YouTuber登録
-                   </Link>
-                 </li>
-               </>
-             )}
-           </ul>
-         </nav>
-
-         {/* メニューフッター */}
-         <div className="p-4 border-t border-gray-200 dark:border-dark-border">
-           <div className="text-sm text-gray-500 dark:text-dark-text-secondary">
-             © {new Date().getFullYear()} MyTubeNavi
-           </div>
-         </div>
-       </div>
-     </div>
-   </>
- );
-};
-
-export default MobileMenu;
+// 個別リンクコンポーネント
+function LinkItem({ to, onClose, icon, label }: { to: string, onClose: () => void, icon: React.ReactNode, label: string }) {
+  return (
+    <Link
+      to={to}
+      onClick={onClose}
+      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-border text-gray-700 dark:text-gray-200"
+    >
+      <div className="h-5 w-5">{icon}</div>
+      <span>{label}</span>
+    </Link>
+  );
+}

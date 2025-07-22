@@ -16,10 +16,21 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": ".",
+    "baseUrl": "./src",  // srcをbaseUrlに設定
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"]  // エイリアス設定を修正
     }
   },
-  "include": ["src"]
+  "include": [
+    "src",
+    "legacy/matching/useMatching.ts",
+    "legacy/matching/useMatchingCore.ts",
+    "legacy/matching/matching",
+    "legacy/matching/useMatchingActions.ts",
+    "legacy/matching/useMatchingCandidates.ts",
+    "legacy/matching/useMatchingPoints.ts",
+    "legacy/matching/useMatchingProfile.ts",
+    "legacy/matching/useMatchingRealtime.ts",
+    "legacy/matching/useMatchingSettings.ts"
+  ]
 }
